@@ -1,66 +1,95 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+import Link from "next/link";
 
-export default function Home() {
+export default function LandingPage() {
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className={styles.intro}>
-          <h1>To get started, edit the page.tsx file.</h1>
-          <p>
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <div className="page">
+      <nav className="nav">
+        <strong style={{ fontFamily: "var(--font-display)" }}>Duma Trainer</strong>
+        <div className="nav-links">
+          <Link href="/login">Student login</Link>
+          <Link href="/admin">Teacher admin</Link>
+          <Link href="/progress">Progress</Link>
+        </div>
+      </nav>
+
+      <section className="hero">
+        <div className="container">
+          <span className="pill">AI Speaking Trainer</span>
+          <div className="spacer" />
+          <h1 className="title">Speak boldly. Grow fast.</h1>
+          <p className="subtitle">
+            Short, repeatable speaking sessions for Kenyan students. Record, get
+            instant feedback, and build confidence day by day.
           </p>
+          <div className="spacer" />
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+            <Link className="btn" href="/login">
+              Start practice
+            </Link>
+            <Link className="btn ghost" href="/admin">
+              Teacher setup
+            </Link>
+          </div>
+
+          <div className="spacer" />
+          <div className="grid three">
+            {[
+              {
+                title: "1 task at a time",
+                text: "Clear instructions and a single recording.",
+              },
+              {
+                title: "Actionable feedback",
+                text: "Two strengths, two fixes, one next step.",
+              },
+              {
+                title: "Public speaking focus",
+                text: "Structure, delivery, and confidence grow each week.",
+              },
+            ].map((item) => (
+              <div key={item.title} className="card">
+                <h3 style={{ fontFamily: "var(--font-display)" }}>{item.title}</h3>
+                <p className="subtitle">{item.text}</p>
+              </div>
+            ))}
+          </div>
         </div>
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className={styles.secondary}
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+      </section>
+
+      <section className="container" style={{ paddingBottom: 40 }}>
+        <div className="card">
+          <div className="grid two">
+            <div>
+              <h2 style={{ fontFamily: "var(--font-display)" }}>
+                Daily practice in minutes
+              </h2>
+              <p className="subtitle">
+                Each session is short and friendly. Students repeat until the score
+                improves.
+              </p>
+              <div className="spacer" />
+              <Link className="btn secondary" href="/login">
+                Try a session
+              </Link>
+            </div>
+            <div className="metric">
+              <span className="status">
+                <span className="status-dot" />
+                AI feedback ready in seconds
+              </span>
+              <strong>Focus areas</strong>
+              <p className="subtitle">
+                Pronunciation, fluency, pace, and structure. The system adapts as
+                learners improve.
+              </p>
+            </div>
+          </div>
         </div>
-      </main>
+      </section>
+
+      <footer className="footer">
+        Built for low-friction speaking practice. Powered by Azure Speech and OpenAI.
+      </footer>
     </div>
   );
 }

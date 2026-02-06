@@ -1,0 +1,63 @@
+import { SignJWT, jwtVerify } from "jose";
+import { cookies, headers } from "next/headers";
+
+const SESSION_COOKIE = "session";
+const SESSION_TTL_DAYS = Number(process.env.SESSION_TTL_DAYS || 120);
+
+function getJwtSecret() {
+  const secret = process.env.SESSION_SECRET;
+  if (!secret) {
+    throw new Error("SESSION_SECRET is not set");
+  }
+  return new TextEncoder().encode(secret);
+}
+
+export async function issueStudentToken(payload: {
+  studentId: string;
+  classId: string;
+}) {
+  const now = Math.floor(Date.now() / 1000);
+  const exp = now + SESSION_TTL_DAYS * 24 * 60 * 60;
+
+  return new SignJWT({
+    sub: payload.studentId,
+    classId: payload.classId,
+  })
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt(now)
+    .setExpirationTime(exp)
+    .sign(getJwtSecret());
+}
+
+export async function setSessionCookie(token: string) {
+  const cookieStore = await cookies();
+  cookieStore.set(SESSION_COOKIE, token, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: SESSION_TTL_DAYS * 24 * 60 * 60,
+  });
+}
+
+export async function getStudentFromRequest() {
+  const cookieStore = await cookies();
+  const cookieToken = cookieStore.get(SESSION_COOKIE)?.value;
+  const authHeader = (await headers()).get("authorization");
+  const bearerToken = authHeader?.startsWith("Bearer ")
+    ? authHeader.slice("Bearer ".length)
+    : undefined;
+  const token = bearerToken || cookieToken;
+  if (!token) return null;
+
+  try {
+    const { payload } = await jwtVerify(token, getJwtSecret());
+    if (!payload.sub || typeof payload.classId !== "string") return null;
+    return {
+      studentId: payload.sub,
+      classId: payload.classId,
+    };
+  } catch {
+    return null;
+  }
+}

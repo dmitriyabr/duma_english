@@ -1,0 +1,195 @@
+// Prisma schema for AI Speaking Trainer MVP
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Teacher {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  classes   Class[]
+}
+
+model Class {
+  id        String   @id @default(cuid())
+  name      String
+  teacherId String
+  createdAt DateTime @default(now())
+
+  teacher   Teacher   @relation(fields: [teacherId], references: [id])
+  codes     ClassCode[]
+  students  Student[]
+}
+
+model ClassCode {
+  id        String   @id @default(cuid())
+  classId   String
+  code      String   @unique
+  expiresAt DateTime?
+  maxUses   Int?
+  usesCount Int      @default(0)
+  status    String   @default("active")
+  createdAt DateTime @default(now())
+
+  class     Class    @relation(fields: [classId], references: [id])
+
+  @@index([classId])
+}
+
+model Student {
+  id          String   @id @default(cuid())
+  classId     String
+  displayName String
+  createdAt   DateTime @default(now())
+
+  class      Class              @relation(fields: [classId], references: [id])
+  attempts   Attempt[]
+  progress   ProgressDaily[]
+  metrics    AttemptMetric[]
+  skillDaily StudentSkillDaily[]
+  profile    LearnerProfile?
+  mastery    StudentSkillMastery[]
+  vocabulary StudentVocabulary[]
+
+  @@index([classId])
+}
+
+model Task {
+  id        String   @id @default(cuid())
+  type      String
+  prompt    String
+  level     Int      @default(1)
+  metaJson  Json?
+  createdAt DateTime @default(now())
+
+  attempts Attempt[]
+}
+
+model Attempt {
+  id               String   @id @default(cuid())
+  studentId        String
+  taskId           String
+  status           String   @default("created")
+  audioObjectKey   String?
+  durationSec      Float?
+  transcript       String?
+  speechMetricsJson Json?
+  rawRecognitionJson Json?
+  taskEvaluationJson Json?
+  aiDebugJson       Json?
+  scoresJson       Json?
+  feedbackJson     Json?
+  errorCode        String?
+  errorMessage     String?
+  createdAt        DateTime @default(now())
+  completedAt      DateTime?
+
+  student  Student         @relation(fields: [studentId], references: [id])
+  task     Task            @relation(fields: [taskId], references: [id])
+  metrics  AttemptMetric[]
+
+  @@index([studentId])
+  @@index([status])
+}
+
+model AttemptMetric {
+  id                 String   @id @default(cuid())
+  attemptId          String
+  studentId          String
+  metricKey          String
+  value              Float
+  source             String
+  reliability        String
+  calculationVersion String
+  createdAt          DateTime @default(now())
+
+  attempt Attempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([attemptId])
+  @@index([studentId, metricKey])
+}
+
+model StudentSkillDaily {
+  id          String   @id @default(cuid())
+  studentId   String
+  date        DateTime
+  skillKey    String
+  value       Float
+  sampleCount Int      @default(1)
+  reliability String
+  createdAt   DateTime @default(now())
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, date, skillKey])
+  @@index([studentId, skillKey, date])
+}
+
+model LearnerProfile {
+  id                  String   @id @default(cuid())
+  studentId           String   @unique
+  stage               String   @default("A0")
+  ageBand             String   @default("9-11")
+  placementScore      Float?
+  placementConfidence Float?
+  activeTrack         String   @default("balanced_convo_speech")
+  cycleWeek           Int      @default(1)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+}
+
+model StudentSkillMastery {
+  id             String   @id @default(cuid())
+  studentId      String
+  skillKey       String
+  masteryScore   Float
+  evidenceCount  Int      @default(0)
+  reliability    String
+  lastAssessedAt DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, skillKey])
+  @@index([studentId])
+}
+
+model StudentVocabulary {
+  id                String   @id @default(cuid())
+  studentId         String
+  lemma             String
+  status            String   @default("new")
+  nextReviewAt      DateTime?
+  retentionScore    Float    @default(0)
+  usageEvidenceCount Int     @default(0)
+  sourceTopicId     String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, lemma])
+  @@index([studentId, status, nextReviewAt])
+}
+
+model ProgressDaily {
+  id         String   @id @default(cuid())
+  studentId  String
+  date       DateTime
+  metricsJson Json
+  createdAt  DateTime @default(now())
+
+  student Student @relation(fields: [studentId], references: [id])
+
+  @@unique([studentId, date])
+}

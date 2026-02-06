@@ -6,6 +6,7 @@ import { analyzeSpeechFromBuffer } from "../lib/speech";
 import { calculateDerivedSpeechMetrics, composeScores } from "../lib/scoring";
 import { computeLanguageScoreFromTaskEvaluation, evaluateTaskQuality } from "../lib/evaluator";
 import { recomputeMastery } from "../lib/adaptive";
+import { finishPlacement, getPlacementQuestions, submitPlacementAnswer } from "../lib/placement";
 
 const POLL_INTERVAL_MS = Number(process.env.WORKER_POLL_INTERVAL_MS || 3000);
 const SCORE_VERSION = "score-v3";
@@ -210,6 +211,69 @@ async function aggregateDailySkills(studentId: string, metrics: CanonicalMetric[
   console.log(JSON.stringify({ event: "progress_aggregated", studentId }));
 }
 
+async function updatePlacementFromAttempt(params: {
+  taskMeta: Record<string, unknown>;
+  attemptId: string;
+  transcript: string;
+  scores: {
+    speechScore: number | null;
+    taskScore: number | null;
+    languageScore: number | null;
+    overallScore: number | null;
+    reliability: string;
+  };
+  speechMetrics: ReturnType<typeof calculateDerivedSpeechMetrics>;
+  taskEvaluation: {
+    taskScore: number;
+    artifacts?: Record<string, unknown>;
+  };
+  taskScore: number;
+}) {
+  const placementSessionId =
+    typeof params.taskMeta.placementSessionId === "string"
+      ? params.taskMeta.placementSessionId
+      : null;
+  const placementQuestionId =
+    typeof params.taskMeta.placementQuestionId === "string"
+      ? params.taskMeta.placementQuestionId
+      : null;
+  if (!placementSessionId || !placementQuestionId) return;
+
+  const selfRating =
+    params.taskScore >= 85 ? 5 : params.taskScore >= 70 ? 4 : params.taskScore >= 55 ? 3 : 2;
+  const vocabularyUsage =
+    typeof params.taskEvaluation.artifacts?.wordUsageCorrectness === "number"
+      ? params.taskEvaluation.artifacts.wordUsageCorrectness
+      : null;
+  const session = await submitPlacementAnswer(placementSessionId, {
+    questionId: placementQuestionId,
+    attemptId: params.attemptId,
+    transcript: params.transcript,
+    selfRating,
+    observedMetrics: {
+      speechScore: params.scores.speechScore,
+      taskScore: params.scores.taskScore,
+      languageScore: params.scores.languageScore,
+      overallScore: params.scores.overallScore,
+      reliability: params.scores.reliability,
+      speechRate: params.speechMetrics.speechRate ?? null,
+      pronunciation:
+        params.speechMetrics.pronunciationTargetRef ??
+        params.speechMetrics.pronunciationSelfRef ??
+        params.speechMetrics.pronunciation ??
+        null,
+      fluency: params.speechMetrics.fluency ?? null,
+      vocabularyUsage,
+      taskCompletion: params.taskEvaluation.taskScore,
+    },
+  });
+
+  const total = getPlacementQuestions().length;
+  if (session.currentIndex >= total) {
+    await finishPlacement(placementSessionId);
+  }
+}
+
 async function processAttempt(attemptId: string) {
   const attempt = await prisma.attempt.findUnique({
     where: { id: attemptId },
@@ -260,12 +324,13 @@ async function processAttempt(attemptId: string) {
 
     if (!analysis) throw lastError || new Error("Speech analysis failed");
 
+    const taskMeta = (attempt.task.metaJson || {}) as Record<string, unknown>;
     const evaluated = await evaluateTaskQuality({
       taskType: attempt.task.type,
       taskPrompt: attempt.task.prompt,
       transcript: analysis.transcript,
       speechMetrics: calculateDerivedSpeechMetrics(analysis.metrics),
-      taskMeta: (attempt.task.metaJson || {}) as Record<string, unknown>,
+      taskMeta,
     });
     const derivedMetrics = calculateDerivedSpeechMetrics(analysis.metrics);
     const languageScore = computeLanguageScoreFromTaskEvaluation(evaluated.taskEvaluation);
@@ -332,6 +397,15 @@ async function processAttempt(attemptId: string) {
     }
 
     await updateStudentVocabularyFromAttempt(attempt.studentId, evaluated.taskEvaluation);
+    await updatePlacementFromAttempt({
+      taskMeta,
+      attemptId: attempt.id,
+      transcript: analysis.transcript,
+      scores,
+      speechMetrics: derivedMetrics,
+      taskEvaluation: evaluated.taskEvaluation,
+      taskScore: evaluated.taskEvaluation.taskScore,
+    });
     await aggregateDailySkills(attempt.studentId, canonicalMetrics, attempt.createdAt);
     await recomputeMastery(attempt.studentId);
 

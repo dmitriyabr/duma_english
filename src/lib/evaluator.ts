@@ -544,7 +544,7 @@ function evaluateSpeechBuilder(input: EvaluationInput): { taskEvaluation: TaskEv
       reason:
         presentCount >= Math.max(3, requiredParts.length - 1)
           ? "You included most speech parts."
-          : "Include hook, point, example, and close.",
+          : "Include all 4 parts: start, main idea, example, and ending.",
       weight: 0.7,
     },
     {
@@ -586,8 +586,9 @@ function selectExampleBetterAnswer(
 ) {
   const failedCount = taskEvaluation.rubricChecks.filter((check) => !check.pass).length;
   const hasStrongAnswer = taskEvaluation.taskScore >= 85 && failedCount === 0;
-  if (!candidate || candidate.trim().length < 20) return transcript;
-  if (hasStrongAnswer) return transcript;
+  if (hasStrongAnswer) return "";
+  if (!candidate || candidate.trim().length < 20) return "";
+  if (candidate.trim().toLowerCase() === transcript.trim().toLowerCase()) return "";
   return candidate;
 }
 
@@ -626,7 +627,7 @@ function buildTaskSpecificPrompt(taskType: string) {
     filler_control:
       "Artifacts required: fillerDensityPer100Words, topFillers, selfCorrections.",
     speech_builder:
-      "Artifacts required: hookPresent, pointPresent, examplePresent, closePresent, orderQuality.",
+      "Artifacts required: startPresent, mainIdeaPresent, examplePresent, endingPresent, orderQuality.",
   };
   return rubricMap[taskType] || rubricMap.topic_talk;
 }

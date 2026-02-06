@@ -16,6 +16,7 @@ export async function GET(_: Request, context: AttemptRouteContext) {
 
   const attempt = await prisma.attempt.findFirst({
     where: { id, studentId: student.studentId },
+    include: { task: true },
   });
 
   if (!attempt) {
@@ -165,6 +166,11 @@ export async function GET(_: Request, context: AttemptRouteContext) {
 
   return NextResponse.json({
     status: attempt.status,
+    flow: {
+      isPlacement: Boolean((attempt.task.metaJson as { isPlacement?: boolean } | null)?.isPlacement),
+      placementSessionId:
+        ((attempt.task.metaJson as { placementSessionId?: string } | null)?.placementSessionId) || null,
+    },
     error:
       attempt.status === "failed"
         ? {

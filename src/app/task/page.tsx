@@ -21,7 +21,7 @@ type TaskResponse = {
 function taskGuide(type: string) {
   if (type !== "speech_builder") return null;
   return {
-    title: "How to do this task",
+    title: "How to do this in 4 steps",
     steps: [
       "Sentence 1: Say what your topic is.",
       "Sentence 2: Say your main idea.",
@@ -37,6 +37,7 @@ export default function TaskPage() {
   const router = useRouter();
   const [task, setTask] = useState<TaskResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [placementNeeded, setPlacementNeeded] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -55,6 +56,13 @@ export default function TaskPage() {
       .catch(() => {
         if (active) setError("Unable to load a task. Please login again.");
       });
+    fetch("/api/progress")
+      .then((res) => (res.ok ? res.json() : Promise.reject(res)))
+      .then((json) => {
+        if (!active) return;
+        setPlacementNeeded(Boolean(json?.placementNeeded));
+      })
+      .catch(() => undefined);
     return () => {
       active = false;
     };
@@ -81,6 +89,19 @@ export default function TaskPage() {
           )}
           {task ? (
             <>
+              {placementNeeded && (
+                <>
+                  <div className="metric" style={{ marginBottom: 12 }}>
+                    <span>Placement recommended</span>
+                    <p className="subtitle">
+                      Complete placement first for better level matching.
+                    </p>
+                    <Link className="btn ghost" href="/placement">
+                      Go to placement
+                    </Link>
+                  </div>
+                </>
+              )}
               <p className="subtitle">{task.prompt}</p>
               <div className="spacer" />
               <div className="status">

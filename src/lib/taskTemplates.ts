@@ -92,7 +92,7 @@ export const TASK_TEMPLATES: TaskTemplate[] = [
     level: 1,
     assessmentMode: "stt",
     prompt:
-      "Speak 4 short sentences: 1) what your topic is, 2) your main idea, 3) one example, 4) a clear ending.",
+      "Speak in 4 short steps: 1) say your topic, 2) say your main idea, 3) give one example, 4) finish clearly.",
     constraints: { minSeconds: 25, maxSeconds: 90 },
     maxDurationSec: 60,
     meta: {
@@ -135,7 +135,7 @@ export function buildTaskTemplate(type: string, options: TaskTemplateBuildOption
 
   if (base.type === "speech_builder") {
     next.prompt =
-      "Speak 4 short sentences: 1) topic, 2) your idea, 3) one example, 4) clear ending.";
+      "Speak in 4 short steps: 1) topic, 2) your idea, 3) one example, 4) clear ending.";
   }
 
   return next;

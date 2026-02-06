@@ -56,6 +56,7 @@ model Student {
   profile    LearnerProfile?
   mastery    StudentSkillMastery[]
   vocabulary StudentVocabulary[]
+  placementSessions PlacementSession[]
 
   @@index([classId])
 }
@@ -180,6 +181,22 @@ model StudentVocabulary {
 
   @@unique([studentId, lemma])
   @@index([studentId, status, nextReviewAt])
+}
+
+model PlacementSession {
+  id           String   @id @default(cuid())
+  studentId    String
+  status       String   @default("started")
+  currentIndex Int      @default(0)
+  responsesJson Json?
+  resultJson   Json?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  completedAt  DateTime?
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([studentId, status])
 }
 
 model ProgressDaily {

@@ -28,6 +28,10 @@ type MetricCard = {
 
 type AttemptResult = {
   status: string;
+  flow?: {
+    isPlacement?: boolean;
+    placementSessionId?: string | null;
+  };
   error: {
     code?: string | null;
     message?: string | null;
@@ -61,6 +65,31 @@ function titleizeMetricKey(key: string) {
   return key
     .replace(/([A-Z])/g, " $1")
     .replace(/^./, (c) => c.toUpperCase());
+}
+
+const ARTIFACT_LABELS: Record<string, string> = {
+  hookPresent: "Strong start",
+  pointPresent: "Main idea is clear",
+  examplePresent: "Has an example",
+  closePresent: "Clear ending",
+  orderQuality: "Structure order",
+  requiredWordsUsed: "Target words used",
+  missingWords: "Missing target words",
+  wordUsageCorrectness: "Word usage correctness",
+  referenceCoverage: "Reference coverage",
+  requiredActsCompleted: "Role-play actions done",
+  supportingDetailCount: "Supporting details",
+  coherenceSignals: "Linking words used",
+  fillerDensityPer100Words: "Fillers per 100 words",
+  topFillers: "Most common fillers",
+  selfCorrections: "Self-corrections",
+  questionAnswered: "Question answered",
+  directAnswerFirst: "Direct answer first",
+  supportingReasons: "Supporting reasons",
+};
+
+function displayArtifactLabel(key: string) {
+  return ARTIFACT_LABELS[key] || titleizeMetricKey(key);
 }
 
 function renderArtifactValue(value: unknown) {
@@ -122,6 +151,8 @@ export default function ResultsPage() {
   });
   const checks = (taskEvaluation?.rubricChecks || []).filter((check) => !!check.name && check.reason);
   const transcript = data?.results?.transcript;
+  const isPlacementFlow = Boolean(data?.flow?.isPlacement);
+  const placementSessionId = data?.flow?.placementSessionId;
 
   return (
     <div className="page">
@@ -215,7 +246,7 @@ export default function ResultsPage() {
                     <ul style={{ paddingLeft: 16 }}>
                       {artifactEntries.map(([key, value]) => (
                         <li key={key}>
-                          {titleizeMetricKey(key)}: {renderArtifactValue(value)}
+                          {displayArtifactLabel(key)}: {renderArtifactValue(value)}
                         </li>
                       ))}
                     </ul>
@@ -280,6 +311,11 @@ export default function ResultsPage() {
               )}
 
               <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+                {isPlacementFlow && placementSessionId && (
+                  <Link className="btn ghost" href={`/placement?session=${placementSessionId}`}>
+                    Back to placement
+                  </Link>
+                )}
                 <Link className="btn" href="/task">
                   Next task
                 </Link>

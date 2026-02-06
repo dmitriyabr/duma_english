@@ -101,10 +101,16 @@ export async function getStudentProgress(studentId: string) {
     .filter((skill) => skill.current !== null)
     .sort((a, b) => (a.current ?? 0) - (b.current ?? 0))[0]?.skillKey || null;
 
+  const placementNeeded =
+    !profile?.placementScore ||
+    typeof profile.placementConfidence !== "number" ||
+    profile.placementConfidence < 0.6;
+
   return {
     stage: profile?.stage || "A0",
     ageBand: profile?.ageBand || "9-11",
     cycleWeek: profile?.cycleWeek || 1,
+    placementNeeded,
     recentAttempts,
     streak,
     skills,

@@ -1,0 +1,2 @@
+DROP TABLE IF EXISTS "StudentSkillDaily" CASCADE;
+DROP TABLE IF EXISTS "StudentSkillMastery" CASCADE;

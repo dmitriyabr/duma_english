@@ -9,12 +9,34 @@ export type RubricCheck = {
   weight: number;
 };
 
+export type LoCheck = {
+  checkId: string;
+  label: string;
+  pass: boolean;
+  confidence: number;
+  severity: "low" | "medium" | "high";
+  evidenceSpan?: string;
+};
+
+export type GrammarCheck = {
+  checkId: string;
+  label: string;
+  pass: boolean;
+  confidence: number;
+  opportunityType: "explicit_target" | "elicited_incidental" | "incidental";
+  errorType?: string;
+  evidenceSpan?: string;
+  correction?: string;
+};
+
 export type TaskEvaluation = {
   taskType: string;
   taskScore: number;
   languageScore?: number;
   artifacts: Record<string, unknown>;
   rubricChecks: RubricCheck[];
+  loChecks: LoCheck[];
+  grammarChecks: GrammarCheck[];
   evidence: string[];
   modelVersion: string;
 };
@@ -86,6 +108,32 @@ const outputSchema = z.object({
         weight: z.number().min(0).max(1),
       })
     ),
+    loChecks: z
+      .array(
+        z.object({
+          checkId: z.string(),
+          label: z.string(),
+          pass: z.boolean(),
+          confidence: z.number().min(0).max(1),
+          severity: z.enum(["low", "medium", "high"]),
+          evidenceSpan: z.string().optional(),
+        })
+      )
+      .optional(),
+    grammarChecks: z
+      .array(
+        z.object({
+          checkId: z.string(),
+          label: z.string(),
+          pass: z.boolean(),
+          confidence: z.number().min(0).max(1),
+          opportunityType: z.enum(["explicit_target", "elicited_incidental", "incidental"]),
+          errorType: z.string().optional(),
+          evidenceSpan: z.string().optional(),
+          correction: z.string().optional(),
+        })
+      )
+      .optional(),
     evidence: z.array(z.string()).max(6),
     modelVersion: z.string(),
   }),
@@ -118,6 +166,21 @@ function toBoolean(value: unknown) {
     if (v === "false" || v === "no" || v === "fail") return false;
   }
   return false;
+}
+
+function toConfidence(value: unknown, fallback = 0.72) {
+  const n = toNumber(value);
+  if (n === null) return fallback;
+  if (n > 1) return Math.max(0, Math.min(1, n / 100));
+  return Math.max(0, Math.min(1, n));
+}
+
+function slugify(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 64);
 }
 
 function toStringArray(value: unknown, fallback: string[] = []) {
@@ -159,6 +222,42 @@ function normalizeModelPayload(payload: unknown, input: EvaluationInput) {
             };
           })
         : [],
+      loChecks: Array.isArray(taskEvaluationRaw.loChecks)
+        ? taskEvaluationRaw.loChecks.map((item) => {
+            const rowItem = (item || {}) as Record<string, unknown>;
+            return {
+              checkId: String(rowItem.checkId || slugify(String(rowItem.label || rowItem.name || "lo_check"))),
+              label: String(rowItem.label || rowItem.name || "LO check"),
+              pass: toBoolean(rowItem.pass),
+              confidence: toConfidence(rowItem.confidence, 0.75),
+              severity:
+                rowItem.severity === "high" || rowItem.severity === "medium" || rowItem.severity === "low"
+                  ? rowItem.severity
+                  : "medium",
+              evidenceSpan: rowItem.evidenceSpan ? String(rowItem.evidenceSpan) : undefined,
+            };
+          })
+        : [],
+      grammarChecks: Array.isArray(taskEvaluationRaw.grammarChecks)
+        ? taskEvaluationRaw.grammarChecks.map((item) => {
+            const rowItem = (item || {}) as Record<string, unknown>;
+            return {
+              checkId: String(rowItem.checkId || slugify(String(rowItem.label || "grammar_check"))),
+              label: String(rowItem.label || "Grammar check"),
+              pass: toBoolean(rowItem.pass),
+              confidence: toConfidence(rowItem.confidence, 0.72),
+              opportunityType:
+                rowItem.opportunityType === "explicit_target" ||
+                rowItem.opportunityType === "elicited_incidental" ||
+                rowItem.opportunityType === "incidental"
+                  ? rowItem.opportunityType
+                  : "incidental",
+              errorType: rowItem.errorType ? String(rowItem.errorType) : undefined,
+              evidenceSpan: rowItem.evidenceSpan ? String(rowItem.evidenceSpan) : undefined,
+              correction: rowItem.correction ? String(rowItem.correction) : undefined,
+            };
+          })
+        : [],
       evidence: toStringArray(taskEvaluationRaw.evidence, [input.transcript.slice(0, 180)]).slice(0, 6),
       modelVersion: String(taskEvaluationRaw.modelVersion || `${MODEL_VERSION}+openai`),
     },
@@ -182,6 +281,174 @@ function normalizeModelPayload(payload: unknown, input: EvaluationInput) {
     ];
   }
   return normalized;
+}
+
+function deriveLoChecks(taskEvaluation: TaskEvaluation, transcript: string): LoCheck[] {
+  const fromModel = Array.isArray(taskEvaluation.loChecks) ? taskEvaluation.loChecks : [];
+  if (fromModel.length > 0) return fromModel.slice(0, 8);
+
+  const fallback: LoCheck[] = taskEvaluation.rubricChecks.map((check, index) => ({
+    checkId: slugify(check.name || `lo_check_${index + 1}`),
+    label: check.name || `LO check ${index + 1}`,
+    pass: Boolean(check.pass),
+    confidence: Math.max(0.55, Math.min(0.95, 0.55 + check.weight * 0.4)),
+    severity: (check.pass ? "low" : check.weight >= 0.4 ? "high" : "medium") as LoCheck["severity"],
+    evidenceSpan: transcript.slice(0, 160),
+  }));
+
+  // Enforce consistency rule: low score with explicit opportunity must include negative LO signal.
+  if (taskEvaluation.taskScore <= 45 && !fallback.some((item) => !item.pass)) {
+    fallback.push({
+      checkId: "lo_check_negative_required",
+      label: "Core task objective not met",
+      pass: false,
+      confidence: 0.9,
+      severity: "high",
+      evidenceSpan: transcript.slice(0, 160),
+    });
+  }
+  return fallback.slice(0, 8);
+}
+
+function deriveGrammarChecks(taskEvaluation: TaskEvaluation, transcript: string): GrammarCheck[] {
+  const fromModel = Array.isArray(taskEvaluation.grammarChecks) ? taskEvaluation.grammarChecks : [];
+  if (fromModel.length > 0) return fromModel.slice(0, 10);
+
+  const artifacts = taskEvaluation.artifacts || {};
+  const checks: GrammarCheck[] = [];
+  const grammarAccuracy =
+    typeof artifacts.grammarAccuracy === "number" ? Math.max(0, Math.min(100, artifacts.grammarAccuracy)) : null;
+  if (grammarAccuracy !== null) {
+    checks.push({
+      checkId: "grammar_accuracy",
+      label: "Grammar accuracy",
+      pass: grammarAccuracy >= 68,
+      confidence: 0.82,
+      opportunityType: "elicited_incidental",
+      errorType: grammarAccuracy >= 68 ? undefined : "mixed",
+      evidenceSpan: transcript.slice(0, 160),
+    });
+  }
+
+  const topErrors = Array.isArray(artifacts.topErrors)
+    ? (artifacts.topErrors as Array<Record<string, unknown>>)
+    : [];
+  for (const row of topErrors.slice(0, 3)) {
+    checks.push({
+      checkId: slugify(`grammar_error_${String(row.error || "issue")}`),
+      label: String(row.error || "Grammar issue"),
+      pass: false,
+      confidence: 0.85,
+      opportunityType: "incidental",
+      errorType: String(row.error || "mixed"),
+      evidenceSpan: row.explanation ? String(row.explanation).slice(0, 160) : transcript.slice(0, 160),
+      correction: row.correction ? String(row.correction) : undefined,
+    });
+  }
+
+  const text = transcript.toLowerCase();
+  const pushCheck = (candidate: GrammarCheck) => {
+    if (checks.some((row) => row.checkId === candidate.checkId)) return;
+    checks.push(candidate);
+  };
+
+  const hasPresentPerfect = /\b(i|you|we|they|he|she|it)\s+(have|has)\s+\w+(ed|en)\b/.test(text);
+  if (hasPresentPerfect) {
+    pushCheck({
+      checkId: "grammar_present_perfect_usage",
+      label: "Present perfect used correctly",
+      pass: true,
+      confidence: 0.8,
+      opportunityType: "incidental",
+      evidenceSpan: transcript.slice(0, 160),
+    });
+  }
+
+  const hasPastNarration = /\b(yesterday|last|ago|when i was)\b/.test(text) && /\b(was|were|did|went|had)\b/.test(text);
+  if (hasPastNarration) {
+    pushCheck({
+      checkId: "grammar_past_narration_usage",
+      label: "Past narration structure",
+      pass: true,
+      confidence: 0.76,
+      opportunityType: "incidental",
+      evidenceSpan: transcript.slice(0, 160),
+    });
+  }
+
+  const hasConditional = /\bif\b[\s\S]{0,40}\b(would|will|could|might)\b/.test(text);
+  if (hasConditional) {
+    pushCheck({
+      checkId: "grammar_conditional_usage",
+      label: "Conditional pattern used",
+      pass: true,
+      confidence: 0.78,
+      opportunityType: "incidental",
+      evidenceSpan: transcript.slice(0, 160),
+    });
+  }
+
+  if (/\b(i|you|we|they)\s+was\b/.test(text)) {
+    pushCheck({
+      checkId: "grammar_subj_verb_agreement_plural_was",
+      label: "Subject-verb agreement",
+      pass: false,
+      confidence: 0.87,
+      opportunityType: "incidental",
+      errorType: "subject_verb_agreement",
+      evidenceSpan: transcript.slice(0, 160),
+      correction: "Use 'were' with I/you/we/they in past context where needed.",
+    });
+  }
+
+  if (/\b(he|she|it)\s+were\b/.test(text)) {
+    pushCheck({
+      checkId: "grammar_subj_verb_agreement_singular_were",
+      label: "Subject-verb agreement",
+      pass: false,
+      confidence: 0.87,
+      opportunityType: "incidental",
+      errorType: "subject_verb_agreement",
+      evidenceSpan: transcript.slice(0, 160),
+      correction: "Use 'was' with he/she/it in past context.",
+    });
+  }
+
+  if (/\b[a-z]{3,}s\s+has\b/.test(text)) {
+    pushCheck({
+      checkId: "grammar_plural_subject_has",
+      label: "Plural subject with singular auxiliary",
+      pass: false,
+      confidence: 0.82,
+      opportunityType: "incidental",
+      errorType: "subject_verb_agreement",
+      evidenceSpan: transcript.slice(0, 160),
+      correction: "Use 'have' with plural nouns.",
+    });
+  }
+
+  if (checks.length === 0) {
+    const hasComplexForm =
+      /\b(was|were|had|did|have|has|will|would|could|should|might|if|because|although|while)\b/.test(text);
+    pushCheck({
+      checkId: "grammar_incidental_usage",
+      label: hasComplexForm ? "Grammar used in context" : "Basic sentence grammar",
+      pass: hasComplexForm ? true : transcript.trim().length > 20,
+      confidence: hasComplexForm ? 0.72 : 0.6,
+      opportunityType: "incidental",
+      evidenceSpan: transcript.slice(0, 160),
+    });
+  }
+
+  return checks.slice(0, 10);
+}
+
+function attachStructuredChecks(taskEvaluation: TaskEvaluation, transcript: string): TaskEvaluation {
+  return {
+    ...taskEvaluation,
+    loChecks: deriveLoChecks(taskEvaluation, transcript),
+    grammarChecks: deriveGrammarChecks(taskEvaluation, transcript),
+  };
 }
 
 function normalizeWords(input: string) {
@@ -333,6 +600,8 @@ function evaluateReadAloud(input: EvaluationInput): { taskEvaluation: TaskEvalua
       mispronouncedHotspots: omittedWords.slice(0, 5),
     },
     rubricChecks: checks,
+    loChecks: [],
+    grammarChecks: [],
     evidence: [input.transcript.slice(0, 200)],
     modelVersion: MODEL_VERSION,
   };
@@ -386,6 +655,8 @@ function evaluateTargetVocab(input: EvaluationInput): { taskEvaluation: TaskEval
       missingWords,
     },
     rubricChecks: checks,
+    loChecks: [],
+    grammarChecks: [],
     evidence: [input.transcript.slice(0, 220)],
     modelVersion: MODEL_VERSION,
   };
@@ -444,6 +715,8 @@ function evaluateRolePlay(input: EvaluationInput): { taskEvaluation: TaskEvaluat
       politenessMarkers: Array.from(text.match(/\b(please|thank you|welcome|nice)\b/g) || []),
     },
     rubricChecks: checks,
+    loChecks: [],
+    grammarChecks: [],
     evidence: [input.transcript.slice(0, 220)],
     modelVersion: MODEL_VERSION,
   };
@@ -496,6 +769,8 @@ function evaluateQAPrompt(input: EvaluationInput): { taskEvaluation: TaskEvaluat
       irrelevantSegments,
     },
     rubricChecks: checks,
+    loChecks: [],
+    grammarChecks: [],
     evidence: [firstSentence, sentences[1] || ""].filter(Boolean),
     modelVersion: MODEL_VERSION,
   };
@@ -547,6 +822,8 @@ function evaluateTopicTalk(input: EvaluationInput): { taskEvaluation: TaskEvalua
       coherenceSignals,
     },
     rubricChecks: checks,
+    loChecks: [],
+    grammarChecks: [],
     evidence: [input.transcript.slice(0, 220)],
     modelVersion: MODEL_VERSION,
   };
@@ -606,6 +883,8 @@ function evaluateFillerControl(input: EvaluationInput): { taskEvaluation: TaskEv
       selfCorrections,
     },
     rubricChecks: checks,
+    loChecks: [],
+    grammarChecks: [],
     evidence: [input.transcript.slice(0, 220)],
     modelVersion: MODEL_VERSION,
   };
@@ -667,6 +946,8 @@ function evaluateSpeechBuilder(input: EvaluationInput): { taskEvaluation: TaskEv
       orderQuality,
     },
     rubricChecks: checks,
+    loChecks: [],
+    grammarChecks: [],
     evidence: sentences.slice(0, 4),
     modelVersion: MODEL_VERSION,
   };
@@ -750,6 +1031,25 @@ function buildTaskTypeJsonExample(taskType: string) {
           { name: "pronunciation_accuracy", pass: false, reason: "One key word was unclear.", weight: 0.35 },
           { name: "reading_fluency", pass: true, reason: "Pace was mostly smooth.", weight: 0.25 },
         ],
+        loChecks: [
+          {
+            checkId: "reading_accuracy",
+            label: "Reading accuracy",
+            pass: false,
+            confidence: 0.82,
+            severity: "medium",
+            evidenceSpan: "One key word was unclear.",
+          },
+        ],
+        grammarChecks: [
+          {
+            checkId: "grammar_incidental_usage",
+            label: "Grammar in context",
+            pass: true,
+            confidence: 0.66,
+            opportunityType: "incidental",
+          },
+        ],
         evidence: ["I like going to school because I learn new things."],
         modelVersion: "eval-v2+openai",
       },
@@ -778,6 +1078,24 @@ function buildTaskTypeJsonExample(taskType: string) {
           { name: "required_words_usage", pass: false, reason: "One required word is missing.", weight: 0.6 },
           { name: "context_fit", pass: true, reason: "Used words fit the topic.", weight: 0.4 },
         ],
+        loChecks: [
+          {
+            checkId: "required_words_usage",
+            label: "Required words usage",
+            pass: false,
+            confidence: 0.88,
+            severity: "high",
+          },
+        ],
+        grammarChecks: [
+          {
+            checkId: "grammar_incidental_usage",
+            label: "Grammar in context",
+            pass: true,
+            confidence: 0.64,
+            opportunityType: "incidental",
+          },
+        ],
         evidence: ["I feel happy when I learn with my friend."],
         modelVersion: "eval-v2+openai",
       },
@@ -805,6 +1123,24 @@ function buildTaskTypeJsonExample(taskType: string) {
         { name: "task_alignment", pass: true, reason: "Main point is relevant.", weight: 0.5 },
         { name: "supporting_detail", pass: false, reason: "Needs one more concrete detail.", weight: 0.3 },
         { name: "clarity", pass: true, reason: "Message is understandable.", weight: 0.2 },
+      ],
+      loChecks: [
+        {
+          checkId: "task_alignment",
+          label: "Task alignment",
+          pass: true,
+          confidence: 0.78,
+          severity: "low",
+        },
+      ],
+      grammarChecks: [
+        {
+          checkId: "grammar_incidental_usage",
+          label: "Grammar in context",
+          pass: true,
+          confidence: 0.62,
+          opportunityType: "incidental",
+        },
       ],
       evidence: ["I like school because I learn new things."],
       modelVersion: "eval-v2+openai",
@@ -958,6 +1294,43 @@ async function evaluateWithOpenAI(input: EvaluationInput) {
                         required: ["name", "pass", "reason", "weight"],
                       },
                     },
+                    loChecks: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        additionalProperties: false,
+                        properties: {
+                          checkId: { type: "string" },
+                          label: { type: "string" },
+                          pass: { type: ["boolean", "string"] },
+                          confidence: { type: ["number", "string"] },
+                          severity: { type: "string", enum: ["low", "medium", "high"] },
+                          evidenceSpan: { type: "string" },
+                        },
+                        required: ["checkId", "label", "pass", "confidence", "severity"],
+                      },
+                    },
+                    grammarChecks: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        additionalProperties: false,
+                        properties: {
+                          checkId: { type: "string" },
+                          label: { type: "string" },
+                          pass: { type: ["boolean", "string"] },
+                          confidence: { type: ["number", "string"] },
+                          opportunityType: {
+                            type: "string",
+                            enum: ["explicit_target", "elicited_incidental", "incidental"],
+                          },
+                          errorType: { type: "string" },
+                          evidenceSpan: { type: "string" },
+                          correction: { type: "string" },
+                        },
+                        required: ["checkId", "label", "pass", "confidence", "opportunityType"],
+                      },
+                    },
                     evidence: { type: "array", items: { type: "string" } },
                     modelVersion: { type: "string" },
                   },
@@ -1072,10 +1445,13 @@ export async function evaluateTaskQuality(input: EvaluationInput) {
   const promptPreview = `${input.taskType} :: ${input.taskPrompt.slice(0, 160)}`;
   const fromModel = await evaluateWithOpenAI(input);
   if (fromModel.parsed) {
-    const modelTaskEvaluation = {
+    const baseTaskEvaluation: TaskEvaluation = {
       ...fromModel.parsed.taskEvaluation,
       modelVersion: `${MODEL_VERSION}+openai`,
+      loChecks: fromModel.parsed.taskEvaluation.loChecks || [],
+      grammarChecks: fromModel.parsed.taskEvaluation.grammarChecks || [],
     };
+    const modelTaskEvaluation = attachStructuredChecks(baseTaskEvaluation, input.transcript);
     const normalizedFeedback = {
       ...fromModel.parsed.feedback,
       exampleBetterAnswer: selectExampleBetterAnswer(
@@ -1096,9 +1472,13 @@ export async function evaluateTaskQuality(input: EvaluationInput) {
   }
 
   const fallback = evaluateDeterministic(input);
+  const normalizedFallback = {
+    taskEvaluation: attachStructuredChecks(fallback.taskEvaluation, input.transcript),
+    feedback: fallback.feedback,
+  };
   console.log(JSON.stringify({ event: "fallback_used", taskType: input.taskType, reason: fromModel.debug.openai.reason }));
   return {
-    ...fallback,
+    ...normalizedFallback,
     source: "rules" as const,
     debug: {
       ...fromModel.debug,

@@ -3,14 +3,22 @@ import { prisma } from "@/lib/db";
 import { computeDecayedMastery } from "./mastery";
 import { mapStageToGseRange } from "./utils";
 
-function skillHintsForTaskType(taskType: string) {
-  if (taskType === "read_aloud") return ["speaking", "grammar"];
-  if (taskType === "target_vocab") return ["vocabulary", "speaking"];
-  if (taskType === "filler_control") return ["speaking"];
-  if (taskType === "qa_prompt") return ["speaking", "writing"];
-  if (taskType === "role_play") return ["speaking", "listening"];
-  if (taskType === "speech_builder") return ["speaking"];
-  return ["speaking", "vocabulary"];
+type DomainKey = "vocab" | "grammar" | "lo";
+
+function nodeDomain(nodeType: string) {
+  if (nodeType === "GSE_VOCAB") return "vocab" as const;
+  if (nodeType === "GSE_GRAMMAR") return "grammar" as const;
+  return "lo" as const;
+}
+
+function taskDomainWeights(taskType: string): Record<DomainKey, number> {
+  if (taskType === "target_vocab") return { vocab: 1, grammar: 0.45, lo: 0.4 };
+  if (taskType === "read_aloud") return { vocab: 0.15, grammar: 0.35, lo: 1 };
+  if (taskType === "qa_prompt") return { vocab: 0.5, grammar: 0.8, lo: 0.85 };
+  if (taskType === "role_play") return { vocab: 0.5, grammar: 0.75, lo: 0.9 };
+  if (taskType === "speech_builder") return { vocab: 0.5, grammar: 0.85, lo: 1 };
+  if (taskType === "filler_control") return { vocab: 0.25, grammar: 0.5, lo: 0.8 };
+  return { vocab: 0.45, grammar: 0.7, lo: 0.9 };
 }
 
 function stageDifficulty(stage: string) {
@@ -46,6 +54,40 @@ function buildPrimaryGoal(params: { overdueCount: number; weakCount: number; unc
   return "maintain_progress";
 }
 
+function nextDomainToProbe(recentTaskTypes: string[]) {
+  const lastThree = recentTaskTypes.slice(0, 3);
+  const counts: Record<DomainKey, number> = { vocab: 0, grammar: 0, lo: 0 };
+  for (const taskType of lastThree) {
+    const w = taskDomainWeights(taskType);
+    (Object.keys(counts) as DomainKey[]).forEach((key) => {
+      if (w[key] >= 0.75) counts[key] += 1;
+    });
+  }
+  return (Object.entries(counts).sort((a, b) => a[1] - b[1])[0]?.[0] || "lo") as DomainKey;
+}
+
+function taskCluster(taskType: string) {
+  if (taskType === "read_aloud") return "reading";
+  if (taskType === "target_vocab") return "vocab";
+  if (taskType === "filler_control") return "delivery";
+  if (taskType === "qa_prompt" || taskType === "role_play") return "interaction";
+  return "monologue";
+}
+
+function sameTypeStreak(recentTaskTypes: string[], taskType: string) {
+  let streak = 0;
+  for (const type of recentTaskTypes) {
+    if (type !== taskType) break;
+    streak += 1;
+  }
+  return streak;
+}
+
+function clusterCountInRecent(recentTaskTypes: string[], cluster: string, window = 5) {
+  const recent = recentTaskTypes.slice(0, window);
+  return recent.filter((type) => taskCluster(type) === cluster).length;
+}
+
 type NodeState = {
   nodeId: string;
   descriptor: string;
@@ -58,29 +100,41 @@ type NodeState = {
   reliability: "high" | "medium" | "low";
   daysSinceEvidence: number;
   halfLifeDays: number;
+  domain: DomainKey;
+  activationState: "observed" | "candidate_for_verification" | "verified";
+  verificationDueAt: Date | null;
 };
 
 type CandidateScore = {
   taskType: string;
   targetNodeIds: string[];
+  domainsTargeted: DomainKey[];
   expectedGain: number;
   successProbability: number;
   engagementRisk: number;
   tokenCost: number;
   latencyRisk: number;
   explorationBonus: number;
+  verificationGain: number;
   utility: number;
   estimatedDifficulty: number;
   selectionReason: string;
+  selectionReasonType: "weakness" | "overdue" | "uncertainty" | "verification";
 };
 
 export type PlannerDecision = {
   decisionId: string;
   chosenTaskType: string;
   targetNodeIds: string[];
+  domainsTargeted: DomainKey[];
+  diagnosticMode: boolean;
+  rotationApplied: boolean;
+  rotationReason: string | null;
   expectedGain: number;
   estimatedDifficulty: number;
   selectionReason: string;
+  selectionReasonType: "weakness" | "overdue" | "uncertainty" | "verification";
+  verificationTargetNodeIds: string[];
   primaryGoal: string;
   candidateScores: CandidateScore[];
 };
@@ -112,7 +166,14 @@ export async function assignTaskTargetsFromCatalog(params: {
 
   const stageRange = mapStageToGseRange(params.stage || "A1");
   const audience = params.ageBand === "6-8" || params.ageBand === "9-11" || params.ageBand === "12-14" ? "YL" : "AL";
-  const skills = skillHintsForTaskType(params.taskType);
+  const domainWeights = taskDomainWeights(params.taskType);
+  const skills = [
+    domainWeights.vocab >= 0.4 ? "vocabulary" : null,
+    domainWeights.grammar >= 0.5 ? "grammar" : null,
+    "speaking",
+    "listening",
+    "writing",
+  ].filter((value): value is string => Boolean(value));
 
   let candidateNodes: Array<{
     nodeId: string;
@@ -227,7 +288,6 @@ async function loadNodeState(params: {
 }) {
   const stageRange = mapStageToGseRange(params.stage || "A1");
   const audience = params.ageBand === "6-8" || params.ageBand === "9-11" || params.ageBand === "12-14" ? "YL" : "AL";
-  const skills = dedupe(params.taskTypes.flatMap((taskType) => skillHintsForTaskType(taskType)));
   const now = new Date();
 
   const mastered = await prisma.studentGseMastery.findMany({
@@ -235,7 +295,6 @@ async function loadNodeState(params: {
       studentId: params.studentId,
       node: {
         audience: { in: [audience, "AL", "AE"] },
-        skill: { in: skills },
         gseCenter: { gte: stageRange.min - 5, lte: stageRange.max + 5 },
       },
     },
@@ -276,6 +335,7 @@ async function loadNodeState(params: {
       descriptor: row.node.descriptor,
       skill: row.node.skill,
       type: row.node.type,
+      domain: nodeDomain(row.node.type),
       gseCenter: row.node.gseCenter,
       decayedMastery: round(decayedMastery),
       masteryMean: round(masteryMean),
@@ -283,6 +343,11 @@ async function loadNodeState(params: {
       reliability,
       daysSinceEvidence: round(daysSinceEvidence),
       halfLifeDays,
+      activationState:
+        row.activationState === "verified" || row.activationState === "candidate_for_verification"
+          ? row.activationState
+          : "observed",
+      verificationDueAt: row.verificationDueAt ?? null,
     };
   });
 
@@ -291,7 +356,6 @@ async function loadNodeState(params: {
   const fallbackNodes = await prisma.gseNode.findMany({
     where: {
       audience: { in: [audience, "AL", "AE"] },
-      skill: { in: skills },
       gseCenter: { gte: stageRange.min - 2, lte: stageRange.max + 2 },
     },
     orderBy: [{ gseCenter: "asc" }],
@@ -312,6 +376,7 @@ async function loadNodeState(params: {
       descriptor: node.descriptor,
       skill: node.skill,
       type: node.type,
+      domain: nodeDomain(node.type),
       gseCenter: node.gseCenter,
       decayedMastery: 30,
       masteryMean: 30,
@@ -319,6 +384,8 @@ async function loadNodeState(params: {
       reliability: "low",
       daysSinceEvidence: 999,
       halfLifeDays: node.type === "GSE_VOCAB" ? 14 : node.type === "GSE_GRAMMAR" ? 21 : 10,
+      activationState: "observed",
+      verificationDueAt: null,
     });
     if (states.length >= 20) break;
   }
@@ -332,15 +399,27 @@ function scoreCandidate(params: {
   stage: string;
   fatigueTypes: string[];
   recentTaskTypes: string[];
+  diagnosticMode?: boolean;
   preferredNodeIds?: string[];
+  qualityDomainFocus?: DomainKey | null;
+  verificationNodeIds?: string[];
 }) {
-  const relevantSkills = skillHintsForTaskType(params.taskType);
+  const domainWeights = taskDomainWeights(params.taskType);
+  const targetDomain = nextDomainToProbe(params.recentTaskTypes);
   const preferredSet = new Set(params.preferredNodeIds || []);
+  const verificationSet = new Set(params.verificationNodeIds || []);
   const preferredNodes = params.nodes
     .filter((node) => preferredSet.has(node.nodeId))
     .sort((a, b) => a.decayedMastery - b.decayedMastery);
   const relevantNodes = params.nodes
-    .filter((node) => !node.skill || relevantSkills.includes(node.skill))
+    .map((node) => {
+      const domainBoost = domainWeights[node.domain] || 0.3;
+      const probeBonus = node.domain === targetDomain ? 10 : 0;
+      const urgency = (100 - node.decayedMastery) * domainBoost + node.masterySigma * 0.9 + probeBonus;
+      return { node, urgency };
+    })
+    .sort((a, b) => b.urgency - a.urgency)
+    .map((row) => row.node)
     .sort((a, b) => a.decayedMastery - b.decayedMastery)
     .slice(0, 3);
   const mergedTargets = [...preferredNodes, ...relevantNodes].filter(
@@ -351,8 +430,9 @@ function scoreCandidate(params: {
   const perNode = targetNodes.map((node) => {
     const deficit = clamp(100 - node.decayedMastery);
     const successProbability = logistic((node.decayedMastery - estimatedDifficulty) / 12);
-    const uncertaintyBoost = 1 + node.masterySigma / 80;
-    const gain = deficit * 0.06 * successProbability * uncertaintyBoost;
+    const uncertaintyBoost = 1 + node.masterySigma / 75;
+    const domainBoost = domainWeights[node.domain] || 0.35;
+    const gain = deficit * 0.05 * successProbability * uncertaintyBoost * (0.6 + domainBoost);
     return {
       node,
       deficit,
@@ -371,19 +451,36 @@ function scoreCandidate(params: {
       ? perNode.reduce((sum, item) => sum + item.node.masterySigma, 0) / perNode.length
       : 25;
   const engagementRisk = params.fatigueTypes.slice(0, 2).includes(params.taskType) ? 0.28 : 0.08;
-  let sameTypeStreak = 0;
-  for (const type of params.recentTaskTypes) {
-    if (type !== params.taskType) break;
-    sameTypeStreak += 1;
-  }
+  const typeStreak = sameTypeStreak(params.recentTaskTypes, params.taskType);
   const sameTypeCountInRecent = params.recentTaskTypes.filter((type) => type === params.taskType).length;
+  const cluster = taskCluster(params.taskType);
+  const sameClusterCount = clusterCountInRecent(params.recentTaskTypes, cluster, 5);
+  const hardDiagnosticBlock = Boolean(params.diagnosticMode) && (typeStreak >= 2 || sameClusterCount >= 3);
   const repetitionPenalty =
-    sameTypeStreak >= 2 ? 2.2 : sameTypeStreak === 1 ? 0.9 : sameTypeCountInRecent >= 3 ? 0.8 : 0;
+    hardDiagnosticBlock
+      ? 100
+      : typeStreak >= 2
+      ? 2.2
+      : typeStreak === 1
+      ? 0.9
+      : sameTypeCountInRecent >= 3
+      ? 0.8
+      : sameClusterCount >= 3
+      ? 1.1
+      : 0;
   const tokenCost =
     params.taskType === "speech_builder" || params.taskType === "role_play" ? 1.3 : 0.9;
   const latencyRisk = params.taskType === "speech_builder" ? 0.22 : 0.1;
   const explorationBonus = clamp(avgSigma / 100, 0.05, 0.3);
   const preferredBoost = targetNodes.some((node) => preferredSet.has(node.nodeId)) ? 0.4 : 0;
+  const domainRotationBonus = targetNodes.some((node) => node.domain === targetDomain) ? 0.35 : 0;
+  const verificationHits = targetNodes.filter((node) => verificationSet.has(node.nodeId)).length;
+  const verificationGain = verificationHits * 1.15;
+  const qualityDomainBoost = params.qualityDomainFocus
+    ? targetNodes.some((node) => node.domain === params.qualityDomainFocus)
+      ? 0.9
+      : -0.55
+    : 0;
   const utility =
     expectedGain -
     engagementRisk * 1.6 -
@@ -391,25 +488,42 @@ function scoreCandidate(params: {
     tokenCost * 0.6 -
     latencyRisk * 0.8 +
     explorationBonus * 1.4 +
-    preferredBoost;
+    preferredBoost +
+    domainRotationBonus +
+    qualityDomainBoost +
+    verificationGain;
   const weakest = targetNodes[0];
   const weakestLabel = weakest?.descriptor?.trim() || "priority learning objective";
+  const domainLabel = weakest?.domain || targetDomain;
+  const selectionReasonType: CandidateScore["selectionReasonType"] =
+    verificationGain > 0
+      ? "verification"
+      : weakest && weakest.daysSinceEvidence > weakest.halfLifeDays
+      ? "overdue"
+      : weakest && weakest.masterySigma >= 22
+      ? "uncertainty"
+      : "weakness";
   const selectionReason = weakest
-    ? `Targets weak objective "${weakestLabel}" (${Math.round(weakest.decayedMastery)}) with expected gain ${round(expectedGain)}.`
+    ? verificationGain > 0
+      ? `Verification priority: confirm node "${weakestLabel}" with expected gain ${round(expectedGain)}.`
+      : `Targets ${domainLabel} node "${weakestLabel}" (${Math.round(weakest.decayedMastery)}) with expected gain ${round(expectedGain)}.`
     : `No node evidence yet; using stage ${params.stage} defaults.`;
 
   return {
     taskType: params.taskType,
     targetNodeIds: targetNodes.map((node) => node.nodeId),
+    domainsTargeted: Array.from(new Set(targetNodes.map((node) => node.domain))),
     expectedGain: round(expectedGain),
     successProbability: round(successProbability),
     engagementRisk: round(engagementRisk),
     tokenCost: round(tokenCost),
     latencyRisk: round(latencyRisk),
     explorationBonus: round(explorationBonus),
+    verificationGain: round(verificationGain),
     utility: round(utility),
     estimatedDifficulty,
     selectionReason,
+    selectionReasonType,
   };
 }
 
@@ -419,13 +533,18 @@ export async function planNextTaskDecision(params: {
   ageBand?: string | null;
   candidateTaskTypes: string[];
   requestedType?: string | null;
+  diagnosticMode?: boolean;
   preferredNodeIds?: string[];
+  qualityDomainFocus?: DomainKey | null;
 }) : Promise<PlannerDecision> {
   const startedAt = Date.now();
   const candidateTaskTypes = dedupe(
     params.requestedType ? [params.requestedType, ...params.candidateTaskTypes] : params.candidateTaskTypes
   ).filter(Boolean);
-  let taskTypes = candidateTaskTypes.length > 0 ? candidateTaskTypes : ["topic_talk"];
+  let taskTypes =
+    candidateTaskTypes.length > 0
+      ? candidateTaskTypes
+      : ["read_aloud", "target_vocab", "qa_prompt", "role_play", "topic_talk", "filler_control", "speech_builder"];
 
   const [nodeStates, recentAttempts, recentInstances] = await Promise.all([
     loadNodeState({
@@ -442,11 +561,20 @@ export async function planNextTaskDecision(params: {
     }),
     prisma.taskInstance.findMany({
       where: { studentId: params.studentId },
-      select: { taskType: true },
+      select: { taskType: true, targetNodeIds: true },
       orderBy: { createdAt: "desc" },
       take: 6,
     }),
   ]);
+  const verificationTargetNodeIds = nodeStates
+    .filter((node) => node.activationState === "candidate_for_verification")
+    .sort((a, b) => {
+      const aDue = a.verificationDueAt ? a.verificationDueAt.getTime() : 0;
+      const bDue = b.verificationDueAt ? b.verificationDueAt.getTime() : 0;
+      return aDue - bDue;
+    })
+    .map((node) => node.nodeId)
+    .slice(0, 4);
 
   const recoveryTriggered = recentAttempts.length >= 3 && recentAttempts.every((attempt) => {
     const scores = (attempt.scoresJson || {}) as { taskScore?: number };
@@ -460,6 +588,13 @@ export async function planNextTaskDecision(params: {
 
   const fatigueTypes = recentAttempts.map((attempt) => attempt.task.type);
   const recentTaskTypes = recentInstances.map((item) => item.taskType);
+  const recentVerificationHit = recentInstances
+    .slice(0, 2)
+    .some((item) => item.targetNodeIds.some((nodeId) => verificationTargetNodeIds.includes(nodeId)));
+  const mergedPreferredNodeIds = dedupe([
+    ...(params.preferredNodeIds || []),
+    ...verificationTargetNodeIds,
+  ]);
   const scored = taskTypes.map((taskType) =>
     scoreCandidate({
       taskType,
@@ -467,13 +602,58 @@ export async function planNextTaskDecision(params: {
       stage: params.stage,
       fatigueTypes,
       recentTaskTypes,
-      preferredNodeIds: params.preferredNodeIds,
+      diagnosticMode: params.diagnosticMode,
+      preferredNodeIds: mergedPreferredNodeIds,
+      qualityDomainFocus: params.qualityDomainFocus,
+      verificationNodeIds: verificationTargetNodeIds,
     })
   );
   scored.sort((a, b) => b.utility - a.utility);
-  const chosen = scored[0];
+  const topCandidate = scored[0];
+  let chosen = topCandidate;
+  let rotationApplied = false;
+  let rotationReason: string | null = null;
+  if (topCandidate) {
+    const topTypeStreak = sameTypeStreak(recentTaskTypes, topCandidate.taskType);
+    const topCluster = taskCluster(topCandidate.taskType);
+    const topClusterCount = clusterCountInRecent(recentTaskTypes, topCluster, 5);
+    const violatesRotation = topTypeStreak >= 2 || topClusterCount >= 2;
+    if (violatesRotation) {
+      const alternative = scored.find((candidate) => {
+        const typeStreak = sameTypeStreak(recentTaskTypes, candidate.taskType);
+        const cluster = taskCluster(candidate.taskType);
+        const clusterCount = clusterCountInRecent(recentTaskTypes, cluster, 5);
+        return typeStreak < 2 && clusterCount < 2;
+      });
+      if (alternative) {
+        chosen = alternative;
+        rotationApplied = true;
+        rotationReason =
+          topTypeStreak >= 2
+            ? `task_type_streak_${topTypeStreak}`
+            : `thematic_cluster_streak_${topClusterCount}`;
+      }
+    }
+  }
   if (!chosen || chosen.targetNodeIds.length === 0) {
     throw new Error("Planner decision failed: no GSE targets resolved.");
+  }
+  if (verificationTargetNodeIds.length > 0 && !recentVerificationHit && chosen.verificationGain <= 0) {
+    const verificationCandidate = scored.find((row) => row.verificationGain > 0);
+    if (verificationCandidate) {
+      chosen = verificationCandidate;
+    }
+  }
+  if (rotationApplied) {
+    console.log(
+      JSON.stringify({
+        event: "planner_rotation_applied",
+        studentId: params.studentId,
+        blockedTaskType: topCandidate?.taskType || null,
+        chosenTaskType: chosen.taskType,
+        reason: rotationReason,
+      })
+    );
   }
 
   const overdueCount = nodeStates.filter((node) => node.daysSinceEvidence > node.halfLifeDays).length;
@@ -481,6 +661,8 @@ export async function planNextTaskDecision(params: {
   const uncertainCount = nodeStates.filter((node) => node.masterySigma >= 22).length;
   const primaryGoal = recoveryTriggered
     ? "auto_recovery_path"
+    : verificationTargetNodeIds.length > 0 && !recentVerificationHit
+    ? "verify_candidate_nodes"
     : buildPrimaryGoal({ overdueCount, weakCount, uncertainCount });
 
   const decision = await prisma.plannerDecisionLog.create({
@@ -495,12 +677,18 @@ export async function planNextTaskDecision(params: {
         tokenCost: chosen.tokenCost,
         latencyRisk: chosen.latencyRisk,
         explorationBonus: chosen.explorationBonus,
+        verificationGain: chosen.verificationGain,
         utility: chosen.utility,
+        rotationApplied,
+        rotationReason,
+        qualityDomainFocus: params.qualityDomainFocus || null,
       } as Prisma.InputJsonValue,
       fallbackUsed: false,
       latencyMs: Date.now() - startedAt,
       expectedGain: chosen.expectedGain,
       targetNodeIds: chosen.targetNodeIds,
+      domainsTargeted: chosen.domainsTargeted,
+      diagnosticMode: Boolean(params.diagnosticMode),
       selectionReason: chosen.selectionReason,
       primaryGoal,
       estimatedDifficulty: chosen.estimatedDifficulty,
@@ -511,9 +699,15 @@ export async function planNextTaskDecision(params: {
     decisionId: decision.id,
     chosenTaskType: chosen.taskType,
     targetNodeIds: chosen.targetNodeIds,
+    domainsTargeted: chosen.domainsTargeted,
+    diagnosticMode: Boolean(params.diagnosticMode),
+    rotationApplied,
+    rotationReason,
     expectedGain: chosen.expectedGain,
     estimatedDifficulty: chosen.estimatedDifficulty,
     selectionReason: chosen.selectionReason,
+    selectionReasonType: chosen.selectionReasonType,
+    verificationTargetNodeIds,
     primaryGoal,
     candidateScores: scored,
   };
@@ -533,6 +727,44 @@ export async function finalizePlannerDecision(params: {
   });
 }
 
+function percentile(values: number[], p: number) {
+  if (values.length === 0) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const idx = Math.min(sorted.length - 1, Math.max(0, Math.ceil((p / 100) * sorted.length) - 1));
+  return sorted[idx];
+}
+
+export async function emitPlannerLatencySnapshot(params?: {
+  sampleRate?: number;
+  windowSize?: number;
+}) {
+  const sampleRate = typeof params?.sampleRate === "number" ? params.sampleRate : 0.15;
+  const windowSize = typeof params?.windowSize === "number" ? params.windowSize : 200;
+  if (Math.random() > sampleRate) return;
+
+  const rows = await prisma.plannerDecisionLog.findMany({
+    where: { latencyMs: { not: null } },
+    orderBy: { decisionTs: "desc" },
+    take: windowSize,
+    select: { latencyMs: true },
+  });
+  const latencies = rows
+    .map((row) => row.latencyMs)
+    .filter((value): value is number => typeof value === "number");
+  if (latencies.length === 0) return;
+  const p95 = percentile(latencies, 95);
+  if (typeof p95 !== "number") return;
+  console.log(
+    JSON.stringify({
+      event: "planner_latency_snapshot",
+      windowSize: latencies.length,
+      p95Ms: p95,
+      p50Ms: percentile(latencies, 50),
+      p99Ms: percentile(latencies, 99),
+    })
+  );
+}
+
 export async function createTaskInstance(params: {
   studentId: string;
   taskId: string;
@@ -543,6 +775,9 @@ export async function createTaskInstance(params: {
   fallbackUsed: boolean;
   estimatedDifficulty?: number | null;
 }) {
+  if (!params.targetNodeIds || params.targetNodeIds.length === 0) {
+    throw new Error("Planner sanity check failed: targetNodeIds is empty.");
+  }
   return prisma.taskInstance.create({
     data: {
       studentId: params.studentId,

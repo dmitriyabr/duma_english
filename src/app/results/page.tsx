@@ -76,6 +76,25 @@ type AttemptResult = {
       gseCenter?: number | null;
       skill?: string | null;
       type?: string | null;
+      targeted?: boolean;
+      activationImpact?: "none" | "observed" | "candidate" | "verified";
+    }>;
+    incidentalFindings?: Array<{
+      nodeId: string;
+      nodeLabel: string;
+      domain: "vocab" | "grammar" | "lo";
+      signal: string;
+      score: number;
+      confidence: number;
+      targeted: boolean;
+      activationImpact: "none" | "observed" | "candidate" | "verified";
+    }>;
+    activationTransitions?: Array<{
+      nodeId: string;
+      activationStateBefore?: "observed" | "candidate_for_verification" | "verified" | null;
+      activationStateAfter?: "observed" | "candidate_for_verification" | "verified" | null;
+      activationImpact: "none" | "observed" | "candidate" | "verified";
+      verificationDueAt?: string | null;
     }>;
     nodeOutcomes?: Array<{
       nodeId: string;
@@ -189,6 +208,8 @@ export default function ResultsPage() {
   const checks = (taskEvaluation?.rubricChecks || []).filter((check) => !!check.name && check.reason);
   const transcript = data?.results?.transcript;
   const gseEvidence = data?.results?.gseEvidence || [];
+  const incidentalFindings = data?.results?.incidentalFindings || [];
+  const activationTransitions = data?.results?.activationTransitions || [];
   const nodeOutcomes = data?.results?.nodeOutcomes || [];
   const nodeLabelById = new Map(gseEvidence.map((item) => [item.nodeId, item.descriptor]));
   const uniqueNodes = Array.from(
@@ -325,6 +346,37 @@ export default function ResultsPage() {
                         </li>
                       ))}
                     </ul>
+                  </div>
+                </>
+              )}
+
+              {(incidentalFindings.length > 0 || activationTransitions.length > 0) && (
+                <>
+                  <div className="spacer" />
+                  <div className="metric">
+                    <span>Detected new advanced usage</span>
+                    {incidentalFindings.length > 0 && (
+                      <ul style={{ paddingLeft: 16 }}>
+                        {incidentalFindings.slice(0, 8).map((item) => (
+                          <li key={`inc-${item.nodeId}-${item.signal}`}>
+                            {item.nodeLabel} ({item.domain}) - confidence {(item.confidence * 100).toFixed(0)}%
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    {activationTransitions.length > 0 && (
+                      <>
+                        <p className="subtitle">Need verification:</p>
+                        <ul style={{ paddingLeft: 16 }}>
+                          {activationTransitions.slice(0, 8).map((item) => (
+                            <li key={`tr-${item.nodeId}`}>
+                              {nodeLabelById.get(item.nodeId) || item.nodeId}: {item.activationStateBefore || "n/a"}{" -> "}
+                              {item.activationStateAfter || "n/a"} ({item.activationImpact})
+                            </li>
+                          ))}
+                        </ul>
+                      </>
+                    )}
                   </div>
                 </>
               )}

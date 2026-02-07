@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getStudentFromRequest } from "@/lib/auth";
-import { buildLearningPlan, recomputeMastery } from "@/lib/adaptive";
+import { recomputeMastery } from "@/lib/adaptive";
+import { nextTargetNodesForStudent } from "@/lib/gse/planner";
+import { projectLearnerStageFromGse } from "@/lib/gse/stageProjection";
 
 export async function POST() {
   const student = await getStudentFromRequest();
@@ -9,14 +11,23 @@ export async function POST() {
   }
 
   const mastery = await recomputeMastery(student.studentId);
-  const plan = await buildLearningPlan({ studentId: student.studentId });
+  const projection = await projectLearnerStageFromGse(student.studentId);
+  const nextTargets = await nextTargetNodesForStudent(student.studentId, 5);
 
   return NextResponse.json({
-    stage: mastery.stage,
+    stage: projection.promotionStage,
+    placementStage: projection.placementStage,
+    promotionStage: projection.promotionStage,
+    placementConfidence: projection.placementConfidence,
+    placementUncertainty: projection.placementUncertainty,
     averageMastery: mastery.averageMastery,
     mastery: mastery.mastery,
-    nextTaskReason: plan.nextTaskReason,
-    recommendedTaskTypes: plan.recommendedTaskTypes,
-    weakestSkills: plan.weakestSkills,
+    nextTargetNodes: nextTargets,
+    promotionReadiness: {
+      targetStage: projection.targetStage,
+      ready: projection.promotionReady,
+      score: projection.score,
+      blockers: projection.blockedByNodeDescriptors,
+    },
   });
 }

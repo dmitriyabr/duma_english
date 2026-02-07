@@ -76,6 +76,24 @@ export async function GET(_: Request, context: AttemptRouteContext) {
     taskScore?: number;
     artifacts?: Record<string, unknown>;
     rubricChecks?: Array<{ name?: string; pass?: boolean; reason?: string; weight?: number }>;
+    loChecks?: Array<{
+      checkId?: string;
+      label?: string;
+      pass?: boolean;
+      confidence?: number;
+      severity?: string;
+      evidenceSpan?: string;
+    }>;
+    grammarChecks?: Array<{
+      checkId?: string;
+      label?: string;
+      pass?: boolean;
+      confidence?: number;
+      opportunityType?: string;
+      errorType?: string;
+      evidenceSpan?: string;
+      correction?: string;
+    }>;
     evidence?: string[];
     modelVersion?: string;
   } | null;
@@ -229,14 +247,46 @@ export async function GET(_: Request, context: AttemptRouteContext) {
   const gseEvidence = attempt.gseEvidence.map((row) => ({
     nodeId: row.nodeId,
     signal: row.signalType,
+    evidenceKind: row.evidenceKind,
+    opportunityType: row.opportunityType,
+    score: row.score,
     confidence: row.confidence,
     impact: row.impact,
+    weight: row.weight,
+    source: row.source,
+    domain: row.domain,
+    usedForPromotion: row.usedForPromotion,
+    targeted: row.targeted,
+    activationImpact: row.activationImpact,
     evidenceText: row.evidenceText,
+    metadataJson: row.metadataJson,
     descriptor: row.node.descriptor,
     gseCenter: row.node.gseCenter,
     skill: row.node.skill,
     type: row.node.type,
   }));
+  const evidenceMatrix = gseEvidence.map((row) => ({
+    nodeId: row.nodeId,
+    nodeLabel: row.descriptor,
+    domain: row.domain,
+    kind: row.evidenceKind,
+    opportunityType: row.opportunityType,
+    score: row.score,
+    confidence: row.confidence,
+    weight: row.weight,
+    source: row.source,
+    usedForPromotion: row.usedForPromotion,
+    targeted: row.targeted,
+    activationImpact: row.activationImpact,
+    signal: row.signal,
+    consistencyFlag:
+      row.metadataJson && typeof row.metadataJson === "object"
+        ? (row.metadataJson as Record<string, unknown>).consistencyFlag || null
+        : null,
+  }));
+  const consistencyFlag = evidenceMatrix.some((row) => row.consistencyFlag)
+    ? "inconsistent_lo_signal_repaired"
+    : null;
   const language = {
     grammar: {
       grammarAccuracy,
@@ -261,8 +311,28 @@ export async function GET(_: Request, context: AttemptRouteContext) {
         decayImpact: number;
         reliability: "high" | "medium" | "low";
         evidenceCount: number;
+        alphaBefore?: number;
+        alphaAfter?: number;
+        betaBefore?: number;
+        betaAfter?: number;
+        activationStateBefore?: "observed" | "candidate_for_verification" | "verified";
+        activationStateAfter?: "observed" | "candidate_for_verification" | "verified";
+        activationImpact?: "none" | "observed" | "candidate" | "verified";
+        verificationDueAt?: string | null;
       }>)
     : [];
+  const incidentalFindings = evidenceMatrix
+    .filter((row) => row.targeted === false)
+    .slice(0, 20);
+  const activationTransitions = nodeOutcomes
+    .filter((row) => row.activationImpact && row.activationImpact !== "none")
+    .map((row) => ({
+      nodeId: row.nodeId,
+      activationStateBefore: row.activationStateBefore || null,
+      activationStateAfter: row.activationStateAfter || null,
+      activationImpact: row.activationImpact,
+      verificationDueAt: row.verificationDueAt || null,
+    }));
 
   return NextResponse.json({
     status: attempt.status,
@@ -288,6 +358,10 @@ export async function GET(_: Request, context: AttemptRouteContext) {
             taskEvaluation,
             feedback,
             gseEvidence,
+            evidenceMatrix,
+            consistencyFlag,
+            incidentalFindings,
+            activationTransitions,
             nodeOutcomes,
             recoveryTriggered: attempt.recoveryTriggered,
             planner: attempt.task.taskInstance?.decisionLog

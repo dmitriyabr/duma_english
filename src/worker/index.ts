@@ -398,14 +398,22 @@ async function processAttempt(attemptId: string) {
     }
 
     await updateStudentVocabularyFromAttempt(attempt.studentId, evaluated.taskEvaluation);
+    const learnerProfile = await prisma.learnerProfile.findUnique({
+      where: { studentId: attempt.studentId },
+      select: { ageBand: true },
+    });
     const gseEvidence = await persistAttemptGseEvidence({
       attemptId: attempt.id,
       studentId: attempt.studentId,
       taskId: attempt.taskId,
+      taskType: attempt.task.type,
+      taskPrompt: attempt.task.prompt,
+      taskMeta,
       transcript: analysis.transcript,
       derivedMetrics,
       taskEvaluation: evaluated.taskEvaluation,
       scoreReliability: scores.reliability,
+      ageBand: learnerProfile?.ageBand || null,
     });
     if (gseEvidence.evidenceCount > 0) {
       console.log(JSON.stringify({ event: "gse_evidence_written", attemptId: attempt.id, count: gseEvidence.evidenceCount }));
@@ -433,6 +441,20 @@ async function processAttempt(attemptId: string) {
         where: { studentId: attempt.studentId, placementFresh: true },
         data: { placementFresh: false },
       });
+      const profile = await prisma.learnerProfile.findUnique({
+        where: { studentId: attempt.studentId },
+        select: { coldStartAttempts: true, coldStartActive: true },
+      });
+      if (profile) {
+        const nextAttempts = (profile.coldStartAttempts || 0) + 1;
+        await prisma.learnerProfile.update({
+          where: { studentId: attempt.studentId },
+          data: {
+            coldStartAttempts: nextAttempts,
+            coldStartActive: profile.coldStartActive && nextAttempts < 8,
+          },
+        });
+      }
     }
     await recomputeMastery(attempt.studentId);
 

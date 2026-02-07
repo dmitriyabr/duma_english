@@ -17,10 +17,15 @@ type TaskResponse = {
   selectionReason?: string;
   decisionId?: string;
   primaryGoal?: string;
+  selectionReasonType?: "weakness" | "overdue" | "uncertainty" | "verification";
+  verificationTargetNodeIds?: string[];
   expectedGain?: number;
   difficulty?: number;
   fallbackUsed?: boolean;
   fallbackReason?: string | null;
+  rotationApplied?: boolean;
+  rotationReason?: string | null;
+  similarityToRecent?: number;
   targetSkills?: string[];
   targetWords?: string[];
   targetNodeIds?: string[];
@@ -117,11 +122,28 @@ export default function TaskPage() {
                     </p>
                   )}
                   {task.primaryGoal && <p className="subtitle">Primary goal: {task.primaryGoal}</p>}
+                  {task.selectionReasonType && (
+                    <p className="subtitle">Reason type: {task.selectionReasonType}</p>
+                  )}
+                  {(task.verificationTargetNodeIds?.length || 0) > 0 && (
+                    <p className="subtitle">
+                      Verification queue targets: {task.verificationTargetNodeIds?.length}
+                    </p>
+                  )}
                   {task.fallbackUsed && (
                     <p className="subtitle">
                       Task generator fallback was used for reliability
                       {task.fallbackReason ? ` (${task.fallbackReason})` : ""}.
                     </p>
+                  )}
+                  {task.rotationApplied && (
+                    <p className="subtitle">
+                      Rotation applied to avoid loop
+                      {task.rotationReason ? ` (${task.rotationReason})` : ""}.
+                    </p>
+                  )}
+                  {typeof task.similarityToRecent === "number" && (
+                    <p className="subtitle">Prompt similarity to recent tasks: {task.similarityToRecent.toFixed(2)}</p>
                   )}
                   {task.targetSkills && task.targetSkills.length > 0 && (
                     <p className="subtitle">Focus skills: {task.targetSkills.join(", ")}</p>

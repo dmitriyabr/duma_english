@@ -800,14 +800,24 @@ export async function finishPlacement(sessionId: string) {
   if (session.status === "completed" && session.resultJson) {
     return session.resultJson as {
       stage: string;
+      provisionalStage: string;
+      promotionStage: string;
       average: number;
       confidence: number;
+      uncertainty: number;
       theta: number;
       sigma: number;
       skillSnapshot: Record<string, number>;
       carryoverApplied: boolean;
       carryoverNodes: string[];
       uncertainNodes: string[];
+      promotionReady: boolean;
+      blockedBundles: Array<{
+        bundleKey: string;
+        title: string;
+        domain: string;
+        reason: string;
+      }>;
       coverage: number | null;
       reliability: number | null;
     };
@@ -828,8 +838,8 @@ export async function finishPlacement(sessionId: string) {
   const beforeProjection = await projectLearnerStageFromGse(session.studentId);
   const carryover = await applyCarryoverIfNeeded({
     studentId: session.studentId,
-    stage: beforeProjection.stage,
-    confidence: beforeProjection.confidence,
+    stage: beforeProjection.promotionStage,
+    confidence: beforeProjection.placementConfidence,
   });
   const stageProjection = await refreshLearnerProfileFromGse({
     studentId: session.studentId,
@@ -853,15 +863,18 @@ export async function finishPlacement(sessionId: string) {
     data: {
       studentId: session.studentId,
       fromStage: session.student.profile?.stage || "A0",
-      targetStage: stageProjection.stage,
-      promoted: stageIndex(stageProjection.stage) > stageIndex(session.student.profile?.stage || "A0"),
+      targetStage: stageProjection.promotionStage,
+      promoted:
+        stageIndex(stageProjection.promotionStage) > stageIndex(session.student.profile?.stage || "A0"),
       blockedByNodes: stageProjection.blockedByNodes,
       reasonsJson: {
         placement: true,
         source: "gse_only",
         theta: session.theta,
         sigma: session.sigma,
-        confidence: stageProjection.confidence,
+        confidence: stageProjection.placementConfidence,
+        placementStage: stageProjection.placementStage,
+        promotionStage: stageProjection.promotionStage,
         currentStageStats: stageProjection.currentStageStats,
         targetStageStats: stageProjection.targetStageStats,
         carryoverApplied: carryover.carryoverApplied,
@@ -871,15 +884,25 @@ export async function finishPlacement(sessionId: string) {
   });
 
   const result = {
-    stage: stageProjection.stage,
+    stage: stageProjection.promotionStage,
+    provisionalStage: stageProjection.placementStage,
+    promotionStage: stageProjection.promotionStage,
     average: stageProjection.score,
-    confidence: stageProjection.confidence,
+    confidence: stageProjection.placementConfidence,
+    uncertainty: stageProjection.placementUncertainty,
     theta: session.theta,
     sigma: session.sigma,
     skillSnapshot,
     carryoverApplied: carryover.carryoverApplied,
     carryoverNodes: carryover.carryoverNodes.slice(0, 40),
     uncertainNodes,
+    promotionReady: stageProjection.promotionReady,
+    blockedBundles: stageProjection.blockedBundles.map((item) => ({
+      bundleKey: item.bundleKey,
+      title: item.title,
+      domain: item.domain,
+      reason: item.reason,
+    })),
     coverage:
       stageProjection.targetStageStats.coverage70 === null
         ? null

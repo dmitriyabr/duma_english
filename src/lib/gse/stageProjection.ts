@@ -1,12 +1,10 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { CEFRStage, SkillKey } from "@/lib/curriculum";
-import { mapStageToGseRange } from "./utils";
+import { computeStageBundleReadiness } from "./bundles";
 
 const STAGE_ORDER: CEFRStage[] = ["A0", "A1", "A2", "B1", "B2", "C1", "C2"];
-const PROMOTION_COVERAGE_THRESHOLD = 0.62;
-const PROMOTION_RELIABILITY_THRESHOLD = 0.6;
-const PROMOTION_MIN_ROWS = 6;
+const RELIABILITY_THRESHOLD = 0.65;
 
 type StageBandStats = {
   stage: CEFRStage;
@@ -14,6 +12,8 @@ type StageBandStats = {
   covered70: number;
   coverage70: number | null;
   reliabilityRatio: number | null;
+  uncertaintyAvg: number | null;
+  directEvidenceSum: number;
   blockers: Array<{ nodeId: string; descriptor: string; value: number }>;
 };
 
@@ -30,12 +30,23 @@ export type StageProjection = {
   confidence: number;
   score: number;
   source: "gse_projection";
+  placementStage: CEFRStage;
+  placementConfidence: number;
+  placementUncertainty: number;
+  promotionStage: CEFRStage;
+  promotionReady: boolean;
   currentStageStats: StageBandStats;
   targetStage: CEFRStage;
   targetStageStats: StageBandStats;
-  promotionReady: boolean;
   blockedByNodes: string[];
   blockedByNodeDescriptors: string[];
+  blockedBundles: Array<{
+    bundleKey: string;
+    title: string;
+    domain: "vocab" | "grammar" | "lo";
+    reason: string;
+    blockers: Array<{ nodeId: string; descriptor: string; value: number }>;
+  }>;
   nodeCoverageByBand: Record<string, { mastered: number; total: number }>;
   derivedSkills: DerivedSkill[];
 };
@@ -45,9 +56,12 @@ type MasteryRow = {
   masteryScore: number;
   masteryMean: number | null;
   masterySigma: number | null;
+  uncertainty: number | null;
   decayedMastery: number | null;
   reliability: string;
   evidenceCount: number;
+  directEvidenceCount: number;
+  updatedAt: Date;
   node: {
     descriptor: string;
     gseCenter: number | null;
@@ -58,6 +72,10 @@ type MasteryRow = {
 
 function clamp(value: number, min = 0, max = 100) {
   return Math.max(min, Math.min(max, value));
+}
+
+function clamp01(value: number) {
+  return Math.max(0, Math.min(1, value));
 }
 
 function toStageIndex(stage: CEFRStage) {
@@ -78,6 +96,14 @@ function scoreValue(row: MasteryRow) {
   return row.decayedMastery ?? row.masteryMean ?? row.masteryScore;
 }
 
+function rowUncertainty(row: MasteryRow) {
+  if (typeof row.uncertainty === "number" && Number.isFinite(row.uncertainty)) {
+    return clamp01(row.uncertainty);
+  }
+  const sigma = typeof row.masterySigma === "number" ? row.masterySigma : 24;
+  return clamp01(sigma / 100);
+}
+
 function gseBandFromCenter(value: number | null | undefined): CEFRStage {
   if (typeof value !== "number") return "A0";
   if (value <= 29) return "A1";
@@ -86,33 +112,6 @@ function gseBandFromCenter(value: number | null | undefined): CEFRStage {
   if (value <= 75) return "B2";
   if (value <= 84) return "C1";
   return "C2";
-}
-
-function buildStageStats(rows: MasteryRow[], stage: CEFRStage): StageBandStats {
-  const range = mapStageToGseRange(stage);
-  const inBand = rows.filter((row) => {
-    const g = row.node.gseCenter;
-    return typeof g === "number" && g >= range.min && g <= range.max;
-  });
-  const covered = inBand.filter((row) => scoreValue(row) >= 70).length;
-  const nonLow = inBand.filter((row) => row.reliability !== "low").length;
-  const blockers = inBand
-    .filter((row) => scoreValue(row) < 60)
-    .sort((a, b) => scoreValue(a) - scoreValue(b))
-    .slice(0, 8)
-    .map((row) => ({
-      nodeId: row.nodeId,
-      descriptor: row.node.descriptor,
-      value: Number(scoreValue(row).toFixed(2)),
-    }));
-  return {
-    stage,
-    total: inBand.length,
-    covered70: covered,
-    coverage70: inBand.length > 0 ? Number((covered / inBand.length).toFixed(4)) : null,
-    reliabilityRatio: inBand.length > 0 ? Number((nonLow / inBand.length).toFixed(4)) : null,
-    blockers,
-  };
 }
 
 function confidenceFromRows(rows: MasteryRow[]) {
@@ -214,17 +213,52 @@ function buildNodeCoverageByBand(rows: MasteryRow[]) {
   }, {});
 }
 
-function projectStage(rows: MasteryRow[]) {
+function projectPromotionStageFromBundles(stageRows: Array<{
+  stage: CEFRStage;
+  ready: boolean;
+}>) {
   let stage: CEFRStage = "A0";
   for (const candidate of STAGE_ORDER.slice(1)) {
-    const stats = buildStageStats(rows, candidate);
-    const coverageOk = (stats.coverage70 ?? 0) >= PROMOTION_COVERAGE_THRESHOLD;
-    const reliabilityOk = (stats.reliabilityRatio ?? 0) >= PROMOTION_RELIABILITY_THRESHOLD;
-    const sampleOk = stats.total >= PROMOTION_MIN_ROWS;
-    if (!coverageOk || !reliabilityOk || !sampleOk) break;
+    const row = stageRows.find((item) => item.stage === candidate);
+    if (!row || !row.ready) break;
     stage = candidate;
   }
   return stage;
+}
+
+function projectPlacementStage(rows: MasteryRow[]) {
+  const usable = rows.filter((row) => row.evidenceCount > 0 && typeof row.node.gseCenter === "number");
+  if (usable.length === 0) {
+    return {
+      stage: "A0" as CEFRStage,
+      confidence: 0.35,
+      uncertainty: 0.95,
+    };
+  }
+
+  const weighted = usable.map((row) => {
+    const reliability = row.reliability === "high" ? 1 : row.reliability === "medium" ? 0.8 : 0.6;
+    const evidenceBoost = Math.min(2.2, 1 + Math.log2(Math.max(1, row.evidenceCount + 1)) * 0.45);
+    const masteryBoost = clamp01(scoreValue(row) / 100);
+    const w = reliability * evidenceBoost * Math.max(0.35, masteryBoost);
+    return {
+      center: row.node.gseCenter as number,
+      weight: w,
+      uncertainty: rowUncertainty(row),
+    };
+  });
+
+  const sumWeight = weighted.reduce((sum, row) => sum + row.weight, 0) || 1;
+  const center = weighted.reduce((sum, row) => sum + row.center * row.weight, 0) / sumWeight;
+  const uncertainty = weighted.reduce((sum, row) => sum + row.uncertainty * row.weight, 0) / sumWeight;
+  const stage = gseBandFromCenter(center);
+  const confidence = Number(clamp(1 - uncertainty, 0.2, 0.98).toFixed(2));
+
+  return {
+    stage,
+    confidence,
+    uncertainty: Number(uncertainty.toFixed(4)),
+  };
 }
 
 export async function projectLearnerStageFromGse(studentId: string): Promise<StageProjection> {
@@ -244,39 +278,85 @@ export async function projectLearnerStageFromGse(studentId: string): Promise<Sta
     take: 2500,
   });
 
-  const stage = projectStage(rows);
-  const targetStage = nextStage(stage);
-  const currentStats = buildStageStats(rows, stage === "A0" ? "A1" : stage);
-  const targetStats = buildStageStats(rows, targetStage);
+  const placement = projectPlacementStage(rows);
+  const bundleReadiness = await computeStageBundleReadiness(studentId);
+  const promotionStage = projectPromotionStageFromBundles(bundleReadiness.stageRows);
+  const targetStage = nextStage(promotionStage);
+  const currentStageRow = bundleReadiness.stageRows.find(
+    (row) => row.stage === (promotionStage === "A0" ? "A1" : promotionStage)
+  );
+  const targetStageRow = bundleReadiness.stageRows.find((row) => row.stage === targetStage);
+  const toStats = (stage: CEFRStage, row?: (typeof bundleReadiness.stageRows)[number]): StageBandStats => ({
+    stage,
+    total: row?.bundleRows.reduce((sum, item) => sum + item.totalRequired, 0) || 0,
+    covered70: row?.bundleRows.reduce((sum, item) => sum + item.coveredCount, 0) || 0,
+    coverage70:
+      row && row.bundleRows.length > 0
+        ? Number(
+            (
+              row.bundleRows.reduce((sum, item) => sum + item.coveredCount, 0) /
+              Math.max(1, row.bundleRows.reduce((sum, item) => sum + item.totalRequired, 0))
+            ).toFixed(4)
+          )
+        : null,
+    reliabilityRatio: row ? Number(row.reliability.toFixed(4)) : null,
+    uncertaintyAvg:
+      row && row.bundleRows.length > 0
+        ? Number(
+            (
+              row.bundleRows.reduce((sum, item) => sum + item.uncertaintyAvg, 0) /
+              row.bundleRows.length
+            ).toFixed(4)
+          )
+        : null,
+    directEvidenceSum: row?.bundleRows.reduce((sum, item) => sum + item.directEvidenceCovered, 0) || 0,
+    blockers:
+      row?.blockedBundles
+        .flatMap((bundle) => bundle.blockers)
+        .filter((value, index, arr) => arr.findIndex((x) => x.nodeId === value.nodeId) === index)
+        .slice(0, 8) || [],
+  });
+  const currentStats = toStats(promotionStage === "A0" ? "A1" : promotionStage, currentStageRow);
+  const targetStats = toStats(targetStage, targetStageRow);
   const promotionReady =
-    toStageIndex(targetStage) === toStageIndex(stage) ||
-    ((targetStats.coverage70 ?? 0) >= PROMOTION_COVERAGE_THRESHOLD &&
-      (targetStats.reliabilityRatio ?? 0) >= PROMOTION_RELIABILITY_THRESHOLD &&
-      targetStats.total >= PROMOTION_MIN_ROWS);
-  const blockedByNodes = targetStats.blockers.map((item) => item.nodeId);
-  const blockedByNodeDescriptors = targetStats.blockers.map((item) => item.descriptor);
+    toStageIndex(targetStage) === toStageIndex(promotionStage) ||
+    Boolean(targetStageRow?.ready);
+
+  const blockedBundles = targetStageRow?.blockedBundles || [];
+  const blockedByNodes = blockedBundles.flatMap((bundle) => bundle.blockers.map((item) => item.nodeId));
+  const blockedByNodeDescriptors = blockedBundles.flatMap((bundle) =>
+    bundle.blockers.map((item) => item.descriptor)
+  );
   const confidence = confidenceFromRows(rows);
   const score = Number(
     (
-      (targetStats.coverage70 ?? currentStats.coverage70 ?? 0) * 60 +
-      ((targetStats.reliabilityRatio ?? currentStats.reliabilityRatio ?? 0) >= PROMOTION_RELIABILITY_THRESHOLD
-        ? 25
-        : 10) +
-      Math.min(15, Math.round(confidence * 15))
+      (targetStageRow?.coverage ?? targetStats.coverage70 ?? currentStats.coverage70 ?? 0) * 60 +
+      ((targetStageRow?.reliability ?? targetStats.reliabilityRatio ?? currentStats.reliabilityRatio ?? 0) >= RELIABILITY_THRESHOLD
+        ? 20
+        : 8) +
+      ((targetStageRow?.stability ?? 0) >= 0.5
+        ? 10
+        : 3) +
+      Math.min(10, Math.round(confidence * 10))
     ).toFixed(1)
   );
 
   return {
-    stage,
+    stage: promotionStage,
     confidence,
     score: clamp(score),
     source: "gse_projection",
+    placementStage: placement.stage,
+    placementConfidence: placement.confidence,
+    placementUncertainty: placement.uncertainty,
+    promotionStage,
+    promotionReady,
     currentStageStats: currentStats,
     targetStage,
     targetStageStats: targetStats,
-    promotionReady,
     blockedByNodes,
     blockedByNodeDescriptors,
+    blockedBundles,
     nodeCoverageByBand: buildNodeCoverageByBand(rows),
     derivedSkills: buildDerivedSkills(rows),
   };
@@ -290,20 +370,41 @@ export async function refreshLearnerProfileFromGse(params: {
   carryoverSummary?: Prisma.InputJsonValue;
 }) {
   const projection = await projectLearnerStageFromGse(params.studentId);
+  if (projection.blockedBundles.length > 0) {
+    console.log(
+      JSON.stringify({
+        event: "promotion_blocked_bundle",
+        studentId: params.studentId,
+        reason: params.reason,
+        promotionStage: projection.promotionStage,
+        targetStage: projection.targetStage,
+        blockedBundles: projection.blockedBundles.map((bundle) => ({
+          bundleKey: bundle.bundleKey,
+          domain: bundle.domain,
+          reason: bundle.reason,
+          blockerCount: bundle.blockers.length,
+        })),
+      })
+    );
+  }
   await prisma.learnerProfile.upsert({
     where: { studentId: params.studentId },
     update: {
-      stage: projection.stage,
+      stage: projection.promotionStage,
       stageSource: "gse_projection",
       stageEvidenceJson: {
         reason: params.reason,
         projectionScore: projection.score,
         confidence: projection.confidence,
+        placementStage: projection.placementStage,
+        placementConfidence: projection.placementConfidence,
+        placementUncertainty: projection.placementUncertainty,
+        promotionStage: projection.promotionStage,
         currentStageStats: projection.currentStageStats,
         targetStageStats: projection.targetStageStats,
       },
       placementScore: projection.score,
-      placementConfidence: projection.confidence,
+      placementConfidence: projection.placementConfidence,
       placementFresh:
         typeof params.placementFresh === "boolean" ? params.placementFresh : undefined,
       placementUncertainNodeIds: params.uncertainNodeIds ?? undefined,
@@ -311,17 +412,21 @@ export async function refreshLearnerProfileFromGse(params: {
     },
     create: {
       studentId: params.studentId,
-      stage: projection.stage,
+      stage: projection.promotionStage,
       stageSource: "gse_projection",
       stageEvidenceJson: {
         reason: params.reason,
         projectionScore: projection.score,
         confidence: projection.confidence,
+        placementStage: projection.placementStage,
+        placementConfidence: projection.placementConfidence,
+        placementUncertainty: projection.placementUncertainty,
+        promotionStage: projection.promotionStage,
         currentStageStats: projection.currentStageStats,
         targetStageStats: projection.targetStageStats,
       },
       placementScore: projection.score,
-      placementConfidence: projection.confidence,
+      placementConfidence: projection.placementConfidence,
       placementFresh: Boolean(params.placementFresh),
       placementUncertainNodeIds: params.uncertainNodeIds || [],
       placementCarryoverJson: params.carryoverSummary ?? Prisma.DbNull,
@@ -334,15 +439,20 @@ export async function refreshLearnerProfileFromGse(params: {
   await prisma.gseStageProjection.create({
     data: {
       studentId: params.studentId,
-      stage: projection.stage,
+      stage: projection.promotionStage,
       confidence: projection.confidence,
       stageScore: projection.score,
       source: "gse_projection",
       reason: params.reason,
       evidenceJson: {
+        placementStage: projection.placementStage,
+        placementConfidence: projection.placementConfidence,
+        placementUncertainty: projection.placementUncertainty,
+        promotionStage: projection.promotionStage,
         currentStageStats: projection.currentStageStats,
         targetStageStats: projection.targetStageStats,
         blockedByNodes: projection.blockedByNodes,
+        blockedBundles: projection.blockedBundles,
       },
     },
   });

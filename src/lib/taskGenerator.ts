@@ -51,9 +51,49 @@ function fallbackTaskSpec(input: GenerateTaskSpecInput): GeneratedTaskSpec {
     reason: input.plannerReason,
     focusSkills: input.focusSkills,
   });
+  const fallbackVariants: Record<string, string[]> = {
+    read_aloud: [
+      "Read this aloud clearly: 'I study English at school and practice with my friends.'",
+      "Read this aloud clearly: 'Every day I learn new words and use them in class.'",
+      "Read this aloud clearly: 'Our class works together, asks questions, and solves problems.'",
+    ],
+    target_vocab: [
+      `Use these words in a short talk: ${input.targetWords.slice(0, 4).join(", ") || "school, learn, friend, goal"}.`,
+      `Make 3-4 sentences using these words: ${input.targetWords.slice(0, 4).join(", ") || "plan, study, team, improve"}.`,
+      `Speak about your day and include these words: ${input.targetWords.slice(0, 4).join(", ") || "homework, class, read, practice"}.`,
+    ],
+    topic_talk: [
+      "Talk about a school activity you enjoy and explain why it helps you.",
+      "Tell us about a challenge you solved this week and what you learned.",
+      "Talk about your favorite subject and give one real example.",
+    ],
+    qa_prompt: [
+      "Question: What helps you learn faster? Give your answer and one example.",
+      "Question: How do you prepare for class? Answer in 3-4 sentences.",
+      "Question: What do you do after school to improve your English?",
+    ],
+    role_play: [
+      "Role-play: Welcome a new classmate and ask two friendly questions.",
+      "Role-play: Ask your teacher for help politely and explain your problem.",
+      "Role-play: Invite a friend to study and agree on a plan.",
+    ],
+    filler_control: [
+      "Speak about your weekend clearly and avoid filler words like 'um' and 'uh'.",
+      "Talk for 30-45 seconds about your favorite game without filler words.",
+      "Explain your morning routine with clear pauses and no filler words.",
+    ],
+    speech_builder: [
+      "Build a short speech: topic, main idea, one example, clear ending.",
+      "Give a 4-part mini speech: start, key point, example, finish.",
+      "Speak in 4 steps: topic, idea, example, ending.",
+    ],
+  };
+  const variants = fallbackVariants[input.taskType] || [];
+  const selectedPrompt = variants.find((candidate) => !isTooSimilarPrompt(candidate, input.recentPrompts || []));
+  const prompt = selectedPrompt || template.prompt;
   return {
     taskType: template.type,
-    prompt: template.prompt,
+    prompt,
     constraints: template.constraints,
     maxDurationSec: template.maxDurationSec,
     assessmentMode: template.assessmentMode,

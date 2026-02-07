@@ -16,6 +16,10 @@ type Skill = {
 
 type ProgressData = {
   stage?: string;
+  placementStage?: string;
+  promotionStage?: string;
+  placementUncertainty?: number | null;
+  whyDifferent?: string;
   ageBand?: string;
   cycleWeek?: number;
   placementConfidence?: number | null;
@@ -37,10 +41,21 @@ type ProgressData = {
   nodeProgress?: {
     masteredNodes: number;
     inProgressNodes: number;
+    observedNodesCount?: number;
+    candidateNodesCount?: number;
+    verifiedNodesCount?: number;
     delta7: number;
     delta28: number;
     coverage7: number;
     coverage28: number;
+    verificationQueue?: Array<{
+      nodeId: string;
+      descriptor: string;
+      dueAt?: string | null;
+      domain: "vocab" | "grammar" | "lo";
+      mastery: number;
+      reliability: "high" | "medium" | "low";
+    }>;
     nextTargetNodes: Array<{
       nodeId: string;
       descriptor: string;
@@ -72,6 +87,13 @@ type ProgressData = {
     coverageRatio: number | null;
     blockedByNodes: string[];
     blockedByNodeDescriptors?: string[];
+    blockedBundles?: Array<{
+      bundleKey: string;
+      title: string;
+      domain: string;
+      reason: string;
+      reasonLabel?: string;
+    }>;
   };
   weeklyFocusReason?: string;
 };
@@ -149,8 +171,13 @@ export default function ProgressPage() {
                   <span>Weekly focus</span>
                   <strong>{data.focus ? labelForSkill(data.focus) : "Build more samples"}</strong>
                   <p className="subtitle">
-                    Stage: {data.stage || "A0"} | Age: {data.ageBand || "9-11"} | Week {data.cycleWeek || 1}
+                    Stage (promotion): {data.promotionStage || data.stage || "A0"} | Placement:{" "}
+                    {data.placementStage || "A0"} | Age: {data.ageBand || "9-11"} | Week {data.cycleWeek || 1}
                   </p>
+                  {typeof data.placementUncertainty === "number" && (
+                    <p className="subtitle">Placement uncertainty: {data.placementUncertainty.toFixed(2)}</p>
+                  )}
+                  {data.whyDifferent && <p className="subtitle">{data.whyDifferent}</p>}
                   {data.weeklyFocusReason && <p className="subtitle">{data.weeklyFocusReason}</p>}
                 </div>
               </div>
@@ -198,6 +225,11 @@ export default function ProgressPage() {
                       Mastered: {data.nodeProgress.masteredNodes} | In progress: {data.nodeProgress.inProgressNodes}
                     </p>
                     <p className="subtitle">
+                      Observed: {data.nodeProgress.observedNodesCount || 0} | Candidate:{" "}
+                      {data.nodeProgress.candidateNodesCount || 0} | Verified:{" "}
+                      {data.nodeProgress.verifiedNodesCount || 0}
+                    </p>
+                    <p className="subtitle">
                       Node coverage 7d: {data.nodeProgress.coverage7} ({data.nodeProgress.delta7 >= 0 ? "+" : ""}
                       {data.nodeProgress.delta7}) | 28d: {data.nodeProgress.coverage28} (
                       {data.nodeProgress.delta28 >= 0 ? "+" : ""}
@@ -212,6 +244,18 @@ export default function ProgressPage() {
                           </li>
                         ))}
                       </ul>
+                    )}
+                    {(data.nodeProgress.verificationQueue?.length || 0) > 0 && (
+                      <>
+                        <p className="subtitle">Need verification:</p>
+                        <ul style={{ paddingLeft: 16 }}>
+                          {data.nodeProgress.verificationQueue?.slice(0, 8).map((node) => (
+                            <li key={`verify-${node.nodeId}`}>
+                              {node.descriptor} ({node.domain}) - mastery {Math.round(node.mastery)}
+                            </li>
+                          ))}
+                        </ul>
+                      </>
                     )}
                   </div>
                 </>
@@ -235,6 +279,16 @@ export default function ProgressPage() {
                       (data.promotionReadiness.blockedByNodeDescriptors?.length || 0) > 0 && (
                         <p className="subtitle">
                           Blockers: {data.promotionReadiness.blockedByNodeDescriptors?.slice(0, 5).join(", ")}
+                        </p>
+                      )}
+                    {!data.promotionReadiness.ready &&
+                      (data.promotionReadiness.blockedBundles?.length || 0) > 0 && (
+                        <p className="subtitle">
+                          Blocked bundles:{" "}
+                          {data.promotionReadiness.blockedBundles
+                            ?.slice(0, 4)
+                            .map((item) => `${item.title} [${item.reasonLabel || item.reason}]`)
+                            .join("; ")}
                         </p>
                       )}
                   </div>

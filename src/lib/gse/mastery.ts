@@ -1,12 +1,23 @@
 import { prisma } from "@/lib/db";
 
 export type GseReliability = "high" | "medium" | "low";
+export type GseEvidenceKind = "direct" | "supporting" | "negative";
+export type GseOpportunityType = "explicit_target" | "elicited_incidental" | "incidental";
+export type NodeActivationState = "observed" | "candidate_for_verification" | "verified";
+export type EvidenceActivationImpact = "none" | "observed" | "candidate" | "verified";
 
 export type MasteryEvidence = {
   nodeId: string;
   confidence: number; // 0..1
   impact: number; // 0..1
   reliability: GseReliability;
+  evidenceKind?: GseEvidenceKind;
+  opportunityType?: GseOpportunityType;
+  score?: number; // 0..1
+  weight?: number; // precomputed weight in [0..1.2]
+  usedForPromotion?: boolean;
+  taskType?: string;
+  targeted?: boolean;
 };
 
 export type NodeMasteryOutcome = {
@@ -19,16 +30,28 @@ export type NodeMasteryOutcome = {
   decayImpact: number;
   reliability: GseReliability;
   evidenceCount: number;
+  alphaBefore: number;
+  alphaAfter: number;
+  betaBefore: number;
+  betaAfter: number;
+  activationStateBefore: NodeActivationState;
+  activationStateAfter: NodeActivationState;
+  activationImpact: EvidenceActivationImpact;
+  verificationDueAt: string | null;
 };
 
 function clamp(value: number, min = 0, max = 100) {
   return Math.max(min, Math.min(max, value));
 }
 
+function clamp01(value: number) {
+  return Math.max(0, Math.min(1, value));
+}
+
 function reliabilityFactor(reliability: GseReliability) {
   if (reliability === "high") return 1;
-  if (reliability === "medium") return 0.7;
-  return 0.45;
+  if (reliability === "medium") return 0.78;
+  return 0.58;
 }
 
 function defaultHalfLifeDays(nodeType: string | null, skill: string | null) {
@@ -47,6 +70,44 @@ function effectiveHalfLifeDays(base: number, evidenceCount: number, reliability:
   const repetitionBoost = 1 + Math.log2(Math.max(1, evidenceCount + 1)) * 0.35;
   const reliabilityBoost = reliability === "high" ? 1.2 : reliability === "medium" ? 1 : 0.85;
   return Math.max(3, base * repetitionBoost * reliabilityBoost);
+}
+
+function baseWeight(kind: GseEvidenceKind, opportunity: GseOpportunityType) {
+  if (kind === "direct" && opportunity === "explicit_target") return 1;
+  if (kind === "direct" && opportunity === "elicited_incidental") return 0.65;
+  if (kind === "supporting" && opportunity === "incidental") return 0.35;
+  if (kind === "negative" && opportunity === "explicit_target") return 0.9;
+  if (kind === "negative" && opportunity === "incidental") return 0.4;
+  if (kind === "supporting") return 0.3;
+  if (kind === "negative") return 0.55;
+  return 0.5;
+}
+
+function deriveReliability(params: {
+  directEvidenceCount: number;
+  uncertainty: number;
+  crossTaskEvidenceCount: number;
+}) {
+  const directScore = Math.min(1, params.directEvidenceCount / 12);
+  const uncertaintyScore = 1 - Math.min(1, params.uncertainty / 0.45);
+  const crossTaskScore = Math.min(1, params.crossTaskEvidenceCount / 8);
+  const score = directScore * 0.45 + uncertaintyScore * 0.4 + crossTaskScore * 0.15;
+  if (score >= 0.75) return "high" as const;
+  if (score >= 0.5) return "medium" as const;
+  return "low" as const;
+}
+
+function normalizeActivationState(value: string | null | undefined): NodeActivationState {
+  if (value === "verified" || value === "candidate_for_verification" || value === "observed") return value;
+  return "observed";
+}
+
+function median(values: number[]) {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  if (sorted.length % 2 === 0) return (sorted[mid - 1] + sorted[mid]) / 2;
+  return sorted[mid];
 }
 
 export function computeDecayedMastery(params: {
@@ -68,14 +129,20 @@ export function computeDecayedMastery(params: {
 }
 
 export function computeNextMasteryScore(current: number, evidence: MasteryEvidence) {
-  const confidence = clamp(evidence.confidence * 100) / 100;
-  const impact = clamp(evidence.impact * 100) / 100;
-  const factor = reliabilityFactor(evidence.reliability);
-  const signal = clamp(35 + confidence * impact * factor * 65);
-  const sigma = 22;
-  const step = clamp(0.08 + sigma / 200, 0.08, 0.28);
-  const next = current + step * (signal - current);
-  return Number(clamp(next).toFixed(2));
+  const kind = evidence.evidenceKind || "direct";
+  const opportunity = evidence.opportunityType || "explicit_target";
+  const score = clamp01(
+    typeof evidence.score === "number"
+      ? evidence.score
+      : clamp01(0.5 + evidence.confidence * evidence.impact * 0.5)
+  );
+  const weight =
+    typeof evidence.weight === "number"
+      ? clamp01(evidence.weight)
+      : clamp01(baseWeight(kind, opportunity) * evidence.confidence * reliabilityFactor(evidence.reliability));
+  const alpha = Math.max(1, (current / 100) * 8) + weight * score;
+  const beta = Math.max(1, (1 - current / 100) * 8) + weight * (1 - score);
+  return Number(clamp((alpha / (alpha + beta)) * 100).toFixed(2));
 }
 
 export async function applyEvidenceToStudentMastery(params: {
@@ -85,6 +152,7 @@ export async function applyEvidenceToStudentMastery(params: {
 }) {
   const outcomes: NodeMasteryOutcome[] = [];
   const now = new Date();
+
   for (const evidence of params.evidences) {
     const existing = await prisma.studentGseMastery.findUnique({
       where: {
@@ -102,20 +170,86 @@ export async function applyEvidenceToStudentMastery(params: {
         },
       },
     });
+    const spacingStateRaw =
+      existing?.spacingStateJson && typeof existing.spacingStateJson === "object"
+        ? (existing.spacingStateJson as Record<string, unknown>)
+        : {};
+    const incidentalTaskTypes = Array.isArray(spacingStateRaw.incidentalTaskTypes)
+      ? spacingStateRaw.incidentalTaskTypes
+          .map((value) => String(value))
+          .filter(Boolean)
+      : [];
+    const incidentalConfidences = Array.isArray(spacingStateRaw.incidentalConfidences)
+      ? spacingStateRaw.incidentalConfidences
+          .map((value) => (typeof value === "number" ? value : Number(value)))
+          .filter((value) => Number.isFinite(value))
+      : [];
+    const activationStateBefore = normalizeActivationState(existing?.activationState);
+
+    const previousMean = existing?.masteryMean ?? existing?.masteryScore ?? 25;
+    const previousScore01 = clamp01(previousMean / 100);
+    const priorStrength = Math.max(4, (existing?.evidenceCount ?? 0) + 4);
+    const alphaBefore =
+      typeof existing?.alpha === "number" && existing.alpha > 0
+        ? existing.alpha
+        : Math.max(1, previousScore01 * priorStrength);
+    const betaBefore =
+      typeof existing?.beta === "number" && existing.beta > 0
+        ? existing.beta
+        : Math.max(1, (1 - previousScore01) * priorStrength);
+
+    const kind: GseEvidenceKind = evidence.evidenceKind || "direct";
+    const opportunity: GseOpportunityType = evidence.opportunityType || "explicit_target";
+    const score = clamp01(
+      typeof evidence.score === "number"
+        ? evidence.score
+        : evidence.reliability === "low"
+        ? evidence.confidence * evidence.impact * 0.8
+        : evidence.confidence * evidence.impact
+    );
+    const computedWeight =
+      typeof evidence.weight === "number"
+        ? Math.max(0.05, Math.min(1.2, evidence.weight))
+        : Math.max(
+            0.05,
+            Math.min(
+              1.2,
+              baseWeight(kind, opportunity) *
+                clamp01(evidence.confidence) *
+                reliabilityFactor(evidence.reliability) *
+                Math.max(0.2, clamp01(evidence.impact))
+            )
+          );
+
+    const alphaAfter = alphaBefore + computedWeight * score;
+    const betaAfter = betaBefore + computedWeight * (1 - score);
+    const nextMean = Number(clamp((alphaAfter / (alphaAfter + betaAfter)) * 100).toFixed(2));
+    const nextUncertainty = Number((1 / Math.sqrt(Math.max(2, alphaAfter + betaAfter))).toFixed(4));
 
     const previousReliability = (existing?.reliability as GseReliability | null) || "low";
+    const nextCount = (existing?.evidenceCount ?? 0) + 1;
+    const directEvidenceCount =
+      (existing?.directEvidenceCount ?? 0) + (kind === "direct" ? 1 : 0);
+    const negativeEvidenceCount =
+      (existing?.negativeEvidenceCount ?? 0) + (kind === "negative" ? 1 : 0);
+    const crossTaskEvidenceCount =
+      (existing?.crossTaskEvidenceCount ?? 0) + (opportunity === "incidental" ? 1 : 0);
+    const supportingEvidenceCount =
+      (existing?.supportingEvidenceCount ?? 0) + (kind === "supporting" ? 1 : 0);
+
+    const derivedReliability = deriveReliability({
+      directEvidenceCount,
+      uncertainty: nextUncertainty,
+      crossTaskEvidenceCount,
+    });
     const reliability: GseReliability =
-      previousReliability === "high" || evidence.reliability === "high"
+      previousReliability === "high" && derivedReliability === "medium"
         ? "high"
-        : previousReliability === "medium" || evidence.reliability === "medium"
-        ? "medium"
-        : "low";
-    const previousMean = existing?.masteryMean ?? existing?.masteryScore ?? 25;
-    const previousSigma = existing?.masterySigma ?? 24;
+        : derivedReliability;
+
     const previousHalfLife =
       existing?.halfLifeDays ??
       defaultHalfLifeDays(existing?.node?.type || null, existing?.node?.skill || null);
-    const previousCount = existing?.evidenceCount ?? 0;
     const previousDecayed =
       existing?.decayedMastery ??
       computeDecayedMastery({
@@ -123,20 +257,15 @@ export async function applyEvidenceToStudentMastery(params: {
         lastEvidenceAt: existing?.lastEvidenceAt ?? null,
         now,
         halfLifeDays: previousHalfLife,
-        evidenceCount: previousCount,
+        evidenceCount: existing?.evidenceCount ?? 0,
         reliability: previousReliability,
       });
 
-    const observation = clamp(
-      evidence.confidence * evidence.impact * reliabilityFactor(evidence.reliability) * 100
-    );
-    const updateRate = clamp(0.08 + previousSigma / 220, 0.08, 0.32);
-    const nextMean = Number(clamp(previousDecayed + updateRate * (observation - previousDecayed)).toFixed(2));
-    const nextSigma = Number(Math.max(6, previousSigma * (1 - 0.12 * updateRate)).toFixed(2));
-    const nextCount = previousCount + 1;
     const nextHalfLife = Number(
-      Math.max(previousHalfLife, defaultHalfLifeDays(existing?.node?.type || null, existing?.node?.skill || null))
-        .toFixed(2)
+      Math.max(
+        previousHalfLife,
+        defaultHalfLifeDays(existing?.node?.type || null, existing?.node?.skill || null)
+      ).toFixed(2)
     );
     const nextDecayed = computeDecayedMastery({
       masteryMean: nextMean,
@@ -146,6 +275,52 @@ export async function applyEvidenceToStudentMastery(params: {
       evidenceCount: nextCount,
       reliability,
     });
+
+    const incidentalObserved =
+      kind === "supporting" && opportunity === "incidental" && evidence.targeted === false;
+    const nextIncidentalTaskTypes = [...incidentalTaskTypes];
+    const nextIncidentalConfidences = [...incidentalConfidences];
+    if (incidentalObserved) {
+      if (evidence.taskType && !nextIncidentalTaskTypes.includes(evidence.taskType)) {
+        nextIncidentalTaskTypes.push(evidence.taskType);
+      }
+      nextIncidentalConfidences.push(clamp01(evidence.confidence));
+      while (nextIncidentalConfidences.length > 12) nextIncidentalConfidences.shift();
+    }
+    const incidentalTaskTypeCount = nextIncidentalTaskTypes.length;
+    const incidentalMedianConfidence = median(nextIncidentalConfidences);
+
+    let activationStateAfter: NodeActivationState = activationStateBefore;
+    let activationImpact: EvidenceActivationImpact = "none";
+    let verificationDueAt: Date | null = existing?.verificationDueAt ?? null;
+
+    const verificationPass =
+      kind === "direct" &&
+      opportunity === "explicit_target" &&
+      score >= 0.7 &&
+      evidence.confidence >= 0.75 &&
+      evidence.usedForPromotion !== false;
+
+    if (activationStateBefore !== "verified" && verificationPass) {
+      activationStateAfter = "verified";
+      verificationDueAt = null;
+      activationImpact = "verified";
+    } else if (activationStateBefore !== "verified") {
+      if (incidentalObserved && activationStateBefore === "observed") {
+        activationImpact = "observed";
+      }
+      const candidateReady =
+        nextIncidentalConfidences.length >= 3 &&
+        incidentalTaskTypeCount >= 2 &&
+        incidentalMedianConfidence >= 0.7;
+      if (candidateReady) {
+        if (activationStateBefore !== "candidate_for_verification") {
+          activationImpact = "candidate";
+        }
+        activationStateAfter = "candidate_for_verification";
+        verificationDueAt = verificationDueAt || now;
+      }
+    }
 
     await prisma.studentGseMastery.upsert({
       where: {
@@ -157,12 +332,26 @@ export async function applyEvidenceToStudentMastery(params: {
       update: {
         masteryScore: nextMean,
         masteryMean: nextMean,
-        masterySigma: nextSigma,
+        masterySigma: Number((nextUncertainty * 100).toFixed(2)),
+        uncertainty: nextUncertainty,
+        alpha: alphaAfter,
+        beta: betaAfter,
         decayedMastery: nextDecayed,
         halfLifeDays: nextHalfLife,
         reliability,
         evidenceCount: nextCount,
+        directEvidenceCount,
+        supportingEvidenceCount,
+        negativeEvidenceCount,
+        crossTaskEvidenceCount,
+        incidentalTaskTypeCount,
+        activationState: activationStateAfter,
+        verificationDueAt,
         lastEvidenceAt: now,
+        spacingStateJson: {
+          incidentalTaskTypes: nextIncidentalTaskTypes,
+          incidentalConfidences: nextIncidentalConfidences,
+        },
         calculationVersion: params.calculationVersion,
       },
       create: {
@@ -170,12 +359,26 @@ export async function applyEvidenceToStudentMastery(params: {
         nodeId: evidence.nodeId,
         masteryScore: nextMean,
         masteryMean: nextMean,
-        masterySigma: nextSigma,
+        masterySigma: Number((nextUncertainty * 100).toFixed(2)),
+        uncertainty: nextUncertainty,
+        alpha: alphaAfter,
+        beta: betaAfter,
         decayedMastery: nextDecayed,
         halfLifeDays: nextHalfLife,
         reliability,
         evidenceCount: nextCount,
+        directEvidenceCount,
+        supportingEvidenceCount,
+        negativeEvidenceCount,
+        crossTaskEvidenceCount,
+        incidentalTaskTypeCount,
+        activationState: activationStateAfter,
+        verificationDueAt,
         lastEvidenceAt: now,
+        spacingStateJson: {
+          incidentalTaskTypes: nextIncidentalTaskTypes,
+          incidentalConfidences: nextIncidentalConfidences,
+        },
         calculationVersion: params.calculationVersion,
       },
     });
@@ -190,6 +393,14 @@ export async function applyEvidenceToStudentMastery(params: {
       decayImpact: Number((previousMean - previousDecayed).toFixed(2)),
       reliability,
       evidenceCount: nextCount,
+      alphaBefore: Number(alphaBefore.toFixed(4)),
+      alphaAfter: Number(alphaAfter.toFixed(4)),
+      betaBefore: Number(betaBefore.toFixed(4)),
+      betaAfter: Number(betaAfter.toFixed(4)),
+      activationStateBefore,
+      activationStateAfter,
+      activationImpact,
+      verificationDueAt: verificationDueAt ? verificationDueAt.toISOString() : null,
     });
   }
 

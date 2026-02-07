@@ -25,6 +25,8 @@ export async function GET(_: Request, context: PlannerDecisionContext) {
     expectedGain: decision.expectedGain,
     estimatedDifficulty: decision.estimatedDifficulty,
     targetNodeIds: decision.targetNodeIds,
+    domainsTargeted: decision.domainsTargeted,
+    diagnosticMode: decision.diagnosticMode,
     selectionReason: decision.selectionReason,
     primaryGoal: decision.primaryGoal,
     fallbackUsed: decision.fallbackUsed,

@@ -64,6 +64,11 @@ export default function PlacementPage() {
   const [state, setState] = useState<PlacementState | null>(null);
 
   useEffect(() => {
+    // Placement is now hidden in UX; cold-start diagnostics run inside normal tasks.
+    router.replace("/task");
+  }, [router]);
+
+  useEffect(() => {
     let active = true;
     let timer: NodeJS.Timeout | null = null;
 

@@ -52,9 +52,7 @@ model Student {
   attempts   Attempt[]
   progress   ProgressDaily[]
   metrics    AttemptMetric[]
-  skillDaily StudentSkillDaily[]
   profile    LearnerProfile?
-  mastery    StudentSkillMastery[]
   vocabulary StudentVocabulary[]
   placementSessions PlacementSession[]
   gseMastery StudentGseMastery[]
@@ -129,22 +127,6 @@ model AttemptMetric {
   @@index([studentId, metricKey])
 }
 
-model StudentSkillDaily {
-  id          String   @id @default(cuid())
-  studentId   String
-  date        DateTime
-  skillKey    String
-  value       Float
-  sampleCount Int      @default(1)
-  reliability String
-  createdAt   DateTime @default(now())
-
-  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
-
-  @@unique([studentId, date, skillKey])
-  @@index([studentId, skillKey, date])
-}
-
 model LearnerProfile {
   id                  String   @id @default(cuid())
   studentId           String   @unique
@@ -158,29 +140,14 @@ model LearnerProfile {
   placementCompletedAt DateTime?
   placementUncertainNodeIds String[]
   placementCarryoverJson Json?
+  coldStartActive     Boolean  @default(true)
+  coldStartAttempts   Int      @default(0)
   activeTrack         String   @default("balanced_convo_speech")
   cycleWeek           Int      @default(1)
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 
   student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
-}
-
-model StudentSkillMastery {
-  id             String   @id @default(cuid())
-  studentId      String
-  skillKey       String
-  masteryScore   Float
-  evidenceCount  Int      @default(0)
-  reliability    String
-  lastAssessedAt DateTime?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
-
-  @@unique([studentId, skillKey])
-  @@index([studentId])
 }
 
 model StudentVocabulary {
@@ -324,9 +291,44 @@ model GseNode {
   attemptEvidence AttemptGseEvidence[]
   mastery         StudentGseMastery[]
   taskTargets     TaskGseTarget[]
+  bundleLinks     GseBundleNode[]
 
   @@index([catalogVersionId, type])
   @@index([catalogVersionId, audience, skill])
+}
+
+model GseBundle {
+  id               String   @id @default(cuid())
+  key              String   @unique
+  stage            String
+  domain           String
+  title            String
+  requiredCoverage Float    @default(0.65)
+  minDirectEvidence Int     @default(12)
+  reliabilityGate  Float    @default(0.65)
+  active           Boolean  @default(true)
+  metadataJson     Json?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  nodes GseBundleNode[]
+
+  @@index([stage, domain, active])
+}
+
+model GseBundleNode {
+  id        String   @id @default(cuid())
+  bundleId  String
+  nodeId    String
+  required  Boolean  @default(true)
+  weight    Float    @default(1)
+  createdAt DateTime @default(now())
+
+  bundle GseBundle @relation(fields: [bundleId], references: [id], onDelete: Cascade)
+  node   GseNode   @relation(fields: [nodeId], references: [nodeId], onDelete: Cascade)
+
+  @@unique([bundleId, nodeId])
+  @@index([nodeId])
 }
 
 model GseNodeAlias {
@@ -364,8 +366,17 @@ model AttemptGseEvidence {
   studentId   String
   nodeId      String
   signalType  String
+  evidenceKind String  @default("supporting")
+  opportunityType String @default("incidental")
+  score       Float    @default(0.5)
+  weight      Float    @default(0.2)
   confidence  Float
   impact      Float
+  source      String   @default("rules")
+  domain      String?
+  usedForPromotion Boolean @default(false)
+  targeted    Boolean  @default(true)
+  activationImpact String @default("none")
   evidenceText String?
   metadataJson Json?
   createdAt   DateTime @default(now())
@@ -376,6 +387,7 @@ model AttemptGseEvidence {
 
   @@index([attemptId])
   @@index([studentId, nodeId])
+  @@index([studentId, nodeId, usedForPromotion])
 }
 
 model StudentGseMastery {
@@ -383,11 +395,21 @@ model StudentGseMastery {
   studentId        String
   nodeId           String
   masteryScore     Float
+  alpha            Float    @default(1)
+  beta             Float    @default(1)
   masteryMean      Float?
   masterySigma     Float?
+  uncertainty      Float?
   decayedMastery   Float?
   halfLifeDays     Float?
   evidenceCount    Int      @default(0)
+  directEvidenceCount Int   @default(0)
+  supportingEvidenceCount Int @default(0)
+  negativeEvidenceCount Int @default(0)
+  crossTaskEvidenceCount Int @default(0)
+  incidentalTaskTypeCount Int @default(0)
+  activationState String @default("observed")
+  verificationDueAt DateTime?
   reliability      String
   lastEvidenceAt   DateTime?
   decayStateJson   Json?
@@ -401,6 +423,7 @@ model StudentGseMastery {
 
   @@unique([studentId, nodeId])
   @@index([studentId, masteryScore])
+  @@index([studentId, activationState, verificationDueAt])
 }
 
 model GseStageProjection {
@@ -433,6 +456,8 @@ model PlannerDecisionLog {
   selectionReason  String
   primaryGoal      String?
   estimatedDifficulty Float?
+  domainsTargeted  String[]
+  diagnosticMode   Boolean  @default(false)
   createdAt        DateTime @default(now())
 
   student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)

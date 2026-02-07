@@ -25,6 +25,13 @@ export async function POST(_: Request, context: PlacementFinishContext) {
       placementId: id,
       status: "completed",
       result,
+      provisionalStage: result.provisionalStage,
+      promotionStage: result.promotionStage,
+      confidence: result.confidence,
+      uncertainty: result.uncertainty,
+      coverage: result.coverage,
+      reliability: result.reliability,
+      blockedBundles: result.blockedBundles,
     });
   } catch (error) {
     return NextResponse.json(

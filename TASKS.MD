@@ -1,6 +1,48 @@
 # TASKS: Autonomous English Trainer Roadmap (A1 -> C2 + Stage Speaking)
 
 ## Execution Log (последнее обновление)
+- GSE Brain v5 (implemented):
+  - Added non-target language capture:
+    - incidental `GSE_VOCAB` evidence from transcript words via `sourceKey + aliases`
+    - incidental `GSE_GRAMMAR` evidence from grammar checks mapped to grammar nodes
+  - Added activation lifecycle in mastery:
+    - `observed -> candidate_for_verification -> verified`
+    - verification requires direct explicit evidence (`score >= 0.7`, `confidence >= 0.75`)
+  - Promotion now counts verified nodes only (bundle coverage/reliability/stability use `activationState=verified`)
+  - Planner verification priority:
+    - surfaces candidate nodes and injects verification gain into utility
+    - exposes `selectionReasonType` and `verificationTargetNodeIds`
+  - API/UI explainability extensions:
+    - attempts: `incidentalFindings[]`, `activationTransitions[]`
+    - progress: `observed/candidate/verified` counters + `verificationQueue[]`
+  - Schema/migration:
+    - `StudentGseMastery`: `activationState`, `supportingEvidenceCount`, `incidentalTaskTypeCount`, `verificationDueAt`
+    - `AttemptGseEvidence`: `targeted`, `activationImpact`
+    - migration: `20260207213000_gse_brain_v5_observed_verified`
+- Brain-focus update (GSE v3/v4 continuation):
+  - Evidence consistency v2.1:
+    - в `TaskEvaluation` добавлены стабильные `loChecks[]` и `grammarChecks[]`
+    - в `gse/evidence` введен check-level mapping + `metadataJson` (`checkId`, `ruleVersion`, `consistencyFlag`)
+    - добавлено правило `lo_check_negative_required` для low task score при explicit target
+  - Results/attempt API расширены:
+    - `evidenceMatrix[]` и `consistencyFlag` в `/api/attempts/:id`
+  - Stage explainability усилена:
+    - `placementStage` и `promotionStage` явно разделены в прогрессе
+    - добавлен `whyDifferent` и человекочитаемые причины blockers
+  - Quality loop operationalized:
+    - `src/lib/gse/quality.ts`
+    - endpoint `GET /api/quality/gse`
+    - пороговые quality-gates: `lowScoreWithoutNegativeRate`, `grammarOverweightRate`, `vocabFalsePositiveRate`
+- Удалена legacy skill-модель из схемы:
+  - удалены `StudentSkillDaily`, `StudentSkillMastery` из Prisma schema
+  - добавлена миграция `20260207204000_drop_legacy_skill_tables`
+- Sprint 6 (in progress): observability + quality hardening
+  - добавлено событие `node_update_applied` после применения evidence к node mastery
+  - добавлено событие `promotion_blocked_bundle` при stage refresh
+  - добавлен latency snapshot для planner (`planner_latency_snapshot`, p50/p95/p99)
+  - добавлен QA-скрипт `npm run gse:qa` (`src/scripts/gse_quality_checks.ts`)
+  - в `evidence.ts` добавлена age-band calibration (`6-8`, `9-11`, `12-14`) для весов evidence
+  - исправлен расчет причины `coverage` в bundle blockers
 - Реализован adaptive placement (CAT/IRT-lite):
   - `placement_item` bank (seed A0..C2, 5 core skills)
   - online update `theta/sigma`
@@ -85,6 +127,14 @@
   - `npm test` ✅
   - `npm run lint` ✅
   - `npm run build` ✅
+
+## Current Active Focus (brain-only)
+1. Закрыть quality action loop:
+- при breach quality threshold автоматически включать corrective policy на домен (`vocab|grammar|lo`) в planner utility (не только в выборе task type).
+2. Усилить promotion объяснимость:
+- каждое blocked condition должно ссылаться на конкретные bundle/node labels + численные пороги.
+3. Довести evidence-mastery согласованность:
+- consistency rule failures должны логироваться отдельным событием и попадать в quality report.
 
 ## 0) Правило исполнения (обязательно)
 - Двигаемся сверху вниз по этому файлу.
@@ -372,3 +422,37 @@
 1. Реализовать grammar evaluator + schema + fallback + UI cards.
 2. Расширить scoring pipeline (language/discourse/reliability gating).
 3. Обновить `/api/progress` под новые skills и weekly coach focus.
+
+---
+
+## 9) Execution Log (2026-02-07, GSE Brain v5 follow-up)
+
+### Сделано
+1. Исправлен корневой баг vocab mapping:
+- в `src/lib/gse/evidence.ts` матчинг переведен с `sourceKey` (тех-ID) на человеческие лексемы (`descriptor/alias`) + лемматизация.
+2. Добавлен incidental vocab capture v2:
+- поддержка unigram/bigram/trigram кандидатов из transcript;
+- фильтр stopwords для снижения мусорных совпадений.
+3. Усилен grammar capture:
+- в `src/lib/evaluator.ts` добавлены rule-based grammar checks (positive + negative), включая agreement ошибки.
+- в `src/lib/gse/evidence.ts` non-target grammar теперь пишет не только supporting, но и negative incidental evidence.
+4. Добавлена автогенерация алиасов узлов:
+- `src/lib/gse/catalog.ts` теперь строит и пишет `GseNodeAlias` (`source=auto`) при обновлении каталога.
+5. Добавлен и выполнен backfill алиасов:
+- новый скрипт `src/scripts/gse_backfill_aliases.ts`;
+- npm script: `gse:aliases:backfill`;
+- фактически заполнено ~240k auto aliases в локальной БД.
+6. Добавлены тесты:
+- `src/lib/gse_evidence_v2.test.ts`: проверка target vocab matching по descriptor при тех-ID в sourceKey.
+
+### Проверки
+1. `npm test` — pass.
+2. `npm run lint` — pass.
+3. `npm run build` — pass.
+
+### Следующий шаг (по мозгу, без отвлечений)
+1. Ограничить incidental vocab disambiguation:
+- когда один alias матчится к множеству нод, оставлять top-k по близости GSE band + task context.
+2. Ввести явный verification loop UI/API:
+- `candidate_for_verification` -> приоритетная проверочная задача -> `verified`.
+3. Пересчитать promotion readiness после накопления verified evidence и показать разницу до/после в progress.

@@ -30,6 +30,25 @@ function trendFromDelta(delta: number | null): SkillTrend["trend"] {
   return "flat";
 }
 
+const STAGE_ORDER = ["A0", "A1", "A2", "B1", "B2", "C1", "C2"] as const;
+function stageIndex(stage?: string | null) {
+  const idx = STAGE_ORDER.indexOf((stage || "A0") as (typeof STAGE_ORDER)[number]);
+  return idx === -1 ? 0 : idx;
+}
+
+function readableBundleReason(reason: string) {
+  const parts = reason.split(",").map((item) => item.trim());
+  const mapped = parts.map((item) => {
+    if (item === "no_bundle_config") return "bundle is not configured";
+    if (item === "coverage") return "coverage is below threshold";
+    if (item === "reliability") return "reliability is below gate";
+    if (item === "stability") return "14-day stability is not met";
+    if (item === "direct_evidence") return "not enough direct evidence";
+    return item;
+  });
+  return mapped.join("; ");
+}
+
 async function computeStreak(studentId: string) {
   const days = await prisma.attempt.findMany({
     where: { studentId, status: "completed" },
@@ -87,6 +106,9 @@ export async function getStudentProgress(studentId: string) {
     const value = row.decayedMastery ?? row.masteryMean ?? row.masteryScore;
     return value >= 40 && value < 80;
   }).length;
+  const observedNodesCount = gseMastery.filter((row) => row.activationState === "observed").length;
+  const candidateNodesCount = gseMastery.filter((row) => row.activationState === "candidate_for_verification").length;
+  const verifiedNodesCount = gseMastery.filter((row) => row.activationState === "verified").length;
 
   const now = new Date();
   const last7Start = new Date(now);
@@ -153,6 +175,23 @@ export async function getStudentProgress(studentId: string) {
       sigma: row.masterySigma ?? 24,
       mastery: row.decayedMastery ?? row.masteryMean ?? row.masteryScore,
     }));
+  const verificationQueue = gseMastery
+    .filter((row) => row.activationState === "candidate_for_verification")
+    .sort((a, b) => {
+      const aDue = a.verificationDueAt ? a.verificationDueAt.getTime() : 0;
+      const bDue = b.verificationDueAt ? b.verificationDueAt.getTime() : 0;
+      return aDue - bDue;
+    })
+    .slice(0, 12)
+    .map((row) => ({
+      nodeId: row.nodeId,
+      descriptor: row.node.descriptor,
+      dueAt: row.verificationDueAt,
+      domain:
+        row.node.type === "GSE_VOCAB" ? "vocab" : row.node.type === "GSE_GRAMMAR" ? "grammar" : "lo",
+      mastery: row.decayedMastery ?? row.masteryMean ?? row.masteryScore,
+      reliability: row.reliability,
+    }));
 
   const skills: SkillTrend[] = projection.derivedSkills.map((item) => ({
     skillKey: item.skillKey,
@@ -178,11 +217,25 @@ export async function getStudentProgress(studentId: string) {
       ? `Improve ${focus} from weakest GSE node cluster.`
       : "Build more attempts to estimate weakest nodes.";
 
+  const placementStage = projection.placementStage;
+  const promotionStage = projection.promotionStage;
+  let whyDifferent = "Placement and promotion are aligned.";
+  if (stageIndex(placementStage) > stageIndex(promotionStage)) {
+    const topReason = projection.blockedBundles[0]?.reason || "bundle evidence is not sufficient yet";
+    whyDifferent = `Placement is provisional and higher than promotion because ${readableBundleReason(topReason)}.`;
+  } else if (stageIndex(placementStage) < stageIndex(promotionStage)) {
+    whyDifferent = "Promotion is higher because long-term bundle evidence is stronger than initial placement.";
+  }
+
   return {
-    stage: projection.stage,
+    stage: projection.promotionStage,
+    placementStage: projection.placementStage,
+    promotionStage: projection.promotionStage,
+    placementUncertainty: projection.placementUncertainty,
+    whyDifferent,
     ageBand: profile?.ageBand || "9-11",
     cycleWeek: profile?.cycleWeek || 1,
-    placementConfidence: profile?.placementConfidence || projection.confidence,
+    placementConfidence: profile?.placementConfidence || projection.placementConfidence,
     placementFresh: Boolean(profile?.placementFresh),
     carryoverSummary: profile?.placementCarryoverJson || null,
     placementNeeded: gseMastery.length < 8,
@@ -197,17 +250,25 @@ export async function getStudentProgress(studentId: string) {
     nodeProgress: {
       masteredNodes,
       inProgressNodes,
+      observedNodesCount,
+      candidateNodesCount,
+      verifiedNodesCount,
       nextTargetNodes,
       delta7: last7Coverage - prev7Coverage,
       delta28: last28Coverage - prev28Coverage,
       coverage7: last7Coverage,
       coverage28: last28Coverage,
+      verificationQueue,
     },
+    observedNodesCount,
+    candidateNodesCount,
+    verifiedNodesCount,
+    verificationQueue,
     nodeCoverageByBand: projection.nodeCoverageByBand,
     overdueNodes,
     uncertainNodes,
     promotionReadiness: {
-      currentStage: projection.stage,
+      currentStage: projection.promotionStage,
       targetStage: projection.targetStage,
       ready: projection.promotionReady,
       readinessScore: projection.score,
@@ -217,6 +278,11 @@ export async function getStudentProgress(studentId: string) {
           : Number((projection.targetStageStats.coverage70 * 100).toFixed(1)),
       blockedByNodes: projection.blockedByNodes,
       blockedByNodeDescriptors: projection.blockedByNodeDescriptors,
+      blockedBundles: projection.blockedBundles,
+      blockedBundlesReadable: projection.blockedBundles.map((item) => ({
+        ...item,
+        reasonLabel: readableBundleReason(item.reason),
+      })),
     },
     blockedByNodes: projection.blockedByNodes,
     weeklyFocusReason,

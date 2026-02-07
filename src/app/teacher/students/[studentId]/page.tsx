@@ -94,10 +94,22 @@ type NodeOutcomeRow = {
   previousMean?: number;
   nextMean?: number;
   attemptCreatedAt: string;
+  streakMultiplier?: number;
+};
+
+type LevelNodeRow = {
+  nodeId: string;
+  descriptor: string;
+  gseCenter: number | null;
+  value: number;
+  directEvidenceCount: number;
+  activationState: string | null;
+  status: "mastered" | "credited" | "in_progress" | "no_evidence";
 };
 
 type StudentProfile = {
   catalogNodesByBand?: Record<string, number>;
+  perStageCredited?: Record<string, number>;
   student: {
     id: string;
     displayName: string;
@@ -124,6 +136,9 @@ export default function TeacherStudentProfilePage() {
   const [data, setData] = useState<StudentProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [levelModalStage, setLevelModalStage] = useState<string | null>(null);
+  const [levelModalNodes, setLevelModalNodes] = useState<LevelNodeRow[] | null>(null);
+  const [levelModalLoading, setLevelModalLoading] = useState(false);
 
   useEffect(() => {
     fetch(`/api/teacher/students/${studentId}`)
@@ -135,6 +150,27 @@ export default function TeacherStudentProfilePage() {
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, [studentId]);
+
+  async function openLevelModal(stage: string) {
+    setLevelModalStage(stage);
+    setLevelModalNodes(null);
+    setLevelModalLoading(true);
+    try {
+      const res = await fetch(
+        `/api/teacher/students/${studentId}/level-nodes?stage=${encodeURIComponent(stage)}`
+      );
+      if (res.ok) {
+        const json = await res.json();
+        setLevelModalNodes(json.nodes ?? []);
+      }
+    } finally {
+      setLevelModalLoading(false);
+    }
+  }
+  function closeLevelModal() {
+    setLevelModalStage(null);
+    setLevelModalNodes(null);
+  }
 
   if (loading) {
     return (
@@ -159,7 +195,7 @@ export default function TeacherStudentProfilePage() {
     );
   }
 
-  const { student, progress, recentAttempts, catalogNodesByBand } = data;
+  const { student, progress, recentAttempts, catalogNodesByBand, perStageCredited } = data;
   const np = progress.nodeProgress;
   const pr = progress.promotionReadiness;
 
@@ -203,7 +239,7 @@ export default function TeacherStudentProfilePage() {
                 By level (temporary)
               </h2>
               <p className="subtitle" style={{ marginBottom: 10, fontSize: "0.8rem" }}>
-                Total = nodes in catalog at this level. With evidence = nodes this student has attempted. Mastered = value ≥75. In progress = with evidence but not yet mastered.
+                Total = nodes in catalog. Credited = verified+70 or (value≥50 and ≥1 direct). Click a level to see all nodes and their status.
               </p>
               <div style={{ overflowX: "auto" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem" }}>
@@ -211,6 +247,7 @@ export default function TeacherStudentProfilePage() {
                     <tr style={{ borderBottom: "1px solid rgba(16,22,47,0.12)", color: "var(--ink-2)" }}>
                       <th style={{ textAlign: "left", padding: "6px 8px", fontWeight: 600 }}>Level</th>
                       <th style={{ textAlign: "right", padding: "6px 8px" }}>Total</th>
+                      <th style={{ textAlign: "right", padding: "6px 8px" }}>Credited</th>
                       <th style={{ textAlign: "right", padding: "6px 8px" }}>With evidence</th>
                       <th style={{ textAlign: "right", padding: "6px 8px" }}>Mastered</th>
                       <th style={{ textAlign: "right", padding: "6px 8px" }}>In progress</th>
@@ -223,6 +260,7 @@ export default function TeacherStudentProfilePage() {
                     {(["A1", "A2", "B1", "B2", "C1", "C2"] as const).map((stage) => {
                       const stat = progress.nodeCoverageByBand?.[stage] ?? { mastered: 0, total: 0 };
                       const catalogTotal = catalogNodesByBand?.[stage] ?? 0;
+                      const credited = perStageCredited?.[stage] ?? 0;
                       const withEvidence = stat.total;
                       const mastered = stat.mastered;
                       const inProgress = withEvidence - mastered;
@@ -230,8 +268,23 @@ export default function TeacherStudentProfilePage() {
                       const pctCatalog = catalogTotal > 0 ? Math.round((mastered / catalogTotal) * 100) : 0;
                       return (
                         <tr key={stage} style={{ borderBottom: "1px solid rgba(16,22,47,0.06)" }}>
-                          <td style={{ padding: "6px 8px", fontWeight: 600 }}>{stage}</td>
+                          <td
+                            style={{
+                              padding: "6px 8px",
+                              fontWeight: 600,
+                              cursor: "pointer",
+                              textDecoration: "underline",
+                              color: "var(--accent-1)",
+                            }}
+                            onClick={() => openLevelModal(stage)}
+                            role="button"
+                            tabIndex={0}
+                            onKeyDown={(e) => e.key === "Enter" && openLevelModal(stage)}
+                          >
+                            {stage}
+                          </td>
                           <td style={{ textAlign: "right", padding: "6px 8px" }}>{catalogTotal}</td>
+                          <td style={{ textAlign: "right", padding: "6px 8px" }}>{credited}</td>
                           <td style={{ textAlign: "right", padding: "6px 8px" }}>{withEvidence}</td>
                           <td style={{ textAlign: "right", padding: "6px 8px" }}>{mastered}</td>
                           <td style={{ textAlign: "right", padding: "6px 8px", color: "var(--ink-2)" }}>{inProgress}</td>
@@ -262,6 +315,116 @@ export default function TeacherStudentProfilePage() {
                     })}
                   </tbody>
                 </table>
+              </div>
+            </div>
+          )}
+
+          {/* Level nodes modal (click level to open) */}
+          {levelModalStage != null && (
+            <div
+              style={{
+                position: "fixed",
+                inset: 0,
+                background: "rgba(16,22,47,0.5)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                zIndex: 1000,
+                padding: 24,
+              }}
+              onClick={closeLevelModal}
+              role="dialog"
+              aria-modal="true"
+              aria-label={`Level ${levelModalStage} nodes`}
+            >
+              <div
+                className="card"
+                style={{
+                  maxWidth: 640,
+                  maxHeight: "80vh",
+                  overflow: "hidden",
+                  display: "flex",
+                  flexDirection: "column",
+                  padding: 0,
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div style={{ padding: "16px 20px", borderBottom: "1px solid rgba(16,22,47,0.1)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <h3 style={{ fontFamily: "var(--font-display)", fontSize: "1.1rem", margin: 0 }}>
+                    Level {levelModalStage} — all nodes
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={closeLevelModal}
+                    style={{
+                      padding: "6px 12px",
+                      cursor: "pointer",
+                      border: "1px solid rgba(16,22,47,0.2)",
+                      borderRadius: "var(--radius-sm)",
+                      background: "white",
+                      fontSize: "0.9rem",
+                    }}
+                  >
+                    Close
+                  </button>
+                </div>
+                <div style={{ overflow: "auto", flex: 1, padding: 16 }}>
+                  {levelModalLoading ? (
+                    <p className="subtitle">Loading…</p>
+                  ) : levelModalNodes ? (
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem" }}>
+                      <thead>
+                        <tr style={{ borderBottom: "1px solid rgba(16,22,47,0.12)", color: "var(--ink-2)" }}>
+                          <th style={{ textAlign: "left", padding: "8px", fontWeight: 600 }}>Descriptor</th>
+                          <th style={{ textAlign: "left", padding: "8px", width: 100 }}>Status</th>
+                          <th style={{ textAlign: "right", padding: "8px", width: 56 }}>Value</th>
+                          <th style={{ textAlign: "right", padding: "8px", width: 56 }}>Direct</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[...levelModalNodes]
+                          .sort((a, b) => b.value - a.value)
+                          .map((n) => (
+                          <tr key={n.nodeId} style={{ borderBottom: "1px solid rgba(16,22,47,0.06)" }}>
+                            <td style={{ padding: "8px", color: "var(--ink-1)" }} title={n.descriptor}>
+                              {(n.descriptor || n.nodeId).slice(0, 60)}
+                              {(n.descriptor?.length ?? 0) > 60 ? "…" : ""}
+                            </td>
+                            <td style={{ padding: "8px" }}>
+                              <span
+                                style={{
+                                  padding: "2px 6px",
+                                  borderRadius: 4,
+                                  fontSize: "0.8rem",
+                                  background:
+                                    n.status === "mastered"
+                                      ? "rgba(45,212,160,0.2)"
+                                      : n.status === "credited"
+                                        ? "rgba(99,102,241,0.15)"
+                                        : n.status === "in_progress"
+                                          ? "rgba(16,22,47,0.08)"
+                                          : "rgba(16,22,47,0.04)",
+                                  color:
+                                    n.status === "mastered"
+                                      ? "#0d9668"
+                                      : n.status === "credited"
+                                        ? "#4f46e5"
+                                        : "var(--ink-2)",
+                                }}
+                              >
+                                {n.status}
+                              </span>
+                            </td>
+                            <td style={{ textAlign: "right", padding: "8px" }}>{n.value}</td>
+                            <td style={{ textAlign: "right", padding: "8px" }}>{n.directEvidenceCount}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <p className="subtitle">No nodes.</p>
+                  )}
+                </div>
               </div>
             </div>
           )}
@@ -470,6 +633,9 @@ export default function TeacherStudentProfilePage() {
                       ? `${Math.round(item.previousMean)} → ${Math.round(item.nextMean)} (+${item.deltaMastery.toFixed(1)})`
                       : `${item.deltaMastery >= 0 ? "+" : ""}${item.deltaMastery.toFixed(1)}`}
                     {" "}(decay impact {item.decayImpact.toFixed(1)})
+                    {typeof item.streakMultiplier === "number"
+                      ? ` · streak ×${item.streakMultiplier.toFixed(2)}`
+                      : null}
                   </li>
                 ))}
               </ul>

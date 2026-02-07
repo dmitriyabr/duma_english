@@ -38,6 +38,8 @@ export type NodeMasteryOutcome = {
   activationStateAfter: NodeActivationState;
   activationImpact: EvidenceActivationImpact;
   verificationDueAt: string | null;
+  /** When present, the evidence weight was multiplied by this (streak bonus). */
+  streakMultiplier?: number;
 };
 
 function clamp(value: number, min = 0, max = 100) {
@@ -240,9 +242,10 @@ export async function applyEvidenceToStudentMastery(params: {
     if (score >= 0.6) effectiveWeight *= 1.1;
     else if (score < 0.4) effectiveWeight *= 0.9;
     // Streak bonus: exponent with cap (2nd ×1.15, 3rd ×1.32, 4th+ ×1.5)
+    let streakMultiplierApplied: number | undefined;
     if (directSuccess && directSuccessStreak >= 1) {
-      const streakMultiplier = Math.min(1.5, 1.15 ** Math.min(directSuccessStreak, 3));
-      effectiveWeight *= streakMultiplier;
+      streakMultiplierApplied = Math.min(1.5, 1.15 ** Math.min(directSuccessStreak, 3));
+      effectiveWeight *= streakMultiplierApplied;
     }
     effectiveWeight = Math.max(0.05, Math.min(maxWeight, effectiveWeight));
 
@@ -438,6 +441,7 @@ export async function applyEvidenceToStudentMastery(params: {
       activationStateAfter,
       activationImpact,
       verificationDueAt: verificationDueAt ? verificationDueAt.toISOString() : null,
+      ...(streakMultiplierApplied !== undefined && { streakMultiplier: streakMultiplierApplied }),
     });
   }
 

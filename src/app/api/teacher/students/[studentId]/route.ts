@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { getTeacherFromRequest } from "@/lib/auth";
 import { ensureLearnerProfile } from "@/lib/adaptive";
 import { getStudentProgress } from "@/lib/progress";
+import { computeStageBundleReadiness } from "@/lib/gse/bundles";
 import { mapStageToGseRange } from "@/lib/gse/utils";
 
 async function ensureTeacherCanAccessStudent(
@@ -102,6 +103,7 @@ export async function GET(
     nextMean?: number;
     reliability?: string;
     evidenceCount?: number;
+    streakMultiplier?: number;
   };
   const recentNodeOutcomes: Array<{
     descriptor: string;
@@ -112,6 +114,7 @@ export async function GET(
     previousMean?: number;
     nextMean?: number;
     attemptCreatedAt: string;
+    streakMultiplier?: number;
   }> = [];
   const nodeIdsFromOutcomes = new Set<string>();
   for (const a of attemptsWithOutcomes) {
@@ -154,21 +157,30 @@ export async function GET(
         previousMean: o.previousMean,
         nextMean: o.nextMean,
         attemptCreatedAt: attemptDate,
+        ...(typeof o.streakMultiplier === "number" && { streakMultiplier: o.streakMultiplier }),
       });
     }
   }
 
   const STAGES = ["A1", "A2", "B1", "B2", "C1", "C2"] as const;
-  const catalogNodesByBand: Record<string, number> = {};
-  await Promise.all(
-    STAGES.map(async (stage) => {
-      const range = mapStageToGseRange(stage);
-      const count = await prisma.gseNode.count({
-        where: { gseCenter: { gte: range.min, lte: range.max } },
-      });
-      catalogNodesByBand[stage] = count;
-    })
-  );
+  const placementStage = (progress as { placementStage?: string }).placementStage;
+  const [catalogNodesByBand, bundleReadiness] = await Promise.all([
+    Promise.all(
+      STAGES.map(async (stage) => {
+        const range = mapStageToGseRange(stage);
+        const count = await prisma.gseNode.count({
+          where: { gseCenter: { gte: range.min, lte: range.max } },
+        });
+        return [stage, count] as const;
+      })
+    ).then((pairs) => Object.fromEntries(pairs)),
+    computeStageBundleReadiness(studentId, placementStage as "A0" | "A1" | "A2" | "B1" | "B2" | "C1" | "C2" | undefined),
+  ]);
+
+  const perStageCredited: Record<string, number> = {};
+  for (const row of bundleReadiness.stageRows) {
+    perStageCredited[row.stage] = row.bundleRows.reduce((sum, b) => sum + b.coveredCount, 0);
+  }
 
   return NextResponse.json({
     student: {
@@ -180,6 +192,7 @@ export async function GET(
     },
     progress,
     catalogNodesByBand,
+    perStageCredited,
     recentAttempts: recentAttempts.map((a) => ({
       id: a.id,
       createdAt: a.createdAt,

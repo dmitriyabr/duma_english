@@ -288,7 +288,7 @@ export async function projectLearnerStageFromGse(studentId: string): Promise<Sta
   });
 
   const placement = projectPlacementStage(rows);
-  const bundleReadiness = await computeStageBundleReadiness(studentId);
+  const bundleReadiness = await computeStageBundleReadiness(studentId, placement.stage);
   const bundlePromotionStage = projectPromotionStageFromBundles(bundleReadiness.stageRows);
   // If placement is above bundle-based promotion, lift promotion: learner shows skills from higher
   // nodes → treat as that level so we don't show "A0" while they're working on B1.

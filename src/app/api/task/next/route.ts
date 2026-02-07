@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { getStudentFromRequest } from "@/lib/auth";
 import { buildTaskTemplate } from "@/lib/taskTemplates";
 import { buildLearningPlan } from "@/lib/adaptive";
+import { assignTaskTargetsFromCatalog } from "@/lib/gse/planner";
 
 export async function GET(req: Request) {
   const student = await getStudentFromRequest();
@@ -32,6 +33,13 @@ export async function GET(req: Request) {
       metaJson: (template.meta || {}) as Prisma.InputJsonValue,
     },
   });
+  const gseSelection = await assignTaskTargetsFromCatalog({
+    taskId: task.id,
+    stage: learningPlan.currentStage,
+    taskType: template.type,
+    ageBand: learningPlan.ageBand,
+    studentId: student.studentId,
+  });
 
   return NextResponse.json({
     taskId: task.id,
@@ -46,5 +54,7 @@ export async function GET(req: Request) {
     targetSkills: learningPlan.weakestSkills,
     targetWords: learningPlan.targetWords,
     recommendedTaskTypes: learningPlan.recommendedTaskTypes,
+    targetNodeIds: gseSelection.targetNodeIds,
+    selectionReason: gseSelection.selectionReason,
   });
 }

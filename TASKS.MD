@@ -1,5 +1,51 @@
 # TASKS: Autonomous English Trainer Roadmap (A1 -> C2 + Stage Speaking)
 
+## Execution Log (последнее обновление)
+- Введены таблицы и связи `gse_*`:
+  - `gse_catalog_versions`, `gse_nodes`, `gse_node_aliases`, `gse_node_edges`
+  - `attempt_gse_evidence`, `student_gse_mastery`, `task_gse_targets`
+- Добавлен ingestion foundation:
+  - `src/lib/gse/catalog.ts`
+  - `src/lib/gse/importers.ts` (CSV/XLSX/PDF adapters)
+  - `src/lib/gse/merge.ts`, `src/lib/gse/utils.ts`, `src/lib/gse/types.ts`
+- Добавлен GitHub ingestion adapter:
+  - `src/lib/gse/github.ts` (repo tree scan, parse JSON/CSV/TSV/SQLite)
+  - bootstrap-режим для `ruupert/gse_analyser` через публичный toolkit API
+  - CLI: `npm run gse:import:github`
+- Выполнен импорт из репозиториев:
+  - `ruupert/gse_analyser` + `fildpauz/vocab-lists`
+  - результат: `imported=35762`, `created=24174`, `updated=11588`
+- Добавлен официальный API scraper (без curl-заглушек):
+  - `src/lib/gse/officialApi.ts` (пагинация, retry/backoff, маппинг vocab/grammar/LO)
+  - `src/scripts/gse_import_from_official_api.ts`
+  - npm script: `npm run gse:import:official`
+- Выполнен полный импорт из official API:
+  - vocabulary: `40045`
+  - grammar: `456`
+  - learning objectives: `1413`
+  - mapped total: `41914`
+  - refresh result: `created=40227`, `updated=1687`
+- Добавлены API:
+  - `POST /api/gse/catalog/refresh`
+  - `GET /api/gse/node/:id`
+  - `GET /api/gse/catalog/version`
+- Подключен node-targeting в выдачу задач:
+  - `GET /api/task/next` возвращает `targetNodeIds`, `selectionReason`
+- Подключена запись evidence и mastery в worker:
+  - `src/lib/gse/evidence.ts`
+  - `src/lib/gse/mastery.ts`
+- Расширены результаты и прогресс:
+  - `/api/attempts/:id` -> `gseEvidence[]`, `language` блок
+  - `/api/progress` -> `nodeProgress`
+  - UI: `/results`, `/progress`, `/task` обновлены
+- Добавлены unit-тесты для GSE foundation:
+  - `src/lib/gse_merge.test.ts`
+  - `src/lib/gse_mastery.test.ts`
+- Проверки:
+  - `npm test` ✅
+  - `npm run lint` ✅
+  - `npm run build` ✅
+
 ## 0) Правило исполнения (обязательно)
 - Двигаемся сверху вниз по этому файлу.
 - Любые новые идеи сначала фиксируем в этом файле, потом реализуем.
@@ -286,4 +332,3 @@
 1. Реализовать grammar evaluator + schema + fallback + UI cards.
 2. Расширить scoring pipeline (language/discourse/reliability gating).
 3. Обновить `/api/progress` под новые skills и weekly coach focus.
-

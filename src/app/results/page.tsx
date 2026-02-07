@@ -55,6 +55,28 @@ type AttemptResult = {
       wordCount?: number;
     } | null;
     taskEvaluation?: TaskEvaluation | null;
+    language?: {
+      grammar?: {
+        grammarAccuracy?: number;
+        errorCountByType?: Record<string, number> | null;
+        topErrors?: Array<{ error?: string; correction?: string; explanation?: string }>;
+      };
+      discourse?: {
+        coherenceScore?: number;
+        argumentScore?: number;
+        registerScore?: number;
+      };
+    } | null;
+    gseEvidence?: Array<{
+      nodeId: string;
+      descriptor: string;
+      signal: string;
+      confidence: number;
+      impact: number;
+      gseCenter?: number | null;
+      skill?: string | null;
+      type?: string | null;
+    }>;
     feedback?: Feedback | null;
     visibleMetrics?: MetricCard[];
     debug?: unknown;
@@ -151,6 +173,10 @@ export default function ResultsPage() {
   });
   const checks = (taskEvaluation?.rubricChecks || []).filter((check) => !!check.name && check.reason);
   const transcript = data?.results?.transcript;
+  const gseEvidence = data?.results?.gseEvidence || [];
+  const uniqueNodes = Array.from(
+    new Map(gseEvidence.map((item) => [item.nodeId, item])).values()
+  ).slice(0, 6);
   const isPlacementFlow = Boolean(data?.flow?.isPlacement);
   const placementSessionId = data?.flow?.placementSessionId;
 
@@ -247,6 +273,22 @@ export default function ResultsPage() {
                       {artifactEntries.map(([key, value]) => (
                         <li key={key}>
                           {displayArtifactLabel(key)}: {renderArtifactValue(value)}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div className="spacer" />
+                </>
+              )}
+
+              {uniqueNodes.length > 0 && (
+                <>
+                  <div className="metric">
+                    <span>I can nodes (GSE)</span>
+                    <ul style={{ paddingLeft: 16 }}>
+                      {uniqueNodes.map((node) => (
+                        <li key={node.nodeId}>
+                          {node.descriptor} [{node.nodeId}]
                         </li>
                       ))}
                     </ul>

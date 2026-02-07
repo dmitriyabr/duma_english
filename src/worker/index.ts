@@ -7,6 +7,7 @@ import { calculateDerivedSpeechMetrics, composeScores } from "../lib/scoring";
 import { computeLanguageScoreFromTaskEvaluation, evaluateTaskQuality } from "../lib/evaluator";
 import { recomputeMastery } from "../lib/adaptive";
 import { finishPlacement, getPlacementQuestions, submitPlacementAnswer } from "../lib/placement";
+import { persistAttemptGseEvidence } from "../lib/gse/evidence";
 
 const POLL_INTERVAL_MS = Number(process.env.WORKER_POLL_INTERVAL_MS || 3000);
 const SCORE_VERSION = "score-v3";
@@ -57,6 +58,22 @@ function buildCanonicalMetrics(params: {
   languageScore: number;
 }): CanonicalMetric[] {
   const { derivedMetrics, taskEvaluation, languageScore } = params;
+  const grammarAccuracy =
+    typeof taskEvaluation.artifacts?.grammarAccuracy === "number"
+      ? taskEvaluation.artifacts.grammarAccuracy
+      : null;
+  const coherenceScore =
+    typeof taskEvaluation.artifacts?.coherenceScore === "number"
+      ? taskEvaluation.artifacts.coherenceScore
+      : null;
+  const argumentScore =
+    typeof taskEvaluation.artifacts?.argumentScore === "number"
+      ? taskEvaluation.artifacts.argumentScore
+      : null;
+  const registerScore =
+    typeof taskEvaluation.artifacts?.registerScore === "number"
+      ? taskEvaluation.artifacts.registerScore
+      : null;
   const items: Array<CanonicalMetric | null> = [
     typeof derivedMetrics.speechRate === "number"
       ? { metricKey: "tempo_wpm", value: roundMetric(derivedMetrics.speechRate), source: "rules", reliability: "medium" }
@@ -85,6 +102,18 @@ function buildCanonicalMetrics(params: {
       return { metricKey: "vocabulary_usage", value: roundMetric(vocab), source: "openai", reliability: "medium" };
     })(),
     { metricKey: "task_completion", value: roundMetric(taskEvaluation.taskScore), source: "openai", reliability: "medium" },
+    typeof grammarAccuracy === "number"
+      ? { metricKey: "grammar_accuracy", value: roundMetric(grammarAccuracy), source: "openai", reliability: "medium" }
+      : null,
+    typeof coherenceScore === "number"
+      ? { metricKey: "coherence_score", value: roundMetric(coherenceScore), source: "openai", reliability: "medium" }
+      : null,
+    typeof argumentScore === "number"
+      ? { metricKey: "argument_score", value: roundMetric(argumentScore), source: "openai", reliability: "medium" }
+      : null,
+    typeof registerScore === "number"
+      ? { metricKey: "register_score", value: roundMetric(registerScore), source: "openai", reliability: "medium" }
+      : null,
     (() => {
       const confidence = toPercentConfidence(derivedMetrics.confidence);
       if (confidence === null) return null;
@@ -168,6 +197,7 @@ async function aggregateDailySkills(studentId: string, metrics: CanonicalMetric[
     fluency: metrics.filter((m) => m.metricKey === "fluency"),
     tempo_control: metrics.filter((m) => m.metricKey === "tempo_stability" || m.metricKey === "tempo_wpm"),
     vocabulary: metrics.filter((m) => m.metricKey === "vocabulary_usage" || m.metricKey === "language_score"),
+    grammar: metrics.filter((m) => m.metricKey === "grammar_accuracy"),
     task_completion: metrics.filter((m) => m.metricKey === "task_completion"),
   };
 
@@ -397,6 +427,18 @@ async function processAttempt(attemptId: string) {
     }
 
     await updateStudentVocabularyFromAttempt(attempt.studentId, evaluated.taskEvaluation);
+    const gseEvidence = await persistAttemptGseEvidence({
+      attemptId: attempt.id,
+      studentId: attempt.studentId,
+      taskId: attempt.taskId,
+      transcript: analysis.transcript,
+      derivedMetrics,
+      taskEvaluation: evaluated.taskEvaluation,
+      scoreReliability: scores.reliability,
+    });
+    if (gseEvidence.evidenceCount > 0) {
+      console.log(JSON.stringify({ event: "gse_evidence_written", attemptId: attempt.id, count: gseEvidence.evidenceCount }));
+    }
     await updatePlacementFromAttempt({
       taskMeta,
       attemptId: attempt.id,

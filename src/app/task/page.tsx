@@ -14,8 +14,10 @@ type TaskResponse = {
   stage?: string;
   ageBand?: string;
   reason?: string;
+  selectionReason?: string;
   targetSkills?: string[];
   targetWords?: string[];
+  targetNodeIds?: string[];
 };
 
 function taskGuide(type: string) {
@@ -122,11 +124,15 @@ export default function TaskPage() {
                 <div className="metric" style={{ marginTop: 12 }}>
                   <span>Why this task</span>
                   <p className="subtitle">{task.reason}</p>
+                  {task.selectionReason && <p className="subtitle">{task.selectionReason}</p>}
                   {task.targetSkills && task.targetSkills.length > 0 && (
                     <p className="subtitle">Focus skills: {task.targetSkills.join(", ")}</p>
                   )}
                   {task.targetWords && task.targetWords.length > 0 && (
                     <p className="subtitle">Target words: {task.targetWords.join(", ")}</p>
+                  )}
+                  {task.targetNodeIds && task.targetNodeIds.length > 0 && (
+                    <p className="subtitle">Target nodes: {task.targetNodeIds.join(", ")}</p>
                   )}
                 </div>
               )}

@@ -57,6 +57,8 @@ model Student {
   mastery    StudentSkillMastery[]
   vocabulary StudentVocabulary[]
   placementSessions PlacementSession[]
+  gseMastery StudentGseMastery[]
+  gseEvidence AttemptGseEvidence[]
 
   @@index([classId])
 }
@@ -70,6 +72,7 @@ model Task {
   createdAt DateTime @default(now())
 
   attempts Attempt[]
+  gseTargets TaskGseTarget[]
 }
 
 model Attempt {
@@ -94,6 +97,7 @@ model Attempt {
   student  Student         @relation(fields: [studentId], references: [id])
   task     Task            @relation(fields: [taskId], references: [id])
   metrics  AttemptMetric[]
+  gseEvidence AttemptGseEvidence[]
 
   @@index([studentId])
   @@index([status])
@@ -209,4 +213,133 @@ model ProgressDaily {
   student Student @relation(fields: [studentId], references: [id])
 
   @@unique([studentId, date])
+}
+
+model GseCatalogVersion {
+  id          String   @id @default(cuid())
+  version     String   @unique
+  source      String
+  description String?
+  metadataJson Json?
+  createdAt   DateTime @default(now())
+
+  nodes GseNode[]
+}
+
+model GseNode {
+  id              String   @id @default(cuid())
+  nodeId          String   @unique
+  sourceKey       String
+  type            String
+  catalog         String
+  gseMin          Int?
+  gseMax          Int?
+  gseCenter       Float?
+  cefrBand        String?
+  audience        String?
+  skill           String?
+  descriptor      String
+  source          String
+  sourceVersion   String?
+  licenseTag      String?
+  metadataJson    Json?
+  catalogVersionId String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  catalogVersion GseCatalogVersion @relation(fields: [catalogVersionId], references: [id], onDelete: Cascade)
+  aliases        GseNodeAlias[]
+  outgoingEdges  GseNodeEdge[] @relation("GseNodeEdgeFrom")
+  incomingEdges  GseNodeEdge[] @relation("GseNodeEdgeTo")
+  attemptEvidence AttemptGseEvidence[]
+  mastery         StudentGseMastery[]
+  taskTargets     TaskGseTarget[]
+
+  @@index([catalogVersionId, type])
+  @@index([catalogVersionId, audience, skill])
+}
+
+model GseNodeAlias {
+  id        String   @id @default(cuid())
+  nodeId    String
+  alias     String
+  source    String
+  createdAt DateTime @default(now())
+
+  node GseNode @relation(fields: [nodeId], references: [nodeId], onDelete: Cascade)
+
+  @@unique([nodeId, alias])
+  @@index([alias])
+}
+
+model GseNodeEdge {
+  id         String   @id @default(cuid())
+  fromNodeId String
+  toNodeId   String
+  edgeType   String
+  weight     Float?
+  metadataJson Json?
+  createdAt  DateTime @default(now())
+
+  fromNode GseNode @relation("GseNodeEdgeFrom", fields: [fromNodeId], references: [nodeId], onDelete: Cascade)
+  toNode   GseNode @relation("GseNodeEdgeTo", fields: [toNodeId], references: [nodeId], onDelete: Cascade)
+
+  @@unique([fromNodeId, toNodeId, edgeType])
+  @@index([toNodeId, edgeType])
+}
+
+model AttemptGseEvidence {
+  id          String   @id @default(cuid())
+  attemptId   String
+  studentId   String
+  nodeId      String
+  signalType  String
+  confidence  Float
+  impact      Float
+  evidenceText String?
+  metadataJson Json?
+  createdAt   DateTime @default(now())
+
+  attempt Attempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  node    GseNode @relation(fields: [nodeId], references: [nodeId], onDelete: Cascade)
+
+  @@index([attemptId])
+  @@index([studentId, nodeId])
+}
+
+model StudentGseMastery {
+  id               String   @id @default(cuid())
+  studentId        String
+  nodeId           String
+  masteryScore     Float
+  evidenceCount    Int      @default(0)
+  reliability      String
+  lastEvidenceAt   DateTime?
+  decayStateJson   Json?
+  spacingStateJson Json?
+  calculationVersion String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  node    GseNode @relation(fields: [nodeId], references: [nodeId], onDelete: Cascade)
+
+  @@unique([studentId, nodeId])
+  @@index([studentId, masteryScore])
+}
+
+model TaskGseTarget {
+  id        String   @id @default(cuid())
+  taskId    String
+  nodeId    String
+  weight    Float    @default(1)
+  required  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  node GseNode @relation(fields: [nodeId], references: [nodeId], onDelete: Cascade)
+
+  @@unique([taskId, nodeId])
+  @@index([nodeId])
 }

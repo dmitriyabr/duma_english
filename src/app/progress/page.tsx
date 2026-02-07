@@ -27,6 +27,22 @@ type ProgressData = {
     reliability: "high" | "medium" | "low";
     evidenceCount: number;
   }>;
+  nodeProgress?: {
+    masteredNodes: number;
+    inProgressNodes: number;
+    delta7: number;
+    delta28: number;
+    coverage7: number;
+    coverage28: number;
+    nextTargetNodes: Array<{
+      nodeId: string;
+      descriptor: string;
+      skill?: string | null;
+      gseCenter?: number | null;
+      masteryScore: number;
+      reliability: "high" | "medium" | "low";
+    }>;
+  };
 };
 
 function labelForSkill(skillKey: string) {
@@ -41,6 +57,8 @@ function labelForSkill(skillKey: string) {
       return "Vocabulary";
     case "task_completion":
       return "Task completion";
+    case "grammar":
+      return "Grammar";
     default:
       return skillKey;
   }
@@ -135,6 +153,33 @@ export default function ProgressPage() {
                         </div>
                       ))}
                     </div>
+                  </div>
+                </>
+              )}
+              {data.nodeProgress && (
+                <>
+                  <div className="spacer" />
+                  <div className="metric">
+                    <span>GSE node progress</span>
+                    <p className="subtitle">
+                      Mastered: {data.nodeProgress.masteredNodes} | In progress: {data.nodeProgress.inProgressNodes}
+                    </p>
+                    <p className="subtitle">
+                      Node coverage 7d: {data.nodeProgress.coverage7} ({data.nodeProgress.delta7 >= 0 ? "+" : ""}
+                      {data.nodeProgress.delta7}) | 28d: {data.nodeProgress.coverage28} (
+                      {data.nodeProgress.delta28 >= 0 ? "+" : ""}
+                      {data.nodeProgress.delta28})
+                    </p>
+                    {data.nodeProgress.nextTargetNodes.length > 0 && (
+                      <ul style={{ paddingLeft: 16 }}>
+                        {data.nodeProgress.nextTargetNodes.map((node) => (
+                          <li key={node.nodeId}>
+                            {node.descriptor} [{node.nodeId}] - mastery {Math.round(node.masteryScore)}
+                            {typeof node.gseCenter === "number" ? `, GSE ${Math.round(node.gseCenter)}` : ""}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
                 </>
               )}

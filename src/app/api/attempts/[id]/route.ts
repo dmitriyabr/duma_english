@@ -16,7 +16,24 @@ export async function GET(_: Request, context: AttemptRouteContext) {
 
   const attempt = await prisma.attempt.findFirst({
     where: { id, studentId: student.studentId },
-    include: { task: true },
+    include: {
+      task: true,
+      gseEvidence: {
+        include: {
+          node: {
+            select: {
+              nodeId: true,
+              descriptor: true,
+              gseCenter: true,
+              skill: true,
+              type: true,
+            },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+        take: 30,
+      },
+    },
   });
 
   if (!attempt) {
@@ -46,6 +63,18 @@ export async function GET(_: Request, context: AttemptRouteContext) {
     evidence?: string[];
     modelVersion?: string;
   } | null;
+  const grammarAccuracy =
+    typeof taskEvaluation?.artifacts?.grammarAccuracy === "number"
+      ? taskEvaluation.artifacts.grammarAccuracy
+      : undefined;
+  const coherenceScore =
+    typeof taskEvaluation?.artifacts?.coherenceScore === "number"
+      ? taskEvaluation.artifacts.coherenceScore
+      : undefined;
+  const argumentScore =
+    typeof taskEvaluation?.artifacts?.argumentScore === "number"
+      ? taskEvaluation.artifacts.argumentScore
+      : undefined;
 
   const visibleMetrics = [
     {
@@ -70,6 +99,24 @@ export async function GET(_: Request, context: AttemptRouteContext) {
       key: "languageScore",
       label: "Language",
       value: scores.languageScore,
+      kind: "score",
+    },
+    {
+      key: "grammarAccuracy",
+      label: "Grammar",
+      value: grammarAccuracy,
+      kind: "score",
+    },
+    {
+      key: "coherenceScore",
+      label: "Coherence",
+      value: coherenceScore,
+      kind: "score",
+    },
+    {
+      key: "argumentScore",
+      label: "Argument",
+      value: argumentScore,
       kind: "score",
     },
     {
@@ -163,6 +210,34 @@ export async function GET(_: Request, context: AttemptRouteContext) {
     wordCount: metrics.wordCount,
     provider: process.env.SPEECH_PROVIDER || "mock",
   };
+  const gseEvidence = attempt.gseEvidence.map((row) => ({
+    nodeId: row.nodeId,
+    signal: row.signalType,
+    confidence: row.confidence,
+    impact: row.impact,
+    evidenceText: row.evidenceText,
+    descriptor: row.node.descriptor,
+    gseCenter: row.node.gseCenter,
+    skill: row.node.skill,
+    type: row.node.type,
+  }));
+  const language = {
+    grammar: {
+      grammarAccuracy,
+      errorCountByType:
+        (taskEvaluation?.artifacts?.errorCountByType as Record<string, number> | undefined) || null,
+      topErrors:
+        (taskEvaluation?.artifacts?.topErrors as Array<Record<string, unknown>> | undefined) || [],
+    },
+    discourse: {
+      coherenceScore,
+      argumentScore,
+      registerScore:
+        typeof taskEvaluation?.artifacts?.registerScore === "number"
+          ? taskEvaluation.artifacts.registerScore
+          : undefined,
+    },
+  };
 
   return NextResponse.json({
     status: attempt.status,
@@ -183,9 +258,11 @@ export async function GET(_: Request, context: AttemptRouteContext) {
         ? {
             transcript: attempt.transcript,
             speech,
+            language,
             scores,
             taskEvaluation,
             feedback,
+            gseEvidence,
             visibleMetrics,
             debug: process.env.SHOW_AI_DEBUG === "true" ? attempt.aiDebugJson : null,
           }

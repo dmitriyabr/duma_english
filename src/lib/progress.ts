@@ -1,4 +1,5 @@
 import { prisma } from "./db";
+import { nextTargetNodesForStudent } from "./gse/planner";
 
 type SkillTrend = {
   skillKey: string;
@@ -106,6 +107,54 @@ export async function getStudentProgress(studentId: string) {
     typeof profile.placementConfidence !== "number" ||
     profile.placementConfidence < 0.6;
 
+  const gseMastery = await prisma.studentGseMastery.findMany({
+    where: { studentId },
+    include: {
+      node: {
+        select: { nodeId: true, descriptor: true, gseCenter: true, skill: true },
+      },
+    },
+    orderBy: [{ masteryScore: "asc" }],
+  });
+  const masteredNodes = gseMastery.filter((row) => row.masteryScore >= 80).length;
+  const inProgressNodes = gseMastery.filter(
+    (row) => row.masteryScore >= 40 && row.masteryScore < 80
+  ).length;
+  const now = new Date();
+  const last7Start = new Date(now);
+  last7Start.setDate(last7Start.getDate() - 7);
+  const prev7Start = new Date(now);
+  prev7Start.setDate(prev7Start.getDate() - 14);
+  const last28Start = new Date(now);
+  last28Start.setDate(last28Start.getDate() - 28);
+  const prev28Start = new Date(now);
+  prev28Start.setDate(prev28Start.getDate() - 56);
+
+  const [last7Evidence, prev7Evidence, last28Evidence, prev28Evidence] = await Promise.all([
+    prisma.attemptGseEvidence.findMany({
+      where: { studentId, createdAt: { gte: last7Start } },
+      select: { nodeId: true },
+    }),
+    prisma.attemptGseEvidence.findMany({
+      where: { studentId, createdAt: { gte: prev7Start, lt: last7Start } },
+      select: { nodeId: true },
+    }),
+    prisma.attemptGseEvidence.findMany({
+      where: { studentId, createdAt: { gte: last28Start } },
+      select: { nodeId: true },
+    }),
+    prisma.attemptGseEvidence.findMany({
+      where: { studentId, createdAt: { gte: prev28Start, lt: last28Start } },
+      select: { nodeId: true },
+    }),
+  ]);
+  const uniq = (rows: Array<{ nodeId: string }>) => new Set(rows.map((row) => row.nodeId)).size;
+  const last7Coverage = uniq(last7Evidence);
+  const prev7Coverage = uniq(prev7Evidence);
+  const last28Coverage = uniq(last28Evidence);
+  const prev28Coverage = uniq(prev28Evidence);
+  const nextTargetNodes = await nextTargetNodesForStudent(studentId, 3);
+
   return {
     stage: profile?.stage || "A0",
     ageBand: profile?.ageBand || "9-11",
@@ -115,6 +164,15 @@ export async function getStudentProgress(studentId: string) {
     streak,
     skills,
     focus,
+    nodeProgress: {
+      masteredNodes,
+      inProgressNodes,
+      nextTargetNodes,
+      delta7: last7Coverage - prev7Coverage,
+      delta28: last28Coverage - prev28Coverage,
+      coverage7: last7Coverage,
+      coverage28: last28Coverage,
+    },
     mastery: masteryRows.map((row) => ({
       skillKey: row.skillKey,
       masteryScore: row.masteryScore,

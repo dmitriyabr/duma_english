@@ -184,6 +184,10 @@ export async function applyEvidenceToStudentMastery(params: {
           .map((value) => (typeof value === "number" ? value : Number(value)))
           .filter((value) => Number.isFinite(value))
       : [];
+    const directSuccessStreak =
+      typeof spacingStateRaw.directSuccessStreak === "number" && spacingStateRaw.directSuccessStreak >= 0
+        ? spacingStateRaw.directSuccessStreak
+        : 0;
     const activationStateBefore = normalizeActivationState(existing?.activationState);
 
     // Trust alpha/beta as the single source of truth when they exist; fall back to stored mean otherwise.
@@ -215,7 +219,7 @@ export async function applyEvidenceToStudentMastery(params: {
         ? evidence.confidence * evidence.impact * 0.8
         : evidence.confidence * evidence.impact
     );
-    const computedWeight =
+    let effectiveWeight =
       typeof evidence.weight === "number"
         ? Math.max(0.05, Math.min(1.2, evidence.weight))
         : Math.max(
@@ -229,8 +233,16 @@ export async function applyEvidenceToStudentMastery(params: {
             )
           );
 
-    const alphaAfter = alphaBefore + computedWeight * score;
-    const betaAfter = betaBefore + computedWeight * (1 - score);
+    const directSuccess = kind === "direct" && score >= 0.7;
+    const nextStreak = directSuccess ? directSuccessStreak + 1 : 0;
+
+    if (score >= 0.6) effectiveWeight *= 1.1;
+    else if (score < 0.4) effectiveWeight *= 0.9;
+    if (directSuccess && directSuccessStreak >= 1) effectiveWeight *= 1.15;
+    effectiveWeight = Math.max(0.05, Math.min(1.2, effectiveWeight));
+
+    const alphaAfter = alphaBefore + effectiveWeight * score;
+    const betaAfter = betaBefore + effectiveWeight * (1 - score);
     const nextMean = Number(clamp((alphaAfter / (alphaAfter + betaAfter)) * 100).toFixed(2));
     const nextUncertainty = Number((1 / Math.sqrt(Math.max(2, alphaAfter + betaAfter))).toFixed(4));
 
@@ -315,6 +327,14 @@ export async function applyEvidenceToStudentMastery(params: {
       activationStateAfter = "verified";
       verificationDueAt = null;
       activationImpact = "verified";
+    } else if (
+      activationStateBefore !== "verified" &&
+      nextStreak >= 2 &&
+      directSuccess
+    ) {
+      activationStateAfter = "verified";
+      verificationDueAt = null;
+      activationImpact = "verified";
     } else if (activationStateBefore !== "verified") {
       if (incidentalObserved && activationStateBefore === "observed") {
         activationImpact = "observed";
@@ -361,6 +381,7 @@ export async function applyEvidenceToStudentMastery(params: {
         spacingStateJson: {
           incidentalTaskTypes: nextIncidentalTaskTypes,
           incidentalConfidences: nextIncidentalConfidences,
+          directSuccessStreak: nextStreak,
         },
         calculationVersion: params.calculationVersion,
       },
@@ -388,6 +409,7 @@ export async function applyEvidenceToStudentMastery(params: {
         spacingStateJson: {
           incidentalTaskTypes: nextIncidentalTaskTypes,
           incidentalConfidences: nextIncidentalConfidences,
+          directSuccessStreak: nextStreak,
         },
         calculationVersion: params.calculationVersion,
       },

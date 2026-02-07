@@ -196,54 +196,63 @@ export default function TeacherStudentProfilePage() {
           </div>
 
           {/* Per-level mastery (temporary block — will remove) */}
-          {progress.nodeCoverageByBand && Object.keys(progress.nodeCoverageByBand).length > 0 && (
-            <div className="card" style={{ marginBottom: 24 }}>
-              <h2 style={{ fontFamily: "var(--font-display)", fontSize: "1.2rem", marginBottom: 8 }}>
+          {progress.nodeCoverageByBand != null && (
+            <div className="card" style={{ marginBottom: 24, padding: "12px 16px" }}>
+              <h2 style={{ fontFamily: "var(--font-display)", fontSize: "1.05rem", marginBottom: 6 }}>
                 По уровням (временно)
               </h2>
-              <p className="subtitle" style={{ marginBottom: 12 }}>
-                Освоено нод по уровню (mastered = значение ≥75). Отдельно от текущего уровня и path to next.
+              <p className="subtitle" style={{ marginBottom: 10, fontSize: "0.8rem" }}>
+                Mastered = значение ≥75. In progress = нод с доказательствами, но &lt;75.
               </p>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
-                {(["A1", "A2", "B1", "B2", "C1", "C2"] as const).map((stage) => {
-                  const stat = progress.nodeCoverageByBand?.[stage];
-                  if (!stat || stat.total === 0) return null;
-                  const pct = stat.total > 0 ? Math.round((stat.mastered / stat.total) * 100) : 0;
-                  return (
-                    <div
-                      key={stage}
-                      style={{
-                        padding: "10px 14px",
-                        background: "rgba(16,22,47,0.04)",
-                        borderRadius: "var(--radius-sm)",
-                        minWidth: 100,
-                      }}
-                    >
-                      <div style={{ fontWeight: 600, fontSize: "1rem", marginBottom: 4 }}>{stage}</div>
-                      <div style={{ fontSize: "0.9rem", color: "var(--ink-2)" }}>
-                        {stat.mastered} / {stat.total} mastered
-                      </div>
-                      <div
-                        style={{
-                          height: 6,
-                          borderRadius: 999,
-                          background: "rgba(16,22,47,0.1)",
-                          overflow: "hidden",
-                          marginTop: 6,
-                        }}
-                      >
-                        <div
-                          style={{
-                            height: "100%",
-                            width: `${pct}%`,
-                            background: pct >= 80 ? "var(--accent-2)" : "var(--accent-3)",
-                            borderRadius: 999,
-                          }}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem" }}>
+                  <thead>
+                    <tr style={{ borderBottom: "1px solid rgba(16,22,47,0.12)", color: "var(--ink-2)" }}>
+                      <th style={{ textAlign: "left", padding: "6px 8px", fontWeight: 600 }}>Уровень</th>
+                      <th style={{ textAlign: "right", padding: "6px 8px" }}>Mastered</th>
+                      <th style={{ textAlign: "right", padding: "6px 8px" }}>Всего</th>
+                      <th style={{ textAlign: "right", padding: "6px 8px" }}>In progress</th>
+                      <th style={{ textAlign: "right", padding: "6px 8px", width: 44 }}>%</th>
+                      <th style={{ padding: "6px 8px", width: 80 }}>Bar</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(["A1", "A2", "B1", "B2", "C1", "C2"] as const).map((stage) => {
+                      const stat = progress.nodeCoverageByBand?.[stage] ?? { mastered: 0, total: 0 };
+                      const inProgress = stat.total - stat.mastered;
+                      const pct = stat.total > 0 ? Math.round((stat.mastered / stat.total) * 100) : 0;
+                      return (
+                        <tr key={stage} style={{ borderBottom: "1px solid rgba(16,22,47,0.06)" }}>
+                          <td style={{ padding: "6px 8px", fontWeight: 600 }}>{stage}</td>
+                          <td style={{ textAlign: "right", padding: "6px 8px" }}>{stat.mastered}</td>
+                          <td style={{ textAlign: "right", padding: "6px 8px" }}>{stat.total}</td>
+                          <td style={{ textAlign: "right", padding: "6px 8px", color: "var(--ink-2)" }}>{inProgress}</td>
+                          <td style={{ textAlign: "right", padding: "6px 8px" }}>{stat.total > 0 ? `${pct}%` : "—"}</td>
+                          <td style={{ padding: "6px 8px" }}>
+                            <div
+                              style={{
+                                height: 6,
+                                borderRadius: 999,
+                                background: "rgba(16,22,47,0.1)",
+                                overflow: "hidden",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  height: "100%",
+                                  width: `${pct}%`,
+                                  minWidth: stat.mastered > 0 ? 4 : 0,
+                                  background: pct >= 80 ? "var(--accent-2)" : "var(--accent-3)",
+                                  borderRadius: 999,
+                                }}
+                              />
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             </div>
           )}

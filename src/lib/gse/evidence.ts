@@ -103,6 +103,8 @@ export type BuildOpportunityEvidenceInput = {
   scoreReliability: "high" | "medium" | "low";
   taskTargets: TargetNode[];
   ageBand?: string | null;
+  /** For target_vocab: required words from prompt that match each node (by descriptor/alias). Enables "word used" = direct evidence. */
+  targetNodeIdToExtraLexicalForms?: Record<string, { lemmas: string[]; phrases: string[] }>;
 };
 
 const SOURCE_RELIABILITY_FACTOR: Record<"high" | "medium" | "low", number> = {
@@ -528,7 +530,12 @@ export function buildOpportunityEvidence(input: BuildOpportunityEvidenceInput) {
     }
 
     if (nodeType === "GSE_VOCAB") {
-      const lexicalForms = buildVocabLexicalForms(target.node);
+      const baseForms = buildVocabLexicalForms(target.node);
+      const extra = input.targetNodeIdToExtraLexicalForms?.[target.nodeId];
+      const lexicalForms = {
+        lemmas: extra ? [...baseForms.lemmas, ...extra.lemmas] : baseForms.lemmas,
+        phrases: extra ? [...baseForms.phrases, ...extra.phrases] : baseForms.phrases,
+      };
       const wasUsed = lexicalForms.lemmas.some((lemma) => lemmaSet.has(lemma)) ||
         lexicalForms.phrases.some((phrase) => transcriptPhrasePadded.includes(` ${phrase} `));
       const explicitWordTask =
@@ -718,6 +725,54 @@ export async function persistAttemptGseEvidence(input: BuildAttemptEvidenceInput
     },
   });
 
+  const requiredWordsList = [
+    ...extractRequiredWords(input.taskPrompt),
+    ...(Array.isArray(input.taskMeta?.requiredWords)
+      ? input.taskMeta.requiredWords.map((w) => String(w).toLowerCase())
+      : []),
+  ].map(normalizeWord).filter(Boolean);
+  const requiredWordsSet = new Set(requiredWordsList);
+
+  let targetNodeIdToExtraLexicalForms: Record<string, { lemmas: string[]; phrases: string[] }> | undefined;
+  if (input.taskType === "target_vocab" && requiredWordsList.length > 0) {
+    const vocabTargets = taskTargets.filter((row) => row.node.type === "GSE_VOCAB");
+    const vocabNodeIds = vocabTargets.map((row) => row.nodeId);
+    const aliases = vocabNodeIds.length > 0
+      ? await prisma.gseNodeAlias.findMany({
+          where: { nodeId: { in: vocabNodeIds } },
+          select: { nodeId: true, alias: true },
+        })
+      : [];
+    const aliasByNode = new Map<string, string[]>();
+    for (const a of aliases) {
+      const list = aliasByNode.get(a.nodeId) ?? [];
+      list.push(normalizePhrase(a.alias));
+      aliasByNode.set(a.nodeId, list);
+    }
+    targetNodeIdToExtraLexicalForms = {};
+    for (const row of vocabTargets) {
+      const nodeDescriptor = normalizePhrase(row.node.descriptor ?? "");
+      const nodeAliases = aliasByNode.get(row.nodeId) ?? [];
+      const lemmas = new Set<string>();
+      const phrases = new Set<string>();
+      for (const word of requiredWordsList) {
+        const wordLemma = toLemma(word);
+        const matchesDescriptor = nodeDescriptor.length >= 2 && (word === nodeDescriptor || wordLemma === toLemma(nodeDescriptor));
+        const matchesAlias = nodeAliases.some((al) => al === word || toLemma(al) === wordLemma);
+        if (matchesDescriptor || matchesAlias) {
+          lemmas.add(wordLemma);
+          phrases.add(word);
+        }
+      }
+      if (lemmas.size > 0 || phrases.size > 0) {
+        targetNodeIdToExtraLexicalForms[row.nodeId] = {
+          lemmas: Array.from(lemmas),
+          phrases: Array.from(phrases),
+        };
+      }
+    }
+  }
+
   const { created, metricSignals, consistency } = buildOpportunityEvidence({
     taskType: input.taskType,
     taskPrompt: input.taskPrompt,
@@ -728,22 +783,15 @@ export async function persistAttemptGseEvidence(input: BuildAttemptEvidenceInput
     scoreReliability: input.scoreReliability,
     taskTargets: taskTargets as TargetNode[],
     ageBand: input.ageBand,
+    targetNodeIdToExtraLexicalForms,
   });
 
   const targetNodeIds = new Set(taskTargets.map((row) => row.nodeId));
   const incidentalDefaultConf = confidenceFromReliability(input.scoreReliability);
-  const requiredWords = new Set(
-    [
-      ...extractRequiredWords(input.taskPrompt),
-      ...(Array.isArray(input.taskMeta?.requiredWords)
-        ? input.taskMeta.requiredWords.map((word) => String(word).toLowerCase())
-        : []),
-    ].map(normalizeWord)
-  );
 
   const transcriptWords = mapTranscriptToWordSet(input.transcript)
     .map(normalizeWord)
-    .filter((word) => word.length >= 3 && !requiredWords.has(word) && !STOPWORDS.has(word))
+    .filter((word) => word.length >= 3 && !requiredWordsSet.has(word) && !STOPWORDS.has(word))
     .slice(0, 120);
   const transcriptLemmas = uniqueStrings(transcriptWords.map(toLemma)).filter((word) => word.length >= 3);
   const transcriptCandidates = uniqueStrings([...transcriptWords, ...transcriptLemmas]);

@@ -258,7 +258,7 @@ export async function applyEvidenceToStudentMastery(params: {
     const previousHalfLife =
       existing?.halfLifeDays ??
       defaultHalfLifeDays(existing?.node?.type || null, existing?.node?.skill || null);
-    const previousDecayed =
+    let previousDecayed =
       existing?.decayedMastery ??
       computeDecayedMastery({
         masteryMean: previousMean,
@@ -268,6 +268,8 @@ export async function applyEvidenceToStudentMastery(params: {
         evidenceCount: existing?.evidenceCount ?? 0,
         reliability: previousReliability,
       });
+    // Stale decayed can be above mean after alpha/beta was corrected down; cap so decayImpact stays >= 0.
+    if (previousDecayed > previousMean) previousDecayed = previousMean;
 
     const nextHalfLife = Number(
       Math.max(

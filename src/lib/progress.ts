@@ -283,6 +283,7 @@ export async function getStudentProgress(studentId: string) {
         ...item,
         reasonLabel: readableBundleReason(item.reason),
       })),
+      targetStageBundleProgress: projection.targetStageBundleProgress ?? [],
     },
     blockedByNodes: projection.blockedByNodes,
     weeklyFocusReason,

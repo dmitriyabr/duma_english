@@ -82,6 +82,20 @@ export type StageBundleReadiness = {
   bundleRows: BundleReadinessRow[];
 };
 
+/** Node IDs from all bundles for a given stage (for planner: prefer these to align tasks with progress). */
+export async function getBundleNodeIdsForStage(stage: CEFRStage): Promise<string[]> {
+  await ensureDefaultGseBundles();
+  const bundles = await prisma.gseBundle.findMany({
+    where: { active: true, stage },
+    include: { nodes: { select: { nodeId: true } } },
+  });
+  return dedupe(bundles.flatMap((b) => b.nodes.map((n) => n.nodeId)));
+}
+
+function dedupe<T>(arr: T[]): T[] {
+  return Array.from(new Set(arr));
+}
+
 export async function ensureDefaultGseBundles() {
   const existingCount = await prisma.gseBundle.count({ where: { active: true } });
   if (existingCount >= STAGES.length * DOMAINS.length) return;
@@ -147,7 +161,15 @@ export async function ensureDefaultGseBundles() {
   }
 }
 
-export async function computeStageBundleReadiness(studentId: string) {
+const STAGE_ORDER_FULL: CEFRStage[] = ["A0", "A1", "A2", "B1", "B2", "C1", "C2"];
+function isPlacementAboveStage(placementStage: CEFRStage | undefined, bundleStage: CEFRStage): boolean {
+  if (!placementStage) return false;
+  const pIdx = STAGE_ORDER_FULL.indexOf(placementStage);
+  const bIdx = STAGE_ORDER_FULL.indexOf(bundleStage);
+  return pIdx >= 0 && bIdx >= 0 && pIdx > bIdx;
+}
+
+export async function computeStageBundleReadiness(studentId: string, placementStage?: CEFRStage) {
   await ensureDefaultGseBundles();
 
   const bundles = await prisma.gseBundle.findMany({
@@ -216,7 +238,12 @@ export async function computeStageBundleReadiness(studentId: string) {
       };
     });
 
-    const coveredCount = scored.filter((row) => row.verified && row.value >= 70).length;
+    // Fast credit: when placement is above this bundle's stage, count node as covered if value≥50 and ≥1 direct (no need to grind to verified+70)
+    const placementAbove = isPlacementAboveStage(placementStage, bundle.stage as CEFRStage);
+    const coveredCount = scored.filter(
+      (row) =>
+        (row.verified && row.value >= 70) || (placementAbove && row.value >= 50 && row.direct >= 1)
+    ).length;
     const coverage = totalRequired > 0 ? coveredCount / totalRequired : 0;
     const directEvidenceCovered = scored.filter((row) => row.verified && row.direct > 0 && row.value >= 65).length;
     const reliabilityRatio =

@@ -1,7 +1,16 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import type { CEFRStage } from "@/lib/curriculum";
+import { getBundleNodeIdsForStage } from "./bundles";
 import { computeDecayedMastery } from "./mastery";
 import { mapStageToGseRange } from "./utils";
+
+const STAGE_ORDER: CEFRStage[] = ["A0", "A1", "A2", "B1", "B2", "C1", "C2"];
+function nextStage(stage: string): CEFRStage {
+  const i = STAGE_ORDER.indexOf(stage as CEFRStage);
+  if (i < 0 || i >= STAGE_ORDER.length - 1) return (stage as CEFRStage) || "A1";
+  return STAGE_ORDER[i + 1];
+}
 
 type DomainKey = "vocab" | "grammar" | "lo";
 
@@ -415,11 +424,13 @@ function scoreCandidate(params: {
   preferredNodeIds?: string[];
   qualityDomainFocus?: DomainKey | null;
   verificationNodeIds?: string[];
+  recentlyTargetedNodeIds?: string[];
 }) {
   const domainWeights = taskDomainWeights(params.taskType);
   const targetDomain = nextDomainToProbe(params.recentTaskTypes);
   const preferredSet = new Set(params.preferredNodeIds || []);
   const verificationSet = new Set(params.verificationNodeIds || []);
+  const recentlyTargetedSet = new Set(params.recentlyTargetedNodeIds || []);
   const preferredNodes = params.nodes
     .filter((node) => preferredSet.has(node.nodeId))
     .sort((a, b) => a.decayedMastery - b.decayedMastery);
@@ -433,8 +444,12 @@ function scoreCandidate(params: {
     .sort((a, b) => b.urgency - a.urgency)
     .map((row) => row.node)
     .sort((a, b) => a.decayedMastery - b.decayedMastery)
-    .slice(0, 3);
-  const mergedTargets = [...preferredNodes, ...relevantNodes].filter(
+    .slice(0, 8);
+  // At most 2 from preferred so other nodes get a chance (more spread)
+  const fromPreferred = preferredNodes.slice(0, 2);
+  const preferredIds = new Set(fromPreferred.map((n) => n.nodeId));
+  const fromRelevant = relevantNodes.filter((n) => !preferredIds.has(n.nodeId));
+  const mergedTargets = [...fromPreferred, ...fromRelevant].filter(
     (node, index, arr) => arr.findIndex((x) => x.nodeId === node.nodeId) === index
   );
   const targetNodes = (mergedTargets.length > 0 ? mergedTargets : params.nodes.slice(0, 3)).slice(0, 3);
@@ -484,10 +499,12 @@ function scoreCandidate(params: {
     params.taskType === "speech_builder" || params.taskType === "role_play" ? 1.3 : 0.9;
   const latencyRisk = params.taskType === "speech_builder" ? 0.22 : 0.1;
   const explorationBonus = clamp(avgSigma / 100, 0.05, 0.3);
-  const preferredBoost = targetNodes.some((node) => preferredSet.has(node.nodeId)) ? 0.4 : 0;
+  const preferredBoost = targetNodes.some((node) => preferredSet.has(node.nodeId)) ? 0.18 : 0;
   const domainRotationBonus = targetNodes.some((node) => node.domain === targetDomain) ? 0.35 : 0;
   const verificationHits = targetNodes.filter((node) => verificationSet.has(node.nodeId)).length;
-  const verificationGain = verificationHits * 1.15;
+  const verificationGain = verificationHits * 0.55;
+  const recentlyTargetedOverlap = targetNodes.filter((node) => recentlyTargetedSet.has(node.nodeId)).length;
+  const recentlyTargetedPenalty = recentlyTargetedOverlap * 0.28;
   const qualityDomainBoost = params.qualityDomainFocus
     ? targetNodes.some((node) => node.domain === params.qualityDomainFocus)
       ? 0.9
@@ -497,6 +514,7 @@ function scoreCandidate(params: {
     expectedGain -
     engagementRisk * 1.6 -
     repetitionPenalty -
+    recentlyTargetedPenalty -
     tokenCost * 0.6 -
     latencyRisk * 0.8 +
     explorationBonus * 1.4 +
@@ -569,7 +587,8 @@ export async function planNextTaskDecision(params: {
       ? candidateTaskTypes
       : ["read_aloud", "target_vocab", "qa_prompt", "role_play", "topic_talk", "filler_control", "speech_builder"];
 
-  const [nodeStates, recentAttempts, recentInstances] = await Promise.all([
+  const targetStage = nextStage(params.stage);
+  const [nodeStates, recentAttempts, recentInstances, targetStageBundleNodeIds] = await Promise.all([
     loadNodeState({
       studentId: params.studentId,
       stage: params.stage,
@@ -588,6 +607,7 @@ export async function planNextTaskDecision(params: {
       orderBy: { createdAt: "desc" },
       take: 6,
     }),
+    getBundleNodeIdsForStage(targetStage),
   ]);
   const verificationTargetNodeIds = nodeStates
     .filter((node) => node.activationState === "candidate_for_verification")
@@ -611,12 +631,17 @@ export async function planNextTaskDecision(params: {
 
   const fatigueTypes = recentAttempts.map((attempt) => attempt.task.type);
   const recentTaskTypes = recentInstances.map((item) => item.taskType);
+  const recentlyTargetedNodeIds = dedupe(
+    recentInstances.slice(0, 3).flatMap((item) => item.targetNodeIds ?? [])
+  );
   const recentVerificationHit = recentInstances
     .slice(0, 2)
     .some((item) => item.targetNodeIds.some((nodeId) => verificationTargetNodeIds.includes(nodeId)));
+  // Verification first, then target-stage bundle nodes (so exercises align with progress), then other preferred
   const mergedPreferredNodeIds = dedupe([
-    ...(params.preferredNodeIds || []),
     ...verificationTargetNodeIds,
+    ...targetStageBundleNodeIds,
+    ...(params.preferredNodeIds || []),
   ]);
   const scored = taskTypes.map((taskType) =>
     scoreCandidate({
@@ -629,6 +654,7 @@ export async function planNextTaskDecision(params: {
       preferredNodeIds: mergedPreferredNodeIds,
       qualityDomainFocus: params.qualityDomainFocus,
       verificationNodeIds: verificationTargetNodeIds,
+      recentlyTargetedNodeIds,
     })
   );
   scored.sort((a, b) => b.utility - a.utility);

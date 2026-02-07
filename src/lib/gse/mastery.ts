@@ -14,7 +14,7 @@ export type MasteryEvidence = {
   evidenceKind?: GseEvidenceKind;
   opportunityType?: GseOpportunityType;
   score?: number; // 0..1
-  weight?: number; // precomputed weight in [0..1.2]
+  weight?: number; // precomputed weight in [0..1.5]
   usedForPromotion?: boolean;
   taskType?: string;
   targeted?: boolean;
@@ -38,6 +38,8 @@ export type NodeMasteryOutcome = {
   activationStateAfter: NodeActivationState;
   activationImpact: EvidenceActivationImpact;
   verificationDueAt: string | null;
+  /** When present, the evidence weight was multiplied by this (streak bonus). */
+  streakMultiplier?: number;
 };
 
 function clamp(value: number, min = 0, max = 100) {
@@ -184,6 +186,10 @@ export async function applyEvidenceToStudentMastery(params: {
           .map((value) => (typeof value === "number" ? value : Number(value)))
           .filter((value) => Number.isFinite(value))
       : [];
+    const directSuccessStreak =
+      typeof spacingStateRaw.directSuccessStreak === "number" && spacingStateRaw.directSuccessStreak >= 0
+        ? spacingStateRaw.directSuccessStreak
+        : 0;
     const activationStateBefore = normalizeActivationState(existing?.activationState);
 
     // Trust alpha/beta as the single source of truth when they exist; fall back to stored mean otherwise.
@@ -215,13 +221,14 @@ export async function applyEvidenceToStudentMastery(params: {
         ? evidence.confidence * evidence.impact * 0.8
         : evidence.confidence * evidence.impact
     );
-    const computedWeight =
+    const maxWeight = 1.5; // allow streak bonus to speed progression to mastery
+    let effectiveWeight =
       typeof evidence.weight === "number"
-        ? Math.max(0.05, Math.min(1.2, evidence.weight))
+        ? Math.max(0.05, Math.min(maxWeight, evidence.weight))
         : Math.max(
             0.05,
             Math.min(
-              1.2,
+              maxWeight,
               baseWeight(kind, opportunity) *
                 clamp01(evidence.confidence) *
                 reliabilityFactor(evidence.reliability) *
@@ -229,8 +236,21 @@ export async function applyEvidenceToStudentMastery(params: {
             )
           );
 
-    const alphaAfter = alphaBefore + computedWeight * score;
-    const betaAfter = betaBefore + computedWeight * (1 - score);
+    const directSuccess = kind === "direct" && score >= 0.7;
+    const nextStreak = directSuccess ? directSuccessStreak + 1 : 0;
+
+    if (score >= 0.6) effectiveWeight *= 1.1;
+    else if (score < 0.4) effectiveWeight *= 0.9;
+    // Streak bonus: exponent with cap (2nd ×1.15, 3rd ×1.32, 4th+ ×1.5)
+    let streakMultiplierApplied: number | undefined;
+    if (directSuccess && directSuccessStreak >= 1) {
+      streakMultiplierApplied = Math.min(1.5, 1.15 ** Math.min(directSuccessStreak, 3));
+      effectiveWeight *= streakMultiplierApplied;
+    }
+    effectiveWeight = Math.max(0.05, Math.min(maxWeight, effectiveWeight));
+
+    const alphaAfter = alphaBefore + effectiveWeight * score;
+    const betaAfter = betaBefore + effectiveWeight * (1 - score);
     const nextMean = Number(clamp((alphaAfter / (alphaAfter + betaAfter)) * 100).toFixed(2));
     const nextUncertainty = Number((1 / Math.sqrt(Math.max(2, alphaAfter + betaAfter))).toFixed(4));
 
@@ -258,7 +278,7 @@ export async function applyEvidenceToStudentMastery(params: {
     const previousHalfLife =
       existing?.halfLifeDays ??
       defaultHalfLifeDays(existing?.node?.type || null, existing?.node?.skill || null);
-    const previousDecayed =
+    let previousDecayed =
       existing?.decayedMastery ??
       computeDecayedMastery({
         masteryMean: previousMean,
@@ -268,6 +288,8 @@ export async function applyEvidenceToStudentMastery(params: {
         evidenceCount: existing?.evidenceCount ?? 0,
         reliability: previousReliability,
       });
+    // Stale decayed can be above mean after alpha/beta was corrected down; cap so decayImpact stays >= 0.
+    if (previousDecayed > previousMean) previousDecayed = previousMean;
 
     const nextHalfLife = Number(
       Math.max(
@@ -310,6 +332,14 @@ export async function applyEvidenceToStudentMastery(params: {
       evidence.usedForPromotion !== false;
 
     if (activationStateBefore !== "verified" && verificationPass) {
+      activationStateAfter = "verified";
+      verificationDueAt = null;
+      activationImpact = "verified";
+    } else if (
+      activationStateBefore !== "verified" &&
+      nextStreak >= 2 &&
+      directSuccess
+    ) {
       activationStateAfter = "verified";
       verificationDueAt = null;
       activationImpact = "verified";
@@ -359,6 +389,7 @@ export async function applyEvidenceToStudentMastery(params: {
         spacingStateJson: {
           incidentalTaskTypes: nextIncidentalTaskTypes,
           incidentalConfidences: nextIncidentalConfidences,
+          directSuccessStreak: nextStreak,
         },
         calculationVersion: params.calculationVersion,
       },
@@ -386,6 +417,7 @@ export async function applyEvidenceToStudentMastery(params: {
         spacingStateJson: {
           incidentalTaskTypes: nextIncidentalTaskTypes,
           incidentalConfidences: nextIncidentalConfidences,
+          directSuccessStreak: nextStreak,
         },
         calculationVersion: params.calculationVersion,
       },
@@ -409,6 +441,7 @@ export async function applyEvidenceToStudentMastery(params: {
       activationStateAfter,
       activationImpact,
       verificationDueAt: verificationDueAt ? verificationDueAt.toISOString() : null,
+      ...(streakMultiplierApplied !== undefined && { streakMultiplier: streakMultiplierApplied }),
     });
   }
 

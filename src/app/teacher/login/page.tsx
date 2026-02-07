@@ -2,11 +2,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
-export default function LoginPage() {
+export default function TeacherLoginPage() {
   const router = useRouter();
-  const [code, setCode] = useState("");
-  const [ageBand, setAgeBand] = useState("9-11");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -15,16 +16,15 @@ export default function LoginPage() {
     setError(null);
     setLoading(true);
     try {
-      const response = await fetch("/api/auth/code", {
+      const res = await fetch("/api/auth/teacher/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code, ageBand }),
+        body: JSON.stringify({ email, password }),
       });
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || "Login failed");
-      }
-      router.push("/home");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Login failed");
+      router.push("/teacher");
+      router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
     } finally {
@@ -37,37 +37,37 @@ export default function LoginPage() {
       <section className="hero">
         <div className="container">
           <div className="card" style={{ maxWidth: 420, margin: "0 auto" }}>
-            <h1 className="title">Student Login</h1>
-            <p className="subtitle">
-              Enter your personal code (from your teacher). You will always return to your profile with this code.
-            </p>
+            <h1 className="title">Teacher login</h1>
+            <p className="subtitle">Sign in to your teacher account.</p>
             <div className="spacer" />
             <form onSubmit={handleSubmit} className="grid">
               <div className="field">
-                <label>Your code</label>
+                <label>Email</label>
                 <input
-                  value={code}
-                  onChange={(e) => setCode(e.target.value.toUpperCase())}
-                  placeholder="ABC123"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@school.edu"
                   required
                 />
               </div>
               <div className="field">
-                <label>Age group</label>
-                <select
-                  value={ageBand}
-                  onChange={(e) => setAgeBand(e.target.value)}
-                >
-                  <option value="6-8">6-8</option>
-                  <option value="9-11">9-11</option>
-                  <option value="12-14">12-14</option>
-                </select>
+                <label>Password</label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
               </div>
               {error && <p style={{ color: "var(--accent-1)" }}>{error}</p>}
               <button className="btn" type="submit" disabled={loading}>
-                {loading ? "Signing in…" : "Start"}
+                {loading ? "Signing in…" : "Sign in"}
               </button>
             </form>
+            <p className="subtitle" style={{ marginTop: "1rem" }}>
+              No account? <Link href="/teacher/signup">Sign up</Link>
+            </p>
           </div>
         </div>
       </section>

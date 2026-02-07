@@ -23,29 +23,30 @@ Build an autonomous speaking trainer where every learning decision is based on G
 - attempts/progress/task-next return GSE-specific reasons and node targets.
 
 ## 3) What was just fixed
-1. **Placement-driven promotion and bundle alignment:** If placement (evidence from all nodes) is above bundle-based promotion, we set promotion = placement so the UI shows the real level (e.g. B1) instead of A0. Planner now prefers target-stage bundle nodes (after verification queue) so exercises align with "path to next level". See DEBUG_PLAYBOOK § E3.
-2. Profile inspection script: `npx tsx src/scripts/inspect_teacher_profile.ts [studentId]` explains (1) why 0 nodes are closed (verified & value≥70 per bundle), (2) why blocking nodes (GSE bundle descriptors) differ from words in tasks (vocab queue), (3) exact readiness score breakdown (e.g. 17% = 0+8+3+6). See DEBUG_PLAYBOOK § E2.
-2. Skill progress (direct evidence): For target_vocab, "word used" is now checked against required words from the prompt that are bound to each target node by descriptor/alias. So when the prompt says "Use: school, learn" and the target node has descriptor or alias "school", the learner saying "school" counts as vocab_target_used (direct evidence). Previously we only matched node descriptor/sourceKey, so we almost always wrote vocab_target_missing. Script: `npx tsx src/scripts/inspect_recent_tasks.ts` to inspect evidence by kind (direct vs supporting vs negative).
-3. Task generator prompt no longer sends raw GSE node IDs to the LLM:
+1. **Planner spread and fast credit:** (a) Planner: at most 2 of 3 target nodes from preferred set (verification + bundle), so other nodes get a slot; penalty for recently targeted nodes (0.28 per node in last 3 tasks) to rotate away from same descriptor; preferredBoost 0.4→0.18, verificationGain 1.15→0.55 per hit. (b) Fast credit for lower-level bundles: when placement is above a bundle stage, node counts as covered if value≥50 and ≥1 direct evidence (no need for verified+70), so path-to-next-level bar moves without grinding.
+2. **Placement-driven promotion and bundle alignment:** If placement (evidence from all nodes) is above bundle-based promotion, we set promotion = placement so the UI shows the real level (e.g. B1) instead of A0. Planner now prefers target-stage bundle nodes (after verification queue) so exercises align with "path to next level". See DEBUG_PLAYBOOK § E3.
+3. Profile inspection script: `npx tsx src/scripts/inspect_teacher_profile.ts [studentId]` explains (1) why 0 nodes are closed (verified & value≥70 per bundle), (2) why blocking nodes (GSE bundle descriptors) differ from words in tasks (vocab queue), (3) exact readiness score breakdown (e.g. 17% = 0+8+3+6). See DEBUG_PLAYBOOK § E2.
+4. Skill progress (direct evidence): For target_vocab, "word used" is now checked against required words from the prompt that are bound to each target node by descriptor/alias. So when the prompt says "Use: school, learn" and the target node has descriptor or alias "school", the learner saying "school" counts as vocab_target_used (direct evidence). Previously we only matched node descriptor/sourceKey, so we almost always wrote vocab_target_missing. Script: `npx tsx src/scripts/inspect_recent_tasks.ts` to inspect evidence by kind (direct vs supporting vs negative).
+5. Task generator prompt no longer sends raw GSE node IDs to the LLM:
    - Planner returns `targetNodeDescriptors` (human-readable objectives); task/next passes them as `targetNodeLabels` to the generator.
    - Prompt uses "Target learning objectives" with descriptors and instructs the model to copy given IDs into `target_nodes`.
    - Grammar nodes with missing descriptor show as "Grammar accuracy at this level" instead of "No grammar descriptor available."
-4. Vocab matching bug fixed:
+6. Vocab matching bug fixed:
 - no more matching by technical `sourceKey` IDs.
 - matching now uses descriptor/alias lexical forms.
-5. Alias coverage fixed:
+7. Alias coverage fixed:
 - auto alias generation added.
 - full alias backfill script executed locally.
-6. Grammar capture strengthened:
+8. Grammar capture strengthened:
 - positive and negative incidental grammar signals are emitted.
 - agreement-type errors are explicitly captured.
-7. Validation status:
+9. Validation status:
 - `npm test` pass
 - `npm run lint` pass
 - `npm run build` pass
 
 ## 4) Critical Open Gaps (brain-level only)
-1. **Planner vs promotion bundle alignment:** Exercises are chosen from “any nodes in stage band”; progress is counted only on **bundle** nodes (A1 Grammar/Vocab/Can-Do). So tasks often don’t target the same nodes that move the “path to next level” bar. Done: we lift promotion to placement when placement > bundle promotion and prefer target-stage bundle nodes in planner. Remaining: optional fast-credit for lower-level nodes when higher-level evidence is strong.
+1. **Planner vs promotion bundle alignment:** Exercises are chosen from “any nodes in stage band”; progress is counted only on **bundle** nodes (A1 Grammar/Vocab/Can-Do). So tasks often don’t target the same nodes that move the “path to next level” bar. Done: we lift promotion to placement when placement > bundle promotion and prefer target-stage bundle nodes in planner. Fast credit implemented: when placement is above a bundle stage, nodes with value≥50 and ≥1 direct count as covered.
 2. Incidental vocab disambiguation is still too broad:
 - one word can match many nodes.
 - need top-k resolution by stage range + context.

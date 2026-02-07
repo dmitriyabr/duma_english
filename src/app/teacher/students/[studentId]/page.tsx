@@ -97,6 +97,7 @@ type NodeOutcomeRow = {
 };
 
 type StudentProfile = {
+  catalogNodesByBand?: Record<string, number>;
   student: {
     id: string;
     displayName: string;
@@ -158,7 +159,7 @@ export default function TeacherStudentProfilePage() {
     );
   }
 
-  const { student, progress, recentAttempts } = data;
+  const { student, progress, recentAttempts, catalogNodesByBand } = data;
   const np = progress.nodeProgress;
   const pr = progress.promotionReadiness;
 
@@ -196,38 +197,46 @@ export default function TeacherStudentProfilePage() {
           </div>
 
           {/* Per-level mastery (temporary block — will remove) */}
-          {progress.nodeCoverageByBand != null && (
+          {(progress.nodeCoverageByBand != null || (catalogNodesByBand && Object.keys(catalogNodesByBand).length > 0)) && (
             <div className="card" style={{ marginBottom: 24, padding: "12px 16px" }}>
               <h2 style={{ fontFamily: "var(--font-display)", fontSize: "1.05rem", marginBottom: 6 }}>
-                По уровням (временно)
+                By level (temporary)
               </h2>
               <p className="subtitle" style={{ marginBottom: 10, fontSize: "0.8rem" }}>
-                Mastered = значение ≥75. In progress = нод с доказательствами, но &lt;75.
+                Total = nodes in catalog at this level. With evidence = nodes this student has attempted. Mastered = value ≥75. In progress = with evidence but not yet mastered.
               </p>
               <div style={{ overflowX: "auto" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem" }}>
                   <thead>
                     <tr style={{ borderBottom: "1px solid rgba(16,22,47,0.12)", color: "var(--ink-2)" }}>
-                      <th style={{ textAlign: "left", padding: "6px 8px", fontWeight: 600 }}>Уровень</th>
+                      <th style={{ textAlign: "left", padding: "6px 8px", fontWeight: 600 }}>Level</th>
+                      <th style={{ textAlign: "right", padding: "6px 8px" }}>Total</th>
+                      <th style={{ textAlign: "right", padding: "6px 8px" }}>With evidence</th>
                       <th style={{ textAlign: "right", padding: "6px 8px" }}>Mastered</th>
-                      <th style={{ textAlign: "right", padding: "6px 8px" }}>Всего</th>
                       <th style={{ textAlign: "right", padding: "6px 8px" }}>In progress</th>
+                      <th style={{ textAlign: "right", padding: "6px 8px" }}>No evidence</th>
                       <th style={{ textAlign: "right", padding: "6px 8px", width: 44 }}>%</th>
-                      <th style={{ padding: "6px 8px", width: 80 }}>Bar</th>
+                      <th style={{ padding: "6px 8px", width: 72 }}>Bar</th>
                     </tr>
                   </thead>
                   <tbody>
                     {(["A1", "A2", "B1", "B2", "C1", "C2"] as const).map((stage) => {
                       const stat = progress.nodeCoverageByBand?.[stage] ?? { mastered: 0, total: 0 };
-                      const inProgress = stat.total - stat.mastered;
-                      const pct = stat.total > 0 ? Math.round((stat.mastered / stat.total) * 100) : 0;
+                      const catalogTotal = catalogNodesByBand?.[stage] ?? 0;
+                      const withEvidence = stat.total;
+                      const mastered = stat.mastered;
+                      const inProgress = withEvidence - mastered;
+                      const noEvidence = Math.max(0, catalogTotal - withEvidence);
+                      const pctCatalog = catalogTotal > 0 ? Math.round((mastered / catalogTotal) * 100) : 0;
                       return (
                         <tr key={stage} style={{ borderBottom: "1px solid rgba(16,22,47,0.06)" }}>
                           <td style={{ padding: "6px 8px", fontWeight: 600 }}>{stage}</td>
-                          <td style={{ textAlign: "right", padding: "6px 8px" }}>{stat.mastered}</td>
-                          <td style={{ textAlign: "right", padding: "6px 8px" }}>{stat.total}</td>
+                          <td style={{ textAlign: "right", padding: "6px 8px" }}>{catalogTotal}</td>
+                          <td style={{ textAlign: "right", padding: "6px 8px" }}>{withEvidence}</td>
+                          <td style={{ textAlign: "right", padding: "6px 8px" }}>{mastered}</td>
                           <td style={{ textAlign: "right", padding: "6px 8px", color: "var(--ink-2)" }}>{inProgress}</td>
-                          <td style={{ textAlign: "right", padding: "6px 8px" }}>{stat.total > 0 ? `${pct}%` : "—"}</td>
+                          <td style={{ textAlign: "right", padding: "6px 8px", color: "var(--ink-3)" }}>{noEvidence}</td>
+                          <td style={{ textAlign: "right", padding: "6px 8px" }}>{catalogTotal > 0 ? `${pctCatalog}%` : "—"}</td>
                           <td style={{ padding: "6px 8px" }}>
                             <div
                               style={{
@@ -240,9 +249,9 @@ export default function TeacherStudentProfilePage() {
                               <div
                                 style={{
                                   height: "100%",
-                                  width: `${pct}%`,
-                                  minWidth: stat.mastered > 0 ? 4 : 0,
-                                  background: pct >= 80 ? "var(--accent-2)" : "var(--accent-3)",
+                                  width: `${Math.min(100, pctCatalog)}%`,
+                                  minWidth: mastered > 0 ? 4 : 0,
+                                  background: pctCatalog >= 80 ? "var(--accent-2)" : "var(--accent-3)",
                                   borderRadius: 999,
                                 }}
                               />

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { getTeacherFromRequest } from "@/lib/auth";
 import { ensureLearnerProfile } from "@/lib/adaptive";
 import { getStudentProgress } from "@/lib/progress";
+import { mapStageToGseRange } from "@/lib/gse/utils";
 
 async function ensureTeacherCanAccessStudent(
   teacherId: string,
@@ -157,6 +158,18 @@ export async function GET(
     }
   }
 
+  const STAGES = ["A1", "A2", "B1", "B2", "C1", "C2"] as const;
+  const catalogNodesByBand: Record<string, number> = {};
+  await Promise.all(
+    STAGES.map(async (stage) => {
+      const range = mapStageToGseRange(stage);
+      const count = await prisma.gseNode.count({
+        where: { gseCenter: { gte: range.min, lte: range.max } },
+      });
+      catalogNodesByBand[stage] = count;
+    })
+  );
+
   return NextResponse.json({
     student: {
       id: student.id,
@@ -166,6 +179,7 @@ export async function GET(
       className: student.class.name,
     },
     progress,
+    catalogNodesByBand,
     recentAttempts: recentAttempts.map((a) => ({
       id: a.id,
       createdAt: a.createdAt,

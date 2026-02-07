@@ -108,6 +108,7 @@ type NodeState = {
 type CandidateScore = {
   taskType: string;
   targetNodeIds: string[];
+  targetNodeDescriptors: string[];
   domainsTargeted: DomainKey[];
   expectedGain: number;
   successProbability: number;
@@ -126,6 +127,7 @@ export type PlannerDecision = {
   decisionId: string;
   chosenTaskType: string;
   targetNodeIds: string[];
+  targetNodeDescriptors: string[];
   domainsTargeted: DomainKey[];
   diagnosticMode: boolean;
   rotationApplied: boolean;
@@ -503,7 +505,11 @@ function scoreCandidate(params: {
     qualityDomainBoost +
     verificationGain;
   const weakest = targetNodes[0];
-  const weakestLabel = weakest?.descriptor?.trim() || "priority learning objective";
+  const rawDesc = weakest?.descriptor?.trim();
+  const weakestLabel =
+    !rawDesc || rawDesc === "No grammar descriptor available."
+      ? (weakest?.domain === "grammar" ? "Grammar accuracy at this level" : "priority learning objective")
+      : rawDesc;
   const domainLabel = weakest?.domain || targetDomain;
   const selectionReasonType: CandidateScore["selectionReasonType"] =
     verificationGain > 0
@@ -522,6 +528,13 @@ function scoreCandidate(params: {
   return {
     taskType: params.taskType,
     targetNodeIds: targetNodes.map((node) => node.nodeId),
+    targetNodeDescriptors: targetNodes.map((node) => {
+      const d = node.descriptor?.trim();
+      if (!d || d === "No grammar descriptor available.") {
+        return node.domain === "grammar" ? "Grammar accuracy at this level" : "Learning objective";
+      }
+      return d;
+    }),
     domainsTargeted: Array.from(new Set(targetNodes.map((node) => node.domain))),
     expectedGain: round(expectedGain),
     successProbability: round(successProbability),
@@ -709,6 +722,7 @@ export async function planNextTaskDecision(params: {
     decisionId: decision.id,
     chosenTaskType: chosen.taskType,
     targetNodeIds: chosen.targetNodeIds,
+    targetNodeDescriptors: chosen.targetNodeDescriptors,
     domainsTargeted: chosen.domainsTargeted,
     diagnosticMode: Boolean(params.diagnosticMode),
     rotationApplied,

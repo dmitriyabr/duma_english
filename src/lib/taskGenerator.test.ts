@@ -23,3 +23,28 @@ test("task generator falls back deterministically when OPENAI_API_KEY is missing
 
   if (original) process.env.OPENAI_API_KEY = original;
 });
+
+test("task generator with targetNodeLabels uses them in prompt and returns same node IDs in fallback", async () => {
+  const original = process.env.OPENAI_API_KEY;
+  delete process.env.OPENAI_API_KEY;
+
+  const nodeIds = ["gse:vocab:node1", "gse:grammar:node2"];
+  const labels = ["Can use basic school vocabulary.", "Can use present simple in short answers."];
+  const spec = await generateTaskSpec({
+    taskType: "qa_prompt",
+    stage: "A0",
+    ageBand: "9-11",
+    targetWords: [],
+    targetNodeIds: nodeIds,
+    targetNodeLabels: labels,
+    focusSkills: ["vocabulary", "task_completion"],
+    plannerReason: "Lift weak nodes.",
+    primaryGoal: "lift_weak_nodes",
+  });
+
+  assert.equal(spec.fallbackUsed, true);
+  assert.deepEqual(spec.targetNodes, nodeIds);
+  assert.ok(spec.prompt.length > 0);
+
+  if (original) process.env.OPENAI_API_KEY = original;
+});

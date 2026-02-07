@@ -29,6 +29,14 @@ Check:
 3. reliability and stability gates.
 4. direct evidence counts.
 
+## D) Task generator: why prompt sent “garbage” (raw node IDs)
+The task generator LLM used to receive only raw GSE node IDs (e.g. `gse:gse_grammar_glgr:...`), which are meaningless to the model. Now:
+- Planner returns **targetNodeDescriptors** (human-readable learning objectives) together with targetNodeIds.
+- The prompt sent to the LLM uses **Target learning objectives** (numbered list of descriptors) and asks to copy the given IDs into `target_nodes` in the JSON. So the model designs the task from the objectives, not from opaque IDs.
+- Grammar nodes with empty or "No grammar descriptor available." are shown as "Grammar accuracy at this level" in the prompt and in selection reason.
+
+If you still see bad prompts in LangSmith, check that `decision.targetNodeDescriptors` is passed into `generateTaskSpec` as `targetNodeLabels` (see `GET /api/task/next`).
+
 ## E) Debugging LLM prompts (LangSmith)
 All OpenAI calls (evaluator + task generator) go through LangChain. To trace prompts and responses:
 

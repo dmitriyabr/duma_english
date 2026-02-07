@@ -23,16 +23,20 @@ Build an autonomous speaking trainer where every learning decision is based on G
 - attempts/progress/task-next return GSE-specific reasons and node targets.
 
 ## 3) What was just fixed
-1. Vocab matching bug fixed:
+1. Task generator prompt no longer sends raw GSE node IDs to the LLM:
+   - Planner returns `targetNodeDescriptors` (human-readable objectives); task/next passes them as `targetNodeLabels` to the generator.
+   - Prompt uses "Target learning objectives" with descriptors and instructs the model to copy given IDs into `target_nodes`.
+   - Grammar nodes with missing descriptor show as "Grammar accuracy at this level" instead of "No grammar descriptor available."
+2. Vocab matching bug fixed:
 - no more matching by technical `sourceKey` IDs.
 - matching now uses descriptor/alias lexical forms.
-2. Alias coverage fixed:
+3. Alias coverage fixed:
 - auto alias generation added.
 - full alias backfill script executed locally.
-3. Grammar capture strengthened:
+4. Grammar capture strengthened:
 - positive and negative incidental grammar signals are emitted.
 - agreement-type errors are explicitly captured.
-4. Validation status:
+5. Validation status:
 - `npm test` pass
 - `npm run lint` pass
 - `npm run build` pass

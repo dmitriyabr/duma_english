@@ -24,6 +24,8 @@ type GenerateTaskSpecInput = {
   ageBand: string;
   targetWords: string[];
   targetNodeIds: string[];
+  /** Human-readable learning objectives (same order as targetNodeIds). Shown to LLM instead of raw IDs. */
+  targetNodeLabels?: string[];
   focusSkills: string[];
   plannerReason: string;
   primaryGoal: string;
@@ -297,6 +299,16 @@ export async function generateTaskSpec(input: GenerateTaskSpecInput): Promise<Ge
   const fallback = fallbackTaskSpec(input);
   if (!apiKey) return fallback;
 
+  const labels = input.targetNodeLabels?.filter(Boolean) ?? [];
+  const hasLabels = labels.length > 0 && labels.length === input.targetNodeIds.length;
+  const targetObjectivesBlock = hasLabels
+    ? [
+        "Target learning objectives (design the task so the learner can demonstrate these):",
+        ...labels.map((desc, i) => `${i + 1}) ${desc}`),
+        `In your JSON, set target_nodes to exactly these IDs in this order: ${input.targetNodeIds.join(", ")}`,
+      ].join("\n")
+    : `Target node IDs (copy into target_nodes): ${input.targetNodeIds.join(", ") || "none"}`;
+
   const prompt = [
     "Generate one speaking task for a child learner.",
     "Output JSON only with keys: task_type,instruction,constraints,maxDurationSec,assessmentMode,expected_artifacts,scoring_hooks,estimated_difficulty,target_nodes.",
@@ -307,7 +319,7 @@ export async function generateTaskSpec(input: GenerateTaskSpecInput): Promise<Ge
     `Task type required: ${input.taskType}`,
     `Primary goal: ${input.primaryGoal}`,
     `Target words: ${input.targetWords.join(", ") || "none"}`,
-    `Target node IDs: ${input.targetNodeIds.join(", ") || "none"}`,
+    targetObjectivesBlock,
     `Focus skills: ${input.focusSkills.join(", ") || "speaking"}`,
     `Planner reason: ${input.plannerReason}`,
     `Avoid repeating recent prompts: ${(input.recentPrompts || []).slice(0, 5).join(" || ") || "none"}`,

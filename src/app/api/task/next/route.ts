@@ -136,6 +136,7 @@ export async function GET(req: Request) {
     ageBand: profile?.ageBand || "9-11",
     targetWords: decision.chosenTaskType === "target_vocab" ? targetWords : [],
     targetNodeIds: decision.targetNodeIds,
+    targetNodeLabels: decision.targetNodeDescriptors,
     focusSkills: weakestSkills,
     plannerReason: decision.selectionReason,
     primaryGoal: decision.primaryGoal,

@@ -59,6 +59,7 @@ export async function POST(req: NextRequest) {
     chosenTaskType: decision.chosenTaskType,
     expectedGain: decision.expectedGain,
     targetNodeIds: decision.targetNodeIds,
+    targetNodeDescriptors: decision.targetNodeDescriptors,
     domainsTargeted: decision.domainsTargeted,
     diagnosticMode: decision.diagnosticMode,
     primaryGoal: decision.primaryGoal,

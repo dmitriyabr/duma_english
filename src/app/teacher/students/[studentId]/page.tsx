@@ -32,6 +32,7 @@ type Progress = {
     ready: boolean;
     readinessScore?: number;
     coverageRatio?: number | null;
+    valueProgress?: number;
     blockedByNodes?: string[];
     blockedByNodeDescriptors?: string[];
     blockedBundles?: Array<{
@@ -465,7 +466,7 @@ export default function TeacherStudentProfilePage() {
                     <div
                       style={{
                         height: "100%",
-                        width: `${Math.min(100, Math.max(0, pr.readinessScore ?? pr.coverageRatio ?? 0))}%`,
+                        width: `${Math.min(100, Math.max(0, Math.max(pr.readinessScore ?? pr.coverageRatio ?? 0, (pr.valueProgress ?? 0) * 100)))}%`,
                         background: pr.ready
                           ? "linear-gradient(90deg, var(--accent-2), #2dd4a0)"
                           : "linear-gradient(90deg, var(--accent-3), var(--accent-2))",
@@ -492,11 +493,11 @@ export default function TeacherStudentProfilePage() {
               <p className="subtitle" style={{ marginBottom: 16, fontSize: "0.95rem" }}>
                 {pr.ready
                   ? `Ready for promotion to ${pr.targetStage}.`
-                  : `Progress: ${Math.round(pr.readinessScore ?? pr.coverageRatio ?? 0)}% toward ${pr.targetStage}.`}
+                  : `Progress: ${Math.round(Math.max(pr.readinessScore ?? pr.coverageRatio ?? 0, (pr.valueProgress ?? 0) * 100))}% toward ${pr.targetStage} (node progress ${Math.round((pr.valueProgress ?? 0) * 100)}%).`}
               </p>
               {!pr.ready && (
                 <p className="subtitle" style={{ marginBottom: 16, fontSize: "0.9rem", color: "var(--ink-2)" }}>
-                  The percentage is from bundle-level metrics: coverage (nodes at 70+), reliability, 14-day stability, and direct evidence. So even with 0 nodes at 70 yet, you can see a small % from other signals.
+                  The bar shows the higher of: (1) bundle score (coverage at 70+, reliability, stability) and (2) <strong>node progress</strong> — average progress toward 70 per required node (min(value,70)/70). So the bar moves with every evidence, not only when a node reaches 70.
                 </p>
               )}
 

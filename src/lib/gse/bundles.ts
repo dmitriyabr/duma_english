@@ -58,6 +58,8 @@ export type BundleReadinessRow = {
   requiredCoverage: number;
   coveredCount: number;
   coverage: number;
+  /** 0..1: average progress toward 70 per required node (min(value,70)/70). Makes progress bar move with every evidence. */
+  valueProgress: number;
   directEvidenceCovered: number;
   reliabilityRatio: number;
   stabilityRatio: number;
@@ -245,6 +247,10 @@ export async function computeStageBundleReadiness(studentId: string, placementSt
         (row.verified && row.value >= 70) || (placementAbove && row.value >= 50 && row.direct >= 1)
     ).length;
     const coverage = totalRequired > 0 ? coveredCount / totalRequired : 0;
+    const valueProgress =
+      totalRequired > 0
+        ? scored.reduce((sum, row) => sum + Math.min(1, Math.max(0, row.value / 70)), 0) / totalRequired
+        : 0;
     const directEvidenceCovered = scored.filter((row) => row.verified && row.direct > 0 && row.value >= 65).length;
     const reliabilityRatio =
       totalRequired > 0 ? scored.filter((row) => row.verified && row.reliability !== "low").length / totalRequired : 0;
@@ -271,6 +277,7 @@ export async function computeStageBundleReadiness(studentId: string, placementSt
       requiredCoverage: bundle.requiredCoverage,
       coveredCount,
       coverage: Number(clamp01(coverage).toFixed(4)),
+      valueProgress: Number(clamp01(valueProgress).toFixed(4)),
       directEvidenceCovered,
       reliabilityRatio: Number(clamp01(reliabilityRatio).toFixed(4)),
       stabilityRatio: Number(clamp01(stabilityRatio).toFixed(4)),

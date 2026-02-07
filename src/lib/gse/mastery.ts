@@ -241,6 +241,16 @@ export async function applyEvidenceToStudentMastery(params: {
 
     if (score >= 0.6) effectiveWeight *= 1.1;
     else if (score < 0.4) effectiveWeight *= 0.9;
+    // Repeated supporting success: after 5+ supporting hits on this node, next supporting+incidental with score≥0.6 gets 1.5× so "used the word many times" accumulates faster
+    const supportingCountBefore = existing?.supportingEvidenceCount ?? 0;
+    if (
+      kind === "supporting" &&
+      opportunity === "incidental" &&
+      score >= 0.6 &&
+      supportingCountBefore >= 5
+    ) {
+      effectiveWeight *= 1.5;
+    }
     // Streak bonus: exponent with cap (2nd ×1.15, 3rd ×1.32, 4th+ ×1.5)
     let streakMultiplierApplied: number | undefined;
     if (directSuccess && directSuccessStreak >= 1) {

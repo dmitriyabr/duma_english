@@ -32,6 +32,9 @@ Then the planner prioritises that node for a **verification** task (explicit tar
 
 **Summary:** The pluses are real increments to the 0–100 mean. They are small per evidence and spread across many nodes; decay then reduces the **shown** value. To see high mastery: same nodes need repeated practice (many +0.5s on the same node) and/or strong direct evidence; otherwise decay will keep the displayed number low.
 
+## A3) Why so few streaks and small deltas (+0.6, +1.0)
+Run **`npx tsx src/scripts/inspect_profile_evidence.ts [studentId]`** to see your evidence mix. Typically most evidence is **supporting + incidental** (word used in speech but task was not target_vocab with that word). Streak applies only when **kind=direct** and score≥0.7, so with almost no direct evidence you rarely see “streak ×1.15”. Small deltas: supporting weight 0.35 → each hit adds ~0.5–1.0 to the mean; many such hits still leave value low. See MASTERY_METHODOLOGY.md “Why you see so few streaks”.
+
 ## B) Why skills don't progress (no direct evidence)
 Progress and promotion depend on **direct** evidence (target nodes hit). Check:
 1. **Evidence by kind:** Run `npx tsx src/scripts/inspect_recent_tasks.ts` and look at "Evidence by kind". If you see almost only `supporting` and `negative`, almost no `direct`, skills will not move.

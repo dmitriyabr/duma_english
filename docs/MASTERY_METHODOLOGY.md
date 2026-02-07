@@ -13,16 +13,27 @@ So: “if I systematically don’t err, speed should go up; if I err, it should 
 
 ## What we have today
 
-- **Weights** in `src/lib/gse/mastery.ts` are **fixed** by evidence kind and opportunity (direct+explicit_target=1, supporting+incidental=0.35, negative=0.4–0.9, etc.). There is **no streak bonus** (e.g. “after 3 direct hits in a row, next weight ×1.2”) and **no error penalty** (e.g. “after a negative, next evidence weighted less”).
-- **Verification:** One strong direct+explicit_target pass (score ≥ 0.7, confidence ≥ 0.75) can set the node to **verified** immediately. We do **not** use “N correct in a row” to declare verified; one strong hit is enough.
-- **Fast credit:** When placement is above a bundle stage, we count nodes as covered if value ≥ 50 and ≥ 1 direct (so we don’t grind to verified+70 on lower levels).
+- **Weights** by kind and opportunity: direct+explicit_target=1, supporting+incidental=0.35, etc. **Streak bonus** (done): 2nd direct success in a row ×1.15, 3rd+ up to ×1.5. **PFA-style** (done): score ≥ 0.6 → ×1.1, score &lt; 0.4 → ×0.9.
+- **Verification:** One strong direct+explicit_target pass (score ≥ 0.7, confidence ≥ 0.75) → verified; or **N-CCR** (done): 2 direct successes in a row → verified even if mean &lt; 70.
+- **Fast credit:** When placement is above a bundle stage, node counts as covered if value ≥ 50 and ≥ 1 direct.
 
-So we **do not** currently implement “systematically correct → speed up; errors → slow down” at the **evidence weight** level.
+## Why you see so few streaks and small deltas (+0.6, +1.0)
 
-## Possible additions
+**Real profile data (inspect_profile_evidence.ts):** The vast majority of evidence is **supporting + incidental** (e.g. vocab_incidental_used: “word was used in speech” but the task was not a target_vocab with that word in required words). Example: “ask” had **0 direct**, 8 supporting; “play” had **0 direct**, 35 supporting.
 
-1. **Streak bonus on weight:** 2nd direct success in a row ×1.15, 3rd+ ×1.20 (exponent with cap; see MASTERY_IMPROVEMENTS_PLAN and spaced-repetition / PFA literature on bounded growth).
-2. **N-CCR-style early verification:** e.g. 2–3 direct passes in a row on this node → set verified even if mean < 70.
-3. **PFA-style:** Separate effective learning rates for correct vs incorrect in the alpha/beta update (correct adds more to alpha, incorrect adds more to beta / or use different weights for negative evidence after a streak of positives).
+- **Streak applies only when** kind = **direct** and score ≥ 0.7. So if almost every hit is “supporting”, you will almost never see “streak ×1.15” in the log.
+- **Small deltas:** supporting+incidental has base weight 0.35. So each evidence moves the mean by ~0.5–1.0 points. Even 35 such hits on “play” only push the mean to ~28–30; decay then limits growth. So “дохрена раз использовал слово” gives many **supporting** observations, but each counts for little; we never get **direct** (word was the explicit target and you used it) unless the task was target_vocab or the prompt listed that word in “Use: …”.
 
-See DEBUG_PLAYBOOK for other mastery/evidence details.
+**Spaced repetition:** Decay (mastery падает со временем) is correct. The issue is not decay but **low weight of repeated correct use** when it’s classified as supporting. In principle, “used the word correctly in context” many times should strengthen the estimate; we currently don’t boost that.
+
+## Done: repeated supporting boost
+
+- After **5+ supporting observations** on the same node, the next **supporting + incidental** evidence with score ≥ 0.6 gets weight ×**1.5**. So “used the word many times” (e.g. play ×35, ask ×8) accumulates faster: the 6th, 7th, … such hit moves the mean more. Implemented in `mastery.ts`.
+
+## Possible next steps (methodology)
+
+1. **More direct evidence:** Planner / task choice could schedule more **target_vocab** (or prompts with “Use: X, Y”) for nodes that already have many supporting hits, so the next hit becomes direct → streak can apply and growth speeds up.
+2. **Supporting → “quasi-direct” after N successes:** After e.g. 5+ supporting observations on the same node with score ≥ 0.6 each, treat the next supporting hit as direct for **weight** (and optionally for streak). So repeated correct use accumulates without requiring the task to be explicit target.
+3. ~~Higher weight for repeated supporting~~ (done above): See "Done: repeated supporting boost" above.
+
+See DEBUG_PLAYBOOK for other mastery/evidence details. Run `npx tsx src/scripts/inspect_profile_evidence.ts [studentId]` to see your evidence mix and why streaks are rare.

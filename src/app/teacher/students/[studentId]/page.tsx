@@ -9,6 +9,7 @@ type Progress = {
   placementStage?: string;
   promotionStage?: string;
   streak: number;
+  nodeCoverageByBand?: Record<string, { mastered: number; total: number }>;
   recentAttempts: Array<{
     id: string;
     createdAt: string;
@@ -193,6 +194,59 @@ export default function TeacherStudentProfilePage() {
               </strong>
             </div>
           </div>
+
+          {/* Per-level mastery (temporary block — will remove) */}
+          {progress.nodeCoverageByBand && Object.keys(progress.nodeCoverageByBand).length > 0 && (
+            <div className="card" style={{ marginBottom: 24 }}>
+              <h2 style={{ fontFamily: "var(--font-display)", fontSize: "1.2rem", marginBottom: 8 }}>
+                По уровням (временно)
+              </h2>
+              <p className="subtitle" style={{ marginBottom: 12 }}>
+                Освоено нод по уровню (mastered = значение ≥75). Отдельно от текущего уровня и path to next.
+              </p>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
+                {(["A1", "A2", "B1", "B2", "C1", "C2"] as const).map((stage) => {
+                  const stat = progress.nodeCoverageByBand?.[stage];
+                  if (!stat || stat.total === 0) return null;
+                  const pct = stat.total > 0 ? Math.round((stat.mastered / stat.total) * 100) : 0;
+                  return (
+                    <div
+                      key={stage}
+                      style={{
+                        padding: "10px 14px",
+                        background: "rgba(16,22,47,0.04)",
+                        borderRadius: "var(--radius-sm)",
+                        minWidth: 100,
+                      }}
+                    >
+                      <div style={{ fontWeight: 600, fontSize: "1rem", marginBottom: 4 }}>{stage}</div>
+                      <div style={{ fontSize: "0.9rem", color: "var(--ink-2)" }}>
+                        {stat.mastered} / {stat.total} mastered
+                      </div>
+                      <div
+                        style={{
+                          height: 6,
+                          borderRadius: 999,
+                          background: "rgba(16,22,47,0.1)",
+                          overflow: "hidden",
+                          marginTop: 6,
+                        }}
+                      >
+                        <div
+                          style={{
+                            height: "100%",
+                            width: `${pct}%`,
+                            background: pct >= 80 ? "var(--accent-2)" : "var(--accent-3)",
+                            borderRadius: 999,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Path to next level (GSE nodes breakdown) */}
           {pr && (

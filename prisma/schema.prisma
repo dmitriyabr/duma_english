@@ -44,6 +44,7 @@ model Student {
   id                  String               @id @default(cuid())
   classId             String
   displayName         String
+  loginCode           String?              @unique
   createdAt           DateTime             @default(now())
   attempts            Attempt[]
   gseEvidence         AttemptGseEvidence[]

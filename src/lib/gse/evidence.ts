@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { applyEvidenceToStudentMastery, MasteryEvidence } from "./mastery";
+import { applyEvidenceToStudentMastery, MasteryEvidence, NodeMasteryOutcome } from "./mastery";
 import { confidenceFromReliability } from "./utils";
 
 type DerivedMetrics = {
@@ -129,7 +129,7 @@ export async function persistAttemptGseEvidence(input: BuildAttemptEvidenceInput
   }
 
   if (created.length === 0) {
-    return { evidenceCount: 0 };
+    return { evidenceCount: 0, nodeOutcomes: [] as NodeMasteryOutcome[] };
   }
 
   const deduped = new Map<string, (typeof created)[number]>();
@@ -157,11 +157,11 @@ export async function persistAttemptGseEvidence(input: BuildAttemptEvidenceInput
     impact: row.impact,
     reliability: row.reliability,
   }));
-  await applyEvidenceToStudentMastery({
+  const nodeOutcomes = await applyEvidenceToStudentMastery({
     studentId: input.studentId,
     evidences: masteryEvidences,
     calculationVersion: "gse-mastery-v1",
   });
 
-  return { evidenceCount: rows.length };
+  return { evidenceCount: rows.length, nodeOutcomes };
 }

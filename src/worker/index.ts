@@ -6,7 +6,7 @@ import { analyzeSpeechFromBuffer } from "../lib/speech";
 import { calculateDerivedSpeechMetrics, composeScores } from "../lib/scoring";
 import { computeLanguageScoreFromTaskEvaluation, evaluateTaskQuality } from "../lib/evaluator";
 import { recomputeMastery } from "../lib/adaptive";
-import { finishPlacement, getPlacementQuestions, submitPlacementAnswer } from "../lib/placement";
+import { finishPlacement, submitPlacementAnswer } from "../lib/placement";
 import { persistAttemptGseEvidence } from "../lib/gse/evidence";
 
 const POLL_INTERVAL_MS = Number(process.env.WORKER_POLL_INTERVAL_MS || 3000);
@@ -191,6 +191,37 @@ function selectBestReliability(values: MetricReliability[]) {
   return values.sort((a, b) => reliabilityRank(b) - reliabilityRank(a))[0];
 }
 
+function numeric(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+async function computeRecoveryTrigger(studentId: string) {
+  const attempts = await prisma.attempt.findMany({
+    where: { studentId, status: "completed" },
+    orderBy: { completedAt: "desc" },
+    take: 3,
+  });
+  if (attempts.length < 3) return false;
+
+  const lowTaskChain = attempts.every((attempt) => {
+    const scores = (attempt.scoresJson || {}) as { taskScore?: number };
+    const taskScore = numeric(scores.taskScore);
+    return taskScore !== null && taskScore < 55;
+  });
+
+  const confidences = attempts
+    .map((attempt) => {
+      const metrics = (attempt.speechMetricsJson || {}) as { confidence?: number };
+      const confidence = numeric(metrics.confidence);
+      return confidence !== null ? confidence * 100 : null;
+    })
+    .filter((value): value is number => value !== null);
+  const confidenceDrop =
+    confidences.length >= 3 && confidences[0] + 10 < (confidences[1] + confidences[2]) / 2;
+
+  return lowTaskChain || confidenceDrop;
+}
+
 async function aggregateDailySkills(studentId: string, metrics: CanonicalMetric[], createdAt: Date) {
   const bySkill: Record<string, CanonicalMetric[]> = {
     pronunciation: metrics.filter((m) => m.metricKey === "pronunciation_target_ref" || m.metricKey === "pronunciation_self_ref"),
@@ -263,11 +294,13 @@ async function updatePlacementFromAttempt(params: {
     typeof params.taskMeta.placementSessionId === "string"
       ? params.taskMeta.placementSessionId
       : null;
-  const placementQuestionId =
-    typeof params.taskMeta.placementQuestionId === "string"
+  const placementItemId =
+    typeof params.taskMeta.placementItemId === "string"
+      ? params.taskMeta.placementItemId
+      : typeof params.taskMeta.placementQuestionId === "string"
       ? params.taskMeta.placementQuestionId
       : null;
-  if (!placementSessionId || !placementQuestionId) return;
+  if (!placementSessionId || !placementItemId) return;
 
   const selfRating =
     params.taskScore >= 85 ? 5 : params.taskScore >= 70 ? 4 : params.taskScore >= 55 ? 3 : 2;
@@ -276,7 +309,7 @@ async function updatePlacementFromAttempt(params: {
       ? params.taskEvaluation.artifacts.wordUsageCorrectness
       : null;
   const session = await submitPlacementAnswer(placementSessionId, {
-    questionId: placementQuestionId,
+    itemId: placementItemId,
     attemptId: params.attemptId,
     transcript: params.transcript,
     selfRating,
@@ -298,8 +331,7 @@ async function updatePlacementFromAttempt(params: {
     },
   });
 
-  const total = getPlacementQuestions().length;
-  if (session.currentIndex >= total) {
+  if (session.done) {
     await finishPlacement(placementSessionId);
   }
 }
@@ -439,6 +471,14 @@ async function processAttempt(attemptId: string) {
     if (gseEvidence.evidenceCount > 0) {
       console.log(JSON.stringify({ event: "gse_evidence_written", attemptId: attempt.id, count: gseEvidence.evidenceCount }));
     }
+    const recoveryTriggered = await computeRecoveryTrigger(attempt.studentId);
+    await prisma.attempt.update({
+      where: { id: attempt.id },
+      data: {
+        nodeOutcomesJson: gseEvidence.nodeOutcomes as unknown as Prisma.InputJsonValue,
+        recoveryTriggered,
+      },
+    });
     await updatePlacementFromAttempt({
       taskMeta,
       attemptId: attempt.id,
@@ -448,6 +488,13 @@ async function processAttempt(attemptId: string) {
       taskEvaluation: evaluated.taskEvaluation,
       taskScore: evaluated.taskEvaluation.taskScore,
     });
+    const isPlacementTask = Boolean(taskMeta.isPlacement);
+    if (!isPlacementTask) {
+      await prisma.learnerProfile.updateMany({
+        where: { studentId: attempt.studentId, placementFresh: true },
+        data: { placementFresh: false },
+      });
+    }
     await aggregateDailySkills(attempt.studentId, canonicalMetrics, attempt.createdAt);
     await recomputeMastery(attempt.studentId);
 

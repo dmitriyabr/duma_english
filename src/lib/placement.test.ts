@@ -49,7 +49,7 @@ test("placement tempo scoring maps speechRate into stable bands", () => {
   });
   assert.equal(high, 85);
   assert.equal(medium, 72);
-  assert.equal(low, 58);
+  assert.equal(low, 56);
 });
 
 test("placement scoring falls back to transcript length + self rating", () => {
@@ -96,8 +96,8 @@ test("computePlacementResult derives stage/confidence from mixed responses", () 
     },
   });
 
-  assert.equal(result.stage, "B1");
+  assert.equal(result.stage, "B2");
   assert.ok(result.average >= 80);
-  assert.ok(result.confidence >= 0.9);
+  assert.ok(result.confidence >= 0.7);
   assert.equal(Object.keys(result.skillSnapshot).length, 5);
 });

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { computeNextMasteryScore } from "./gse/mastery";
+import { computeDecayedMastery, computeNextMasteryScore } from "./gse/mastery";
 import { mapTranscriptToWordSet } from "./gse/evidence";
 
 test("mastery update is monotonic for positive evidence", () => {
@@ -29,3 +29,17 @@ test("transcript->word set mapper dedupes and normalizes", () => {
   assert.equal(words.filter((word) => word === "hello").length, 1);
 });
 
+test("decay lowers mastery over time based on half-life", () => {
+  const now = new Date("2026-02-07T12:00:00.000Z");
+  const old = new Date("2026-01-24T12:00:00.000Z");
+  const decayed = computeDecayedMastery({
+    masteryMean: 80,
+    lastEvidenceAt: old,
+    now,
+    halfLifeDays: 14,
+    evidenceCount: 1,
+    reliability: "medium",
+  });
+  assert.ok(decayed < 80);
+  assert.ok(decayed > 0);
+});

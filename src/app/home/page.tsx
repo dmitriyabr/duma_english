@@ -38,7 +38,6 @@ export default function HomePage() {
         <div className="nav-links">
           <Link href="/task">New task</Link>
           <Link href="/progress">Progress</Link>
-          <Link href="/placement">Placement</Link>
         </div>
       </nav>
       <section className="container">
@@ -64,20 +63,6 @@ export default function HomePage() {
               {data?.stage && <p className="subtitle">Stage: {data.stage}</p>}
             </div>
           </div>
-          {data?.placementNeeded && (
-            <>
-              <div className="spacer" />
-              <div className="metric">
-                <span>Placement needed</span>
-                <p className="subtitle">
-                  Run the quick placement to personalize your level and weekly plan.
-                </p>
-                <Link className="btn ghost" href="/placement">
-                  Start quick placement
-                </Link>
-              </div>
-            </>
-          )}
           <div className="spacer" />
           <Link className="btn" href="/task">
             Start a task

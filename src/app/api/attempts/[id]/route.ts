@@ -17,7 +17,23 @@ export async function GET(_: Request, context: AttemptRouteContext) {
   const attempt = await prisma.attempt.findFirst({
     where: { id, studentId: student.studentId },
     include: {
-      task: true,
+      task: {
+        include: {
+          taskInstance: {
+            include: {
+              decisionLog: {
+                select: {
+                  id: true,
+                  selectionReason: true,
+                  primaryGoal: true,
+                  expectedGain: true,
+                  estimatedDifficulty: true,
+                },
+              },
+            },
+          },
+        },
+      },
       gseEvidence: {
         include: {
           node: {
@@ -238,6 +254,15 @@ export async function GET(_: Request, context: AttemptRouteContext) {
           : undefined,
     },
   };
+  const nodeOutcomes = Array.isArray(attempt.nodeOutcomesJson)
+    ? (attempt.nodeOutcomesJson as Array<{
+        nodeId: string;
+        deltaMastery: number;
+        decayImpact: number;
+        reliability: "high" | "medium" | "low";
+        evidenceCount: number;
+      }>)
+    : [];
 
   return NextResponse.json({
     status: attempt.status,
@@ -263,6 +288,17 @@ export async function GET(_: Request, context: AttemptRouteContext) {
             taskEvaluation,
             feedback,
             gseEvidence,
+            nodeOutcomes,
+            recoveryTriggered: attempt.recoveryTriggered,
+            planner: attempt.task.taskInstance?.decisionLog
+              ? {
+                  decisionId: attempt.task.taskInstance.decisionLog.id,
+                  selectionReason: attempt.task.taskInstance.decisionLog.selectionReason,
+                  primaryGoal: attempt.task.taskInstance.decisionLog.primaryGoal,
+                  expectedGain: attempt.task.taskInstance.decisionLog.expectedGain,
+                  estimatedDifficulty: attempt.task.taskInstance.decisionLog.estimatedDifficulty,
+                }
+              : null,
             visibleMetrics,
             debug: process.env.SHOW_AI_DEBUG === "true" ? attempt.aiDebugJson : null,
           }

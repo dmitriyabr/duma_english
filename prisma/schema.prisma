@@ -59,6 +59,9 @@ model Student {
   placementSessions PlacementSession[]
   gseMastery StudentGseMastery[]
   gseEvidence AttemptGseEvidence[]
+  plannerDecisions PlannerDecisionLog[]
+  taskInstances TaskInstance[]
+  promotionAudits PromotionAudit[]
 
   @@index([classId])
 }
@@ -73,6 +76,7 @@ model Task {
 
   attempts Attempt[]
   gseTargets TaskGseTarget[]
+  taskInstance TaskInstance?
 }
 
 model Attempt {
@@ -87,6 +91,8 @@ model Attempt {
   rawRecognitionJson Json?
   taskEvaluationJson Json?
   aiDebugJson       Json?
+  nodeOutcomesJson  Json?
+  recoveryTriggered Boolean  @default(false)
   scoresJson       Json?
   feedbackJson     Json?
   errorCode        String?
@@ -98,6 +104,7 @@ model Attempt {
   task     Task            @relation(fields: [taskId], references: [id])
   metrics  AttemptMetric[]
   gseEvidence AttemptGseEvidence[]
+  placementResponses PlacementResponse[]
 
   @@index([studentId])
   @@index([status])
@@ -144,6 +151,10 @@ model LearnerProfile {
   ageBand             String   @default("9-11")
   placementScore      Float?
   placementConfidence Float?
+  placementFresh      Boolean  @default(false)
+  placementCompletedAt DateTime?
+  placementUncertainNodeIds String[]
+  placementCarryoverJson Json?
   activeTrack         String   @default("balanced_convo_speech")
   cycleWeek           Int      @default(1)
   createdAt           DateTime @default(now())
@@ -192,6 +203,13 @@ model PlacementSession {
   studentId    String
   status       String   @default("started")
   currentIndex Int      @default(0)
+  questionCount Int     @default(0)
+  theta        Float    @default(0)
+  sigma        Float    @default(1)
+  askedItemIds String[]
+  currentItemId String?
+  stageEstimate String?
+  confidenceEstimate Float?
   responsesJson Json?
   resultJson   Json?
   createdAt    DateTime @default(now())
@@ -199,8 +217,57 @@ model PlacementSession {
   completedAt  DateTime?
 
   student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  responses PlacementResponse[]
+  currentItem PlacementItem? @relation("PlacementCurrentItem", fields: [currentItemId], references: [id], onDelete: SetNull)
 
   @@index([studentId, status])
+}
+
+model PlacementItem {
+  id              String   @id @default(cuid())
+  skillKey        String
+  stageBand       String
+  taskType        String
+  promptTemplate  String
+  hint            String?
+  expectedMinWords Int     @default(12)
+  assessmentMode  String   @default("stt")
+  maxDurationSec  Int      @default(60)
+  gseTargets      String[]
+  difficulty      Float
+  discrimination  Float    @default(1)
+  ageBand         String?
+  active          Boolean  @default(true)
+  metadataJson    Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  responses PlacementResponse[]
+  currentInSessions PlacementSession[] @relation("PlacementCurrentItem")
+
+  @@index([active, ageBand, skillKey])
+  @@index([difficulty])
+}
+
+model PlacementResponse {
+  id                String   @id @default(cuid())
+  sessionId         String
+  itemId            String
+  attemptId         String?
+  itemScore         Float
+  observedMetricsJson Json?
+  thetaBefore       Float
+  thetaAfter        Float
+  sigmaAfter        Float
+  createdAt         DateTime @default(now())
+
+  session PlacementSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  item    PlacementItem    @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  attempt Attempt?         @relation(fields: [attemptId], references: [id], onDelete: SetNull)
+
+  @@index([sessionId, createdAt])
+  @@index([itemId])
+  @@index([attemptId])
 }
 
 model ProgressDaily {
@@ -313,6 +380,10 @@ model StudentGseMastery {
   studentId        String
   nodeId           String
   masteryScore     Float
+  masteryMean      Float?
+  masterySigma     Float?
+  decayedMastery   Float?
+  halfLifeDays     Float?
   evidenceCount    Int      @default(0)
   reliability      String
   lastEvidenceAt   DateTime?
@@ -327,6 +398,64 @@ model StudentGseMastery {
 
   @@unique([studentId, nodeId])
   @@index([studentId, masteryScore])
+}
+
+model PlannerDecisionLog {
+  id               String   @id @default(cuid())
+  studentId        String
+  decisionTs       DateTime @default(now())
+  candidateSetJson Json
+  chosenTaskType   String
+  utilityJson      Json
+  fallbackUsed     Boolean  @default(false)
+  latencyMs        Int?
+  expectedGain     Float?
+  targetNodeIds    String[]
+  selectionReason  String
+  primaryGoal      String?
+  estimatedDifficulty Float?
+  createdAt        DateTime @default(now())
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  taskInstance TaskInstance?
+
+  @@index([studentId, decisionTs])
+}
+
+model TaskInstance {
+  id                String   @id @default(cuid())
+  studentId         String
+  taskId            String   @unique
+  decisionLogId     String?  @unique
+  taskType          String
+  targetNodeIds     String[]
+  specJson          Json
+  fallbackUsed      Boolean  @default(false)
+  estimatedDifficulty Float?
+  createdAt         DateTime @default(now())
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  decisionLog PlannerDecisionLog? @relation(fields: [decisionLogId], references: [id], onDelete: SetNull)
+
+  @@index([studentId, createdAt])
+  @@index([decisionLogId])
+}
+
+model PromotionAudit {
+  id             String   @id @default(cuid())
+  studentId      String
+  fromStage      String
+  targetStage    String
+  promoted       Boolean
+  blockedByNodes String[]
+  reasonsJson    Json
+  readinessScore Float
+  createdAt      DateTime @default(now())
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([studentId, createdAt])
 }
 
 model TaskGseTarget {

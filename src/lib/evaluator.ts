@@ -97,6 +97,92 @@ const outputSchema = z.object({
   }),
 });
 
+function toNumber(value: unknown) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const v = value.trim().toLowerCase();
+    if (v === "pass") return 78;
+    if (v === "fail") return 35;
+    const num = Number(value);
+    if (Number.isFinite(num)) return num;
+  }
+  return null;
+}
+
+function toBoolean(value: unknown) {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "string") {
+    const v = value.trim().toLowerCase();
+    if (v === "true" || v === "yes" || v === "pass") return true;
+    if (v === "false" || v === "no" || v === "fail") return false;
+  }
+  return false;
+}
+
+function toStringArray(value: unknown, fallback: string[] = []) {
+  if (Array.isArray(value)) return value.map((v) => String(v)).filter(Boolean);
+  if (typeof value === "string") {
+    return value
+      .split(/\n|,/)
+      .map((v) => v.trim())
+      .filter(Boolean);
+  }
+  return fallback;
+}
+
+function normalizeModelPayload(payload: unknown, input: EvaluationInput) {
+  if (!payload || typeof payload !== "object") return null;
+  const row = payload as Record<string, unknown>;
+  const taskEvaluationRaw = (row.taskEvaluation || {}) as Record<string, unknown>;
+  const feedbackRaw = (row.feedback || {}) as Record<string, unknown>;
+  const normalized = {
+    taskEvaluation: {
+      taskType: String(taskEvaluationRaw.taskType || input.taskType),
+      taskScore: toNumber(taskEvaluationRaw.taskScore),
+      languageScore: toNumber(taskEvaluationRaw.languageScore) ?? undefined,
+      artifacts:
+        taskEvaluationRaw.artifacts && typeof taskEvaluationRaw.artifacts === "object"
+          ? (taskEvaluationRaw.artifacts as Record<string, unknown>)
+          : {},
+      rubricChecks: Array.isArray(taskEvaluationRaw.rubricChecks)
+        ? taskEvaluationRaw.rubricChecks.map((item) => {
+            const rowItem = (item || {}) as Record<string, unknown>;
+            return {
+              name: String(rowItem.name || "check"),
+              pass: toBoolean(rowItem.pass),
+              reason: String(rowItem.reason || "No reason provided."),
+              weight: Math.max(
+                0,
+                Math.min(1, toNumber(rowItem.weight) ?? 0.3)
+              ),
+            };
+          })
+        : [],
+      evidence: toStringArray(taskEvaluationRaw.evidence, [input.transcript.slice(0, 180)]).slice(0, 6),
+      modelVersion: String(taskEvaluationRaw.modelVersion || `${MODEL_VERSION}+openai`),
+    },
+    feedback: {
+      summary: String(feedbackRaw.summary || "Keep practicing with clear and complete answers."),
+      whatWentWell: toStringArray(feedbackRaw.whatWentWell, ["You completed the task."]).slice(0, 3),
+      whatToFixNow: toStringArray(feedbackRaw.whatToFixNow, ["Add one clearer supporting detail next time."]).slice(0, 3),
+      exampleBetterAnswer: String(feedbackRaw.exampleBetterAnswer || ""),
+      nextMicroTask: String(feedbackRaw.nextMicroTask || "Retry with one stronger detail."),
+    },
+  };
+  if (typeof normalized.taskEvaluation.taskScore !== "number") return null;
+  if (!normalized.taskEvaluation.rubricChecks.length) {
+    normalized.taskEvaluation.rubricChecks = [
+      {
+        name: "task_alignment",
+        pass: normalized.taskEvaluation.taskScore >= 65,
+        reason: normalized.taskEvaluation.taskScore >= 65 ? "Task mostly completed." : "Task needs clearer completion.",
+        weight: 1,
+      },
+    ];
+  }
+  return normalized;
+}
+
 function normalizeWords(input: string) {
   return input
     .toLowerCase()
@@ -114,6 +200,50 @@ function splitSentences(input: string) {
 
 function clamp(value: number, min = 0, max = 100) {
   return Math.max(min, Math.min(max, value));
+}
+
+function inferReferenceText(taskPrompt: string) {
+  const prompt = (taskPrompt || "").trim();
+  if (!prompt) return "";
+  const quoted = prompt.match(/['"]([^'"]{3,260})['"]/);
+  if (quoted && quoted[1]) return quoted[1].trim();
+  const afterColon = prompt.split(":").slice(1).join(":").trim();
+  if (afterColon.length >= 3) {
+    return afterColon.replace(/^read\s+this\s+aloud\s+clearly[:\s-]*/i, "").trim();
+  }
+  return prompt.replace(/^read\s+this\s+aloud\s+clearly[:\s-]*/i, "").trim();
+}
+
+function inferRequiredWords(taskPrompt: string) {
+  const prompt = (taskPrompt || "").trim();
+  if (!prompt) return [] as string[];
+  const match = prompt.match(
+    /use\s+(?:these|those|the)\s+words(?:\s+in\s+(?:your\s+)?(?:short\s+)?(?:talk|answer))?\s*:?\s*([^.\n]+)/i
+  );
+  const source = match?.[1] || "";
+  if (!source) return [] as string[];
+  return source
+    .split(/,|\band\b/i)
+    .map((word) =>
+      word
+        .trim()
+        .toLowerCase()
+        .replace(/["'.!?;:()[\]{}]/g, "")
+    )
+    .filter((word) => /^[a-z][a-z'-]*$/.test(word))
+    .slice(0, 20);
+}
+
+function resolveRequiredWords(input: EvaluationInput) {
+  const fromPrompt = inferRequiredWords(input.taskPrompt);
+  const fromMeta = Array.isArray(input.taskMeta?.requiredWords)
+    ? input.taskMeta.requiredWords
+        .map((word) => String(word).toLowerCase().trim())
+        .filter((word) => /^[a-z][a-z'-]*$/.test(word))
+    : [];
+  if (fromPrompt.length >= 2) return fromPrompt;
+  if (fromMeta.length > 0) return fromMeta;
+  return fromPrompt;
 }
 
 function scoreFromChecks(checks: RubricCheck[]) {
@@ -167,14 +297,17 @@ function buildFeedbackFromEvaluation(
 }
 
 function evaluateReadAloud(input: EvaluationInput): { taskEvaluation: TaskEvaluation; feedback: FeedbackResult } {
-  const referenceText = String(input.taskMeta?.referenceText || "");
+  const referenceText = String(input.taskMeta?.referenceText || inferReferenceText(input.taskPrompt) || "");
   const refWords = normalizeWords(referenceText);
   const saidWords = normalizeWords(input.transcript);
   const saidSet = new Set(saidWords);
+  const refSet = new Set(refWords);
   const omittedWords = refWords.filter((w) => !saidSet.has(w));
-  const insertedWords = saidWords.filter((w) => !refWords.includes(w));
+  const insertedWords = saidWords.filter((w) => !refSet.has(w));
   const coverage = refWords.length ? (refWords.length - omittedWords.length) / refWords.length : 0;
   const paValues = [
+    input.speechMetrics.pronunciationTargetRef,
+    input.speechMetrics.pronunciation,
     input.speechMetrics.accuracy,
     input.speechMetrics.fluency,
     input.speechMetrics.completeness,
@@ -244,9 +377,7 @@ function evaluateReadAloud(input: EvaluationInput): { taskEvaluation: TaskEvalua
 }
 
 function evaluateTargetVocab(input: EvaluationInput): { taskEvaluation: TaskEvaluation; feedback: FeedbackResult } {
-  const requiredWords =
-    (Array.isArray(input.taskMeta?.requiredWords) ? input.taskMeta?.requiredWords : [])
-      .map((w) => String(w).toLowerCase()) || [];
+  const requiredWords = resolveRequiredWords(input);
   const transcriptLower = input.transcript.toLowerCase();
   const requiredWordsUsed = requiredWords.filter((word) =>
     new RegExp(`\\b${word}\\w*\\b`, "i").test(transcriptLower)
@@ -632,6 +763,151 @@ function buildTaskSpecificPrompt(taskType: string) {
   return rubricMap[taskType] || rubricMap.topic_talk;
 }
 
+function buildTaskTypeJsonExample(taskType: string) {
+  if (taskType === "read_aloud") {
+    return {
+      taskEvaluation: {
+        taskType: "read_aloud",
+        taskScore: 86,
+        languageScore: 82,
+        artifacts: {
+          referenceCoverage: 96,
+          omittedWords: ["because"],
+          insertedWords: [],
+          mispronouncedHotspots: ["learn"],
+        },
+        rubricChecks: [
+          { name: "reference_coverage", pass: true, reason: "Most target words were read.", weight: 0.4 },
+          { name: "pronunciation_accuracy", pass: false, reason: "One key word was unclear.", weight: 0.35 },
+          { name: "reading_fluency", pass: true, reason: "Pace was mostly smooth.", weight: 0.25 },
+        ],
+        evidence: ["I like going to school because I learn new things."],
+        modelVersion: "eval-v2+openai",
+      },
+      feedback: {
+        summary: "Good reading with one pronunciation point to fix.",
+        whatWentWell: ["You kept the sentence complete.", "Your pace was steady."],
+        whatToFixNow: ["Say 'learn' more clearly."],
+        exampleBetterAnswer: "I like going to school because I learn new things.",
+        nextMicroTask: "Read the sentence once more and stress 'learn' clearly.",
+      },
+    };
+  }
+  if (taskType === "target_vocab") {
+    return {
+      taskEvaluation: {
+        taskType: "target_vocab",
+        taskScore: 78,
+        languageScore: 75,
+        artifacts: {
+          requiredWordsUsed: ["happy", "learn", "friend"],
+          missingWords: ["share"],
+          wordUsageCorrectness: 84,
+          inflectedFormsAccepted: [],
+        },
+        rubricChecks: [
+          { name: "required_words_usage", pass: false, reason: "One required word is missing.", weight: 0.6 },
+          { name: "context_fit", pass: true, reason: "Used words fit the topic.", weight: 0.4 },
+        ],
+        evidence: ["I feel happy when I learn with my friend."],
+        modelVersion: "eval-v2+openai",
+      },
+      feedback: {
+        summary: "Nice vocabulary use. Add the last required word next time.",
+        whatWentWell: ["You used most target words correctly."],
+        whatToFixNow: ["Include the missing word 'share' in your answer."],
+        exampleBetterAnswer: "I feel happy when I learn and share ideas with my friend.",
+        nextMicroTask: "Retry with all required words in one short answer.",
+      },
+    };
+  }
+  return {
+    taskEvaluation: {
+      taskType,
+      taskScore: 74,
+      languageScore: 72,
+      artifacts: {
+        mainPointDetected: true,
+        supportingDetailCount: 1,
+        offTopicRatio: 0.1,
+        coherenceSignals: ["because", "so"],
+      },
+      rubricChecks: [
+        { name: "task_alignment", pass: true, reason: "Main point is relevant.", weight: 0.5 },
+        { name: "supporting_detail", pass: false, reason: "Needs one more concrete detail.", weight: 0.3 },
+        { name: "clarity", pass: true, reason: "Message is understandable.", weight: 0.2 },
+      ],
+      evidence: ["I like school because I learn new things."],
+      modelVersion: "eval-v2+openai",
+    },
+    feedback: {
+      summary: "Good start. Add one stronger detail.",
+      whatWentWell: ["You stayed on topic."],
+      whatToFixNow: ["Give one extra specific example."],
+      exampleBetterAnswer: "I like school because I learn new things, especially science experiments.",
+      nextMicroTask: "Retry and add one concrete example.",
+    },
+  };
+}
+
+function buildOpenAIInput(input: EvaluationInput) {
+  const transcript = (input.transcript || "").slice(0, 900);
+  const taskPrompt = (input.taskPrompt || "").slice(0, 260);
+  const taskMeta = input.taskMeta || {};
+  const referenceText = typeof taskMeta.referenceText === "string" ? taskMeta.referenceText.slice(0, 260) : undefined;
+  const requiredWords = resolveRequiredWords(input).slice(0, 20);
+  return {
+    taskType: input.taskType,
+    taskPrompt,
+    transcript,
+    constraints: input.constraints || null,
+    taskMeta: {
+      referenceText,
+      requiredWords,
+      supportsPronAssessment: Boolean(taskMeta.supportsPronAssessment),
+    },
+    speechMetrics: {
+      durationSec: input.speechMetrics.durationSec,
+      wordCount: input.speechMetrics.wordCount,
+      speechRate: input.speechMetrics.speechRate,
+      fillerCount: input.speechMetrics.fillerCount,
+      pauseCount: input.speechMetrics.pauseCount,
+      confidence: input.speechMetrics.confidence,
+      fluency: input.speechMetrics.fluency,
+      pronunciation: input.speechMetrics.pronunciation,
+      accuracy: input.speechMetrics.accuracy,
+      completeness: input.speechMetrics.completeness,
+      prosody: input.speechMetrics.prosody,
+    },
+  };
+}
+
+function parseMaybeJson(content: string) {
+  const trimmed = content.trim();
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
+    if (fenced && fenced[1]) {
+      try {
+        return JSON.parse(fenced[1].trim());
+      } catch {
+        return null;
+      }
+    }
+    const firstBrace = trimmed.indexOf("{");
+    const lastBrace = trimmed.lastIndexOf("}");
+    if (firstBrace >= 0 && lastBrace > firstBrace) {
+      try {
+        return JSON.parse(trimmed.slice(firstBrace, lastBrace + 1));
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }
+}
+
 async function evaluateWithOpenAI(input: EvaluationInput) {
   const apiKey = process.env.OPENAI_API_KEY;
   const model = process.env.OPENAI_MODEL || "gpt-4o-mini";
@@ -650,13 +926,16 @@ async function evaluateWithOpenAI(input: EvaluationInput) {
     };
   }
 
+  const compactInput = buildOpenAIInput(input);
   const prompt = [
-    "Evaluate this speaking attempt with strict task-specific rubric.",
-    "Do not invent speech numeric metrics; use only speech fields provided in input.",
-    "Return JSON only matching this contract:",
-    "{ taskEvaluation: { taskType, taskScore, artifacts, rubricChecks[{name,pass,reason,weight}], evidence, modelVersion }, feedback: { summary, whatWentWell, whatToFixNow, exampleBetterAnswer, nextMicroTask } }",
+    "Evaluate this child speaking attempt.",
+    "Return ONLY valid JSON object matching schema.",
+    "Hard type rules: taskScore:number, languageScore:number|null, rubricChecks[].pass:boolean, rubricChecks[].weight:number.",
+    "Do not output 'pass'/'fail' strings for numeric fields.",
+    "Do not invent speech metrics; use only provided speechMetrics fields.",
     buildTaskSpecificPrompt(input.taskType),
-    JSON.stringify(input),
+    `Task-type example JSON: ${JSON.stringify(buildTaskTypeJsonExample(input.taskType))}`,
+    `Input JSON: ${JSON.stringify(compactInput)}`,
   ].join("\n");
   const attempts: EvaluationDebugInfo["openai"]["attempts"] = [];
 
@@ -673,13 +952,78 @@ async function evaluateWithOpenAI(input: EvaluationInput) {
           {
             role: "system",
             content:
-              "You are a strict speaking evaluator for children. Output JSON only, no markdown.",
+              "You are a strict speaking evaluator for children. Output one JSON object only. No markdown. No comments. No text outside JSON.",
           },
           { role: "user", content: prompt },
         ],
-        temperature: 0.2,
+        temperature: 0,
         max_tokens: 700,
-        response_format: { type: "json_object" },
+        response_format: {
+          type: "json_schema",
+          json_schema: {
+            name: "speaking_evaluation",
+            strict: true,
+            schema: {
+              type: "object",
+              additionalProperties: false,
+              properties: {
+                taskEvaluation: {
+                  type: "object",
+                  additionalProperties: false,
+                  properties: {
+                    taskType: { type: "string" },
+                    taskScore: { type: ["number", "string"] },
+                    languageScore: { type: ["number", "string", "null"] },
+                    artifacts: { type: "object", additionalProperties: true },
+                    rubricChecks: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        additionalProperties: false,
+                        properties: {
+                          name: { type: "string" },
+                          pass: { type: ["boolean", "string"] },
+                          reason: { type: "string" },
+                          weight: { type: ["number", "string"] },
+                        },
+                        required: ["name", "pass", "reason", "weight"],
+                      },
+                    },
+                    evidence: { type: "array", items: { type: "string" } },
+                    modelVersion: { type: "string" },
+                  },
+                  required: [
+                    "taskType",
+                    "taskScore",
+                    "artifacts",
+                    "rubricChecks",
+                    "evidence",
+                    "modelVersion",
+                  ],
+                },
+                feedback: {
+                  type: "object",
+                  additionalProperties: false,
+                  properties: {
+                    summary: { type: "string" },
+                    whatWentWell: { type: "array", items: { type: "string" } },
+                    whatToFixNow: { type: "array", items: { type: "string" } },
+                    exampleBetterAnswer: { type: "string" },
+                    nextMicroTask: { type: "string" },
+                  },
+                  required: [
+                    "summary",
+                    "whatWentWell",
+                    "whatToFixNow",
+                    "exampleBetterAnswer",
+                    "nextMicroTask",
+                  ],
+                },
+              },
+              required: ["taskEvaluation", "feedback"],
+            },
+          },
+        },
       }),
     });
     if (!response.ok) {
@@ -706,7 +1050,11 @@ async function evaluateWithOpenAI(input: EvaluationInput) {
       continue;
     }
     try {
-      const parsed = outputSchema.parse(JSON.parse(content));
+      const raw = parseMaybeJson(content);
+      if (!raw) throw new Error("model content is not valid JSON");
+      const normalized = normalizeModelPayload(raw, input);
+      if (!normalized) throw new Error("normalized payload is invalid");
+      const parsed = outputSchema.parse(normalized);
       attempts.push({
         try: i + 1,
         status: response.status,

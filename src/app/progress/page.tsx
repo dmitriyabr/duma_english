@@ -17,6 +17,12 @@ type ProgressData = {
   stage?: string;
   ageBand?: string;
   cycleWeek?: number;
+  placementConfidence?: number | null;
+  placementFresh?: boolean;
+  carryoverSummary?: {
+    carryoverApplied?: boolean;
+    carryoverNodes?: string[];
+  } | null;
   streak: number;
   focus: string | null;
   recentAttempts: { id: string; createdAt: string; scores: { overallScore?: number } }[];
@@ -43,6 +49,30 @@ type ProgressData = {
       reliability: "high" | "medium" | "low";
     }>;
   };
+  nodeCoverageByBand?: Record<string, { mastered: number; total: number }>;
+  overdueNodes?: Array<{
+    nodeId: string;
+    descriptor: string;
+    daysSinceEvidence: number;
+    halfLifeDays: number;
+    decayedMastery: number;
+  }>;
+  uncertainNodes?: Array<{
+    nodeId: string;
+    descriptor: string;
+    sigma: number;
+    mastery: number;
+  }>;
+  promotionReadiness?: {
+    currentStage: string;
+    targetStage: string;
+    ready: boolean;
+    readinessScore: number;
+    coverageRatio: number;
+    blockedByNodes: string[];
+    blockedByNodeDescriptors?: string[];
+  };
+  weeklyFocusReason?: string;
 };
 
 function labelForSkill(skillKey: string) {
@@ -120,6 +150,7 @@ export default function ProgressPage() {
                   <p className="subtitle">
                     Stage: {data.stage || "A0"} | Age: {data.ageBand || "9-11"} | Week {data.cycleWeek || 1}
                   </p>
+                  {data.weeklyFocusReason && <p className="subtitle">{data.weeklyFocusReason}</p>}
                 </div>
               </div>
               <div className="spacer" />
@@ -174,12 +205,33 @@ export default function ProgressPage() {
                       <ul style={{ paddingLeft: 16 }}>
                         {data.nodeProgress.nextTargetNodes.map((node) => (
                           <li key={node.nodeId}>
-                            {node.descriptor} [{node.nodeId}] - mastery {Math.round(node.masteryScore)}
+                            {node.descriptor} - mastery {Math.round(node.masteryScore)}
                             {typeof node.gseCenter === "number" ? `, GSE ${Math.round(node.gseCenter)}` : ""}
                           </li>
                         ))}
                       </ul>
                     )}
+                  </div>
+                </>
+              )}
+              {data.promotionReadiness && (
+                <>
+                  <div className="spacer" />
+                  <div className="metric">
+                    <span>Promotion readiness</span>
+                    <p className="subtitle">
+                      {data.promotionReadiness.currentStage} → {data.promotionReadiness.targetStage} | Score:{" "}
+                      {data.promotionReadiness.readinessScore} | Coverage: {data.promotionReadiness.coverageRatio}%
+                    </p>
+                    <p className="subtitle">
+                      Status: {data.promotionReadiness.ready ? "Ready" : "Blocked"}
+                    </p>
+                    {!data.promotionReadiness.ready &&
+                      (data.promotionReadiness.blockedByNodeDescriptors?.length || 0) > 0 && (
+                        <p className="subtitle">
+                          Blockers: {data.promotionReadiness.blockedByNodeDescriptors?.slice(0, 5).join(", ")}
+                        </p>
+                      )}
                   </div>
                 </>
               )}

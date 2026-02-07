@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getStudentFromRequest } from "@/lib/auth";
-import { getPlacementQuestions, submitPlacementAnswer } from "@/lib/placement";
+import { submitPlacementAnswer } from "@/lib/placement";
 import { prisma } from "@/lib/db";
 
 type PlacementAnswerContext = {
@@ -9,9 +9,25 @@ type PlacementAnswerContext = {
 };
 
 const schema = z.object({
-  questionId: z.string().min(1),
+  itemId: z.string().min(1).optional(),
+  questionId: z.string().min(1).optional(),
+  attemptId: z.string().min(1).optional(),
   transcript: z.string().max(1000).optional(),
   selfRating: z.number().int().min(1).max(5).optional(),
+  observedMetrics: z
+    .object({
+      speechScore: z.number().optional(),
+      taskScore: z.number().optional(),
+      languageScore: z.number().optional(),
+      speechRate: z.number().optional(),
+      pronunciation: z.number().optional(),
+      fluency: z.number().optional(),
+      vocabularyUsage: z.number().optional(),
+      taskCompletion: z.number().optional(),
+      grammarAccuracy: z.number().optional(),
+    })
+    .partial()
+    .optional(),
 });
 
 export async function POST(req: NextRequest, context: PlacementAnswerContext) {
@@ -29,16 +45,18 @@ export async function POST(req: NextRequest, context: PlacementAnswerContext) {
   try {
     const body = schema.parse(await req.json());
     const updated = await submitPlacementAnswer(id, body);
-    const questions = getPlacementQuestions();
-    const currentQuestion = questions[updated.currentIndex] || null;
 
     return NextResponse.json({
       placementId: id,
       status: updated.status,
+      theta: updated.theta,
+      sigma: updated.sigma,
       currentIndex: updated.currentIndex,
-      totalQuestions: questions.length,
-      currentQuestion,
-      completed: updated.currentIndex >= questions.length,
+      questionCount: updated.questionCount,
+      totalQuestions: 14,
+      nextItem: updated.nextItem,
+      whyThisItem: updated.whyThisItem,
+      done: updated.done,
     });
   } catch {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });

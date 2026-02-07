@@ -1,4 +1,4 @@
-export type CEFRStage = "A0" | "A1" | "A2" | "B1";
+export type CEFRStage = "A0" | "A1" | "A2" | "B1" | "B2" | "C1" | "C2";
 export type AgeBand = "6-8" | "9-11" | "12-14";
 export type SkillKey =
   | "pronunciation"
@@ -130,6 +130,27 @@ const STAGE_SKILL_TARGETS: Record<CEFRStage, Record<SkillKey, string>> = {
     vocabulary: "Use flexible vocabulary to explain, compare, and persuade.",
     task_completion: "Build coherent public-facing responses with structure.",
   },
+  B2: {
+    pronunciation: "Maintain clear and accurate pronunciation for unfamiliar topics.",
+    fluency: "Sustain extended speech with minimal hesitation.",
+    tempo_control: "Adapt pace and pauses intentionally for emphasis.",
+    vocabulary: "Use precise topic-specific vocabulary and paraphrase effectively.",
+    task_completion: "Handle complex prompts with balanced structure and relevance.",
+  },
+  C1: {
+    pronunciation: "Speak with consistent clarity and advanced control of stress patterns.",
+    fluency: "Deliver long responses smoothly with natural transitions.",
+    tempo_control: "Use dynamic pacing to support argument and audience understanding.",
+    vocabulary: "Deploy nuanced vocabulary, idiomatic range, and precise register.",
+    task_completion: "Address abstract and multi-part tasks with strong coherence.",
+  },
+  C2: {
+    pronunciation: "Maintain near-native clarity and intelligibility under pressure.",
+    fluency: "Speak effortlessly in extended discourse and spontaneous exchanges.",
+    tempo_control: "Control rhythm and pacing strategically for rhetorical effect.",
+    vocabulary: "Use sophisticated lexical range with accuracy and flexibility.",
+    task_completion: "Deliver polished, audience-aware responses for advanced tasks.",
+  },
 };
 
 const AGE_EXPECTED_LENGTH: Record<AgeBand, Record<CEFRStage, string>> = {
@@ -138,18 +159,27 @@ const AGE_EXPECTED_LENGTH: Record<AgeBand, Record<CEFRStage, string>> = {
     A1: "2-3 short sentences",
     A2: "3-4 sentences",
     B1: "4-5 sentences",
+    B2: "5-6 sentences",
+    C1: "6-7 sentences",
+    C2: "7-8 sentences",
   },
   "9-11": {
     A0: "2 short sentences",
     A1: "3-4 sentences",
     A2: "4-6 sentences",
     B1: "6-8 sentences",
+    B2: "8-10 sentences",
+    C1: "10-12 sentences",
+    C2: "12+ sentences",
   },
   "12-14": {
     A0: "2-3 short sentences",
     A1: "4-5 sentences",
     A2: "6-8 sentences",
     B1: "8-10 sentences",
+    B2: "10-12 sentences",
+    C1: "12-14 sentences",
+    C2: "14+ sentences",
   },
 };
 

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getStudentFromRequest } from "@/lib/auth";
-import { getPlacementQuestions, startPlacement } from "@/lib/placement";
+import { getPlacementSession, startPlacement } from "@/lib/placement";
 
 export async function POST() {
   const student = await getStudentFromRequest();
@@ -9,14 +9,17 @@ export async function POST() {
   }
 
   const session = await startPlacement(student.studentId);
-  const questions = getPlacementQuestions();
-  const currentQuestion = questions[session.currentIndex] || null;
+  const state = await getPlacementSession(student.studentId, session.id);
+  const currentQuestion = state?.question || null;
 
   return NextResponse.json({
     placementId: session.id,
     status: session.status,
+    theta: session.theta,
+    sigma: session.sigma,
     currentIndex: session.currentIndex,
-    totalQuestions: questions.length,
+    totalQuestions: state?.totalQuestions || 14,
     currentQuestion,
+    nextItem: currentQuestion,
   });
 }

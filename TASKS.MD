@@ -1,6 +1,46 @@
 # TASKS: Autonomous English Trainer Roadmap (A1 -> C2 + Stage Speaking)
 
 ## Execution Log (последнее обновление)
+- Реализован adaptive placement (CAT/IRT-lite):
+  - `placement_item` bank (seed A0..C2, 5 core skills)
+  - online update `theta/sigma`
+  - stop-rule: `min 6`, `sigma<=0.35` или `max 14`
+  - API теперь возвращает `theta`, `sigma`, `nextItem`, `whyThisItem`
+- Добавлены сущности/поля placement:
+  - `PlacementItem`, `PlacementResponse`
+  - расширение `PlacementSession` (`theta`, `sigma`, `questionCount`, `askedItemIds`, `currentItemId`, ...)
+  - расширение `LearnerProfile` (`placementFresh`, `placementUncertainNodeIds`, `placementCarryoverJson`)
+  - миграция: `20260207170000_adaptive_placement_irt` применена
+- Реализован auto-carryover A1/A2 bundles для B2+ при confidence gate:
+  - synthetic mastery update в `StudentGseMastery`
+  - carryover summary сохраняется в профиль
+- Подключен planner handoff:
+  - `/api/task/next` учитывает `placementFresh` + `placementUncertainNodeIds`
+  - preferred nodes передаются в decision engine
+- Обновлены UI/роуты placement:
+  - `/placement` показывает ability/uncertainty и completion summary
+  - `/api/placement/*` контракты обновлены под adaptive mode
+- Worker обновлен:
+  - placement answer пишется по `placementItemId`
+  - auto-finish placement при `done`
+  - `placementFresh` сбрасывается после первого обычного (не placement) completed attempt
+- Внедрен `Product Brain v1` каркас (decision loop):
+  - `PlannerDecisionLog`, `TaskInstance`, `PromotionAudit`
+  - `Attempt.nodeOutcomesJson`, `Attempt.recoveryTriggered`
+  - расширение `StudentGseMastery` (`masteryMean`, `masterySigma`, `decayedMastery`, `halfLifeDays`)
+- Добавлен decay-aware + Bayesian-like update в `src/lib/gse/mastery.ts`.
+- Добавлена explainability цепочка:
+  - `nodeOutcomes` в результате попытки
+  - planner reason/expected gain в `GET /api/task/next`
+  - `GET /api/planner/decision/:id` и `POST /api/planner/simulate`
+- Добавлен LLM-first task generator с strict schema и fallback:
+  - `src/lib/taskGenerator.ts`
+- Добавлен recovery trigger в worker (серия слабых task attempts / падение confidence).
+- Прогресс расширен:
+  - `nodeCoverageByBand`, `overdueNodes`, `uncertainNodes`, `promotionReadiness`, `weeklyFocusReason`
+- Promotion gate больше не основан только на среднем балле:
+  - `coverage + stability + reliability`
+  - аудит решения пишется в `PromotionAudit`.
 - Введены таблицы и связи `gse_*`:
   - `gse_catalog_versions`, `gse_nodes`, `gse_node_aliases`, `gse_node_edges`
   - `attempt_gse_evidence`, `student_gse_mastery`, `task_gse_targets`

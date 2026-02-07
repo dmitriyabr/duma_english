@@ -21,9 +21,15 @@ export async function GET(_: Request, context: PlacementRouteContext) {
   return NextResponse.json({
     placementId: state.session.id,
     status: state.session.status,
+    theta: state.session.theta,
+    sigma: state.session.sigma,
     currentIndex: state.session.currentIndex,
+    questionCount: state.session.questionCount,
     totalQuestions: state.totalQuestions,
     currentQuestion: state.question,
+    nextItem: state.question,
+    confidenceEstimate: state.session.confidenceEstimate,
+    stageEstimate: state.session.stageEstimate,
     result: state.session.resultJson,
   });
 }

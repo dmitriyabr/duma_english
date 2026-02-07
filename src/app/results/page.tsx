@@ -77,6 +77,21 @@ type AttemptResult = {
       skill?: string | null;
       type?: string | null;
     }>;
+    nodeOutcomes?: Array<{
+      nodeId: string;
+      deltaMastery: number;
+      decayImpact: number;
+      reliability: "high" | "medium" | "low";
+      evidenceCount: number;
+    }>;
+    recoveryTriggered?: boolean;
+    planner?: {
+      decisionId: string;
+      selectionReason?: string | null;
+      primaryGoal?: string | null;
+      expectedGain?: number | null;
+      estimatedDifficulty?: number | null;
+    } | null;
     feedback?: Feedback | null;
     visibleMetrics?: MetricCard[];
     debug?: unknown;
@@ -174,11 +189,11 @@ export default function ResultsPage() {
   const checks = (taskEvaluation?.rubricChecks || []).filter((check) => !!check.name && check.reason);
   const transcript = data?.results?.transcript;
   const gseEvidence = data?.results?.gseEvidence || [];
+  const nodeOutcomes = data?.results?.nodeOutcomes || [];
+  const nodeLabelById = new Map(gseEvidence.map((item) => [item.nodeId, item.descriptor]));
   const uniqueNodes = Array.from(
     new Map(gseEvidence.map((item) => [item.nodeId, item])).values()
   ).slice(0, 6);
-  const isPlacementFlow = Boolean(data?.flow?.isPlacement);
-  const placementSessionId = data?.flow?.placementSessionId;
 
   return (
     <div className="page">
@@ -288,12 +303,59 @@ export default function ResultsPage() {
                     <ul style={{ paddingLeft: 16 }}>
                       {uniqueNodes.map((node) => (
                         <li key={node.nodeId}>
-                          {node.descriptor} [{node.nodeId}]
+                          {node.descriptor}
                         </li>
                       ))}
                     </ul>
                   </div>
                   <div className="spacer" />
+                </>
+              )}
+
+              {nodeOutcomes.length > 0 && (
+                <>
+                  <div className="spacer" />
+                  <div className="metric">
+                    <span>Node mastery updates</span>
+                    <ul style={{ paddingLeft: 16 }}>
+                      {nodeOutcomes.slice(0, 8).map((item) => (
+                        <li key={`${item.nodeId}-${item.evidenceCount}`}>
+                          {nodeLabelById.get(item.nodeId) || "Learning node"}: {item.deltaMastery >= 0 ? "+" : ""}
+                          {item.deltaMastery.toFixed(1)} (decay impact {item.decayImpact.toFixed(1)})
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </>
+              )}
+
+              {data.results?.planner && (
+                <>
+                  <div className="spacer" />
+                  <div className="metric">
+                    <span>Why this task now</span>
+                    {data.results.planner.selectionReason && (
+                      <p className="subtitle">{data.results.planner.selectionReason}</p>
+                    )}
+                    <p className="subtitle">
+                      Goal: {data.results.planner.primaryGoal || "n/a"} | Expected gain:{" "}
+                      {typeof data.results.planner.expectedGain === "number"
+                        ? data.results.planner.expectedGain.toFixed(2)
+                        : "n/a"}
+                    </p>
+                  </div>
+                </>
+              )}
+
+              {data.results?.recoveryTriggered && (
+                <>
+                  <div className="spacer" />
+                  <div className="metric">
+                    <span>Recovery mode</span>
+                    <p className="subtitle">
+                      Activated temporary recovery path. Next tasks will be shorter and more guided.
+                    </p>
+                  </div>
                 </>
               )}
 
@@ -353,11 +415,6 @@ export default function ResultsPage() {
               )}
 
               <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                {isPlacementFlow && placementSessionId && (
-                  <Link className="btn ghost" href={`/placement?session=${placementSessionId}`}>
-                    Back to placement
-                  </Link>
-                )}
                 <Link className="btn" href="/task">
                   Next task
                 </Link>

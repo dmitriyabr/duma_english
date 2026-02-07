@@ -82,3 +82,60 @@ test("read_aloud does not collapse task score when PA metrics are missing", asyn
 
   if (originalKey) process.env.OPENAI_API_KEY = originalKey;
 });
+
+test("read_aloud infers referenceText from prompt when taskMeta is missing", async () => {
+  const originalKey = process.env.OPENAI_API_KEY;
+  delete process.env.OPENAI_API_KEY;
+
+  const result = await evaluateTaskQuality({
+    taskType: "read_aloud",
+    taskPrompt: "Read this aloud clearly: 'I learn English every day at school.'",
+    transcript: "I learn English every day at school.",
+    speechMetrics: {
+      confidence: 0.9,
+      pronunciation: 94,
+      speechRate: 130,
+    },
+    taskMeta: {
+      supportsPronAssessment: true,
+    },
+  });
+
+  const artifacts = result.taskEvaluation.artifacts as {
+    referenceCoverage?: number;
+    insertedWords?: string[];
+  };
+  assert.ok((artifacts.referenceCoverage || 0) >= 95);
+  assert.equal((artifacts.insertedWords || []).length, 0);
+
+  if (originalKey) process.env.OPENAI_API_KEY = originalKey;
+});
+
+test("target_vocab prefers prompt words over stale taskMeta words", async () => {
+  const originalKey = process.env.OPENAI_API_KEY;
+  delete process.env.OPENAI_API_KEY;
+
+  const result = await evaluateTaskQuality({
+    taskType: "target_vocab",
+    taskPrompt: "Use those words trees, clean, recycle, river",
+    transcript: "We cleaned the river and recycle trash near trees.",
+    speechMetrics: {
+      confidence: 0.85,
+      speechRate: 120,
+    },
+    taskMeta: {
+      requiredWords: ["trees", "clean", "recycle", "river", "community", "practice"],
+    },
+  });
+
+  const artifacts = result.taskEvaluation.artifacts as {
+    missingWords?: string[];
+    requiredWordsUsed?: string[];
+  };
+  assert.equal((artifacts.missingWords || []).includes("community"), false);
+  assert.equal((artifacts.missingWords || []).includes("practice"), false);
+  assert.ok((artifacts.requiredWordsUsed || []).includes("trees"));
+  assert.ok((artifacts.requiredWordsUsed || []).includes("recycle"));
+
+  if (originalKey) process.env.OPENAI_API_KEY = originalKey;
+});

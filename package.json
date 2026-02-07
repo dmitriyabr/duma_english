@@ -3,12 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "prisma generate && next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
     "test": "tsx --test src/**/*.test.ts",
-    "worker": "tsx src/worker/index.ts",
+    "worker": "prisma migrate deploy && tsx src/worker/index.ts",
     "gse:import:github": "tsx src/scripts/gse_import_from_github.ts",
     "gse:import:official": "tsx src/scripts/gse_import_from_official_api.ts"
   },

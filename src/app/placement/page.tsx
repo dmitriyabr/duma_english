@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-type PlacementQuestion = {
+type PlacementItem = {
   id: string;
   skillKey: string;
   taskType: string;
@@ -13,19 +13,29 @@ type PlacementQuestion = {
   expectedMinWords: number;
   assessmentMode: "pa" | "stt";
   maxDurationSec: number;
+  difficulty: number;
+  discrimination: number;
 };
 
 type PlacementState = {
   placementId: string;
   status: "started" | "completed";
+  theta?: number;
+  sigma?: number;
+  confidenceEstimate?: number;
+  stageEstimate?: string;
   currentIndex: number;
+  questionCount?: number;
   totalQuestions: number;
-  currentQuestion: PlacementQuestion | null;
+  currentQuestion: PlacementItem | null;
+  nextItem?: PlacementItem | null;
   result?: {
     stage: string;
     average: number;
     confidence: number;
     skillSnapshot: Record<string, number>;
+    carryoverApplied?: boolean;
+    carryoverNodes?: string[];
   } | null;
 };
 
@@ -37,10 +47,12 @@ type PlacementTaskResponse = {
   maxDurationSec: number;
   constraints: { minSeconds: number; maxSeconds: number };
   placement: {
-    questionId: string;
+    itemId: string;
     skillKey: string;
     currentIndex: number;
     totalQuestions: number;
+    theta?: number;
+    sigma?: number;
   };
 };
 
@@ -86,12 +98,6 @@ export default function PlacementPage() {
     };
   }, []);
 
-  const progressLabel = useMemo(() => {
-    if (!state) return "";
-    const shown = Math.min(state.currentIndex + 1, state.totalQuestions);
-    return `${shown} / ${state.totalQuestions}`;
-  }, [state]);
-
   async function startRecordingAnswer() {
     if (!state?.placementId || !state.currentQuestion) return;
     setStarting(true);
@@ -110,7 +116,7 @@ export default function PlacementPage() {
         "activePlacement",
         JSON.stringify({
           placementId: state.placementId,
-          questionId: task.placement.questionId,
+          itemId: task.placement.itemId,
         })
       );
       router.push(`/record?placementId=${state.placementId}`);
@@ -132,7 +138,7 @@ export default function PlacementPage() {
       </nav>
       <section className="container">
         <div className="card">
-          <h1 className="title">Placement Check</h1>
+          <h1 className="title">Adaptive Placement</h1>
           <p className="subtitle">Short audio check to set your level and personal plan.</p>
           {loading && <p className="subtitle">Loading placement...</p>}
           {error && <p style={{ color: "#c1121f" }}>{error}</p>}
@@ -142,13 +148,19 @@ export default function PlacementPage() {
               <div className="spacer" />
               <div className="metric">
                 <span>
-                  Question {progressLabel}
+                  Question {state.questionCount || state.currentIndex + 1} / {state.totalQuestions}
                 </span>
                 <p className="subtitle">{state.currentQuestion.prompt}</p>
                 <p className="subtitle">Hint: {state.currentQuestion.hint}</p>
                 <p className="subtitle">
                   Mode: {state.currentQuestion.assessmentMode.toUpperCase()} | Max {state.currentQuestion.maxDurationSec}s
                 </p>
+                {typeof state.theta === "number" && typeof state.sigma === "number" && (
+                  <p className="subtitle">
+                    Ability: {state.theta.toFixed(2)} | Uncertainty: {state.sigma.toFixed(2)}
+                    {state.stageEstimate ? ` | Stage estimate: ${state.stageEstimate}` : ""}
+                  </p>
+                )}
               </div>
               <div className="spacer" />
               <button className="btn" disabled={starting} onClick={startRecordingAnswer}>
@@ -168,6 +180,7 @@ export default function PlacementPage() {
                 <div className="metric">
                   <span>Placement score</span>
                   <strong>{Math.round(state.result.average)}</strong>
+                  <p className="subtitle">Confidence: {Math.round(state.result.confidence * 100)}%</p>
                 </div>
               </div>
               <div className="spacer" />
@@ -183,6 +196,17 @@ export default function PlacementPage() {
                 </div>
               </div>
               <div className="spacer" />
+              {state.result.carryoverApplied && (
+                <>
+                  <div className="metric">
+                    <span>Fast-track applied</span>
+                    <p className="subtitle">
+                      Lower-level A1/A2 bundles were auto-marked as covered based on strong placement.
+                    </p>
+                  </div>
+                  <div className="spacer" />
+                </>
+              )}
               <button className="btn" onClick={() => router.push("/task")}>
                 Start learning
               </button>

@@ -36,6 +36,39 @@ function startOfDay(input: Date) {
   return date;
 }
 
+function gseBandFromCenter(value: number | null | undefined) {
+  if (typeof value !== "number") return "unknown";
+  if (value <= 29) return "A1";
+  if (value <= 42) return "A2";
+  if (value <= 58) return "B1";
+  if (value <= 75) return "B2";
+  if (value <= 84) return "C1";
+  return "C2";
+}
+
+function stageOrder(stage: string) {
+  const order = ["A0", "A1", "A2", "B1", "B2", "C1", "C2"];
+  const idx = order.indexOf(stage);
+  return idx === -1 ? 0 : idx;
+}
+
+function nextStage(stage: string) {
+  const order = ["A0", "A1", "A2", "B1", "B2", "C1", "C2"];
+  const idx = order.indexOf(stage);
+  if (idx === -1 || idx >= order.length - 1) return stage;
+  return order[idx + 1];
+}
+
+function rangeForStage(stage: string) {
+  if (stage === "A0") return { min: 10, max: 21 };
+  if (stage === "A1") return { min: 22, max: 29 };
+  if (stage === "A2") return { min: 30, max: 42 };
+  if (stage === "B1") return { min: 43, max: 58 };
+  if (stage === "B2") return { min: 59, max: 75 };
+  if (stage === "C1") return { min: 76, max: 84 };
+  return { min: 85, max: 90 };
+}
+
 export async function getStudentProgress(studentId: string) {
   const profile = await prisma.learnerProfile.findUnique({ where: { studentId } });
   const masteryRows = await prisma.studentSkillMastery.findMany({
@@ -111,7 +144,7 @@ export async function getStudentProgress(studentId: string) {
     where: { studentId },
     include: {
       node: {
-        select: { nodeId: true, descriptor: true, gseCenter: true, skill: true },
+        select: { nodeId: true, descriptor: true, gseCenter: true, skill: true, type: true },
       },
     },
     orderBy: [{ masteryScore: "asc" }],
@@ -154,11 +187,90 @@ export async function getStudentProgress(studentId: string) {
   const last28Coverage = uniq(last28Evidence);
   const prev28Coverage = uniq(prev28Evidence);
   const nextTargetNodes = await nextTargetNodesForStudent(studentId, 3);
+  const byBand = gseMastery.reduce<Record<string, { mastered: number; total: number }>>((acc, row) => {
+    const band = gseBandFromCenter(row.node.gseCenter);
+    if (!acc[band]) acc[band] = { mastered: 0, total: 0 };
+    acc[band].total += 1;
+    const value = row.decayedMastery ?? row.masteryMean ?? row.masteryScore;
+    if (value >= 75) acc[band].mastered += 1;
+    return acc;
+  }, {});
+  const overdueNodes = gseMastery
+    .map((row) => {
+      const halfLife = row.halfLifeDays ?? (row.node.type === "GSE_VOCAB" ? 14 : row.node.type === "GSE_GRAMMAR" ? 21 : 10);
+      const lastEvidenceAt = row.lastEvidenceAt || row.updatedAt;
+      const days = (now.getTime() - lastEvidenceAt.getTime()) / (1000 * 60 * 60 * 24);
+      return {
+        nodeId: row.nodeId,
+        descriptor: row.node.descriptor,
+        daysSinceEvidence: Number(days.toFixed(1)),
+        halfLifeDays: halfLife,
+        decayedMastery: row.decayedMastery ?? row.masteryMean ?? row.masteryScore,
+      };
+    })
+    .filter((row) => row.daysSinceEvidence > row.halfLifeDays)
+    .sort((a, b) => b.daysSinceEvidence - a.daysSinceEvidence)
+    .slice(0, 8);
+  const uncertainNodes = gseMastery
+    .filter((row) => (row.masterySigma ?? 24) >= 22)
+    .sort((a, b) => (b.masterySigma ?? 24) - (a.masterySigma ?? 24))
+    .slice(0, 8)
+    .map((row) => ({
+      nodeId: row.nodeId,
+      descriptor: row.node.descriptor,
+      sigma: row.masterySigma ?? 24,
+      mastery: row.decayedMastery ?? row.masteryMean ?? row.masteryScore,
+    }));
+  const currentStage = profile?.stage || "A0";
+  const targetStage = nextStage(currentStage);
+  const targetRange = rangeForStage(targetStage);
+  const targetRows = gseMastery.filter((row) => {
+    const g = row.node.gseCenter;
+    return typeof g === "number" && g >= targetRange.min && g <= targetRange.max;
+  });
+  const covered = targetRows.filter(
+    (row) => (row.decayedMastery ?? row.masteryMean ?? row.masteryScore) >= 70
+  ).length;
+  const coverageRatio = targetRows.length > 0 ? covered / targetRows.length : 0;
+  const keyReliabilityRows = masteryRows.filter((row) =>
+    ["pronunciation", "fluency", "task_completion"].includes(row.skillKey)
+  );
+  const reliabilityGate = keyReliabilityRows.every((row) => row.reliability !== "low");
+  const stabilityGate = skills.every((skill) => skill.delta7 === null || skill.delta7 >= -2.5);
+  const readinessScore = Number(
+    Math.min(100, Math.max(0, coverageRatio * 60 + (reliabilityGate ? 20 : 8) + (stabilityGate ? 20 : 8))).toFixed(1)
+  );
+  const blockedRows = targetRows
+    .filter((row) => (row.decayedMastery ?? row.masteryMean ?? row.masteryScore) < 60)
+    .slice(0, 6);
+  const blockedByNodes = blockedRows.map((row) => row.nodeId);
+  const blockedByNodeDescriptors = blockedRows.map((row) => row.node.descriptor);
+  const promotionReadiness = {
+    currentStage,
+    targetStage,
+    ready:
+      stageOrder(targetStage) === stageOrder(currentStage) ||
+      (coverageRatio >= 0.62 && reliabilityGate && stabilityGate),
+    readinessScore,
+    coverageRatio: Number((coverageRatio * 100).toFixed(1)),
+    blockedByNodes,
+    blockedByNodeDescriptors,
+  };
+  const weeklyFocusReason = overdueNodes.length > 0
+    ? "Review overdue nodes to prevent forgetting."
+    : uncertainNodes.length > 0
+    ? "Collect more evidence on uncertain nodes."
+    : focus
+    ? `Improve ${focus} based on recent trend.`
+    : "Build more attempts to estimate weakest skills.";
 
   return {
     stage: profile?.stage || "A0",
     ageBand: profile?.ageBand || "9-11",
     cycleWeek: profile?.cycleWeek || 1,
+    placementConfidence: profile?.placementConfidence || null,
+    placementFresh: Boolean(profile?.placementFresh),
+    carryoverSummary: profile?.placementCarryoverJson || null,
     placementNeeded,
     recentAttempts,
     streak,
@@ -173,6 +285,12 @@ export async function getStudentProgress(studentId: string) {
       coverage7: last7Coverage,
       coverage28: last28Coverage,
     },
+    nodeCoverageByBand: byBand,
+    overdueNodes,
+    uncertainNodes,
+    promotionReadiness,
+    blockedByNodes,
+    weeklyFocusReason,
     mastery: masteryRows.map((row) => ({
       skillKey: row.skillKey,
       masteryScore: row.masteryScore,

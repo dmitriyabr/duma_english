@@ -15,6 +15,12 @@ type TaskResponse = {
   ageBand?: string;
   reason?: string;
   selectionReason?: string;
+  decisionId?: string;
+  primaryGoal?: string;
+  expectedGain?: number;
+  difficulty?: number;
+  fallbackUsed?: boolean;
+  fallbackReason?: string | null;
   targetSkills?: string[];
   targetWords?: string[];
   targetNodeIds?: string[];
@@ -39,7 +45,6 @@ export default function TaskPage() {
   const router = useRouter();
   const [task, setTask] = useState<TaskResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [placementNeeded, setPlacementNeeded] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -58,13 +63,6 @@ export default function TaskPage() {
       .catch(() => {
         if (active) setError("Unable to load a task. Please login again.");
       });
-    fetch("/api/progress")
-      .then((res) => (res.ok ? res.json() : Promise.reject(res)))
-      .then((json) => {
-        if (!active) return;
-        setPlacementNeeded(Boolean(json?.placementNeeded));
-      })
-      .catch(() => undefined);
     return () => {
       active = false;
     };
@@ -91,19 +89,6 @@ export default function TaskPage() {
           )}
           {task ? (
             <>
-              {placementNeeded && (
-                <>
-                  <div className="metric" style={{ marginBottom: 12 }}>
-                    <span>Placement recommended</span>
-                    <p className="subtitle">
-                      Complete placement first for better level matching.
-                    </p>
-                    <Link className="btn ghost" href="/placement">
-                      Go to placement
-                    </Link>
-                  </div>
-                </>
-              )}
               <p className="subtitle">{task.prompt}</p>
               <div className="spacer" />
               <div className="status">
@@ -125,14 +110,24 @@ export default function TaskPage() {
                   <span>Why this task</span>
                   <p className="subtitle">{task.reason}</p>
                   {task.selectionReason && <p className="subtitle">{task.selectionReason}</p>}
+                  {typeof task.expectedGain === "number" && (
+                    <p className="subtitle">
+                      Expected gain: {task.expectedGain.toFixed(2)} | Difficulty:{" "}
+                      {typeof task.difficulty === "number" ? Math.round(task.difficulty) : "n/a"}
+                    </p>
+                  )}
+                  {task.primaryGoal && <p className="subtitle">Primary goal: {task.primaryGoal}</p>}
+                  {task.fallbackUsed && (
+                    <p className="subtitle">
+                      Task generator fallback was used for reliability
+                      {task.fallbackReason ? ` (${task.fallbackReason})` : ""}.
+                    </p>
+                  )}
                   {task.targetSkills && task.targetSkills.length > 0 && (
                     <p className="subtitle">Focus skills: {task.targetSkills.join(", ")}</p>
                   )}
                   {task.targetWords && task.targetWords.length > 0 && (
                     <p className="subtitle">Target words: {task.targetWords.join(", ")}</p>
-                  )}
-                  {task.targetNodeIds && task.targetNodeIds.length > 0 && (
-                    <p className="subtitle">Target nodes: {task.targetNodeIds.join(", ")}</p>
                   )}
                 </div>
               )}

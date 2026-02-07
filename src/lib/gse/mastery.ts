@@ -14,7 +14,7 @@ export type MasteryEvidence = {
   evidenceKind?: GseEvidenceKind;
   opportunityType?: GseOpportunityType;
   score?: number; // 0..1
-  weight?: number; // precomputed weight in [0..1.2]
+  weight?: number; // precomputed weight in [0..1.5]
   usedForPromotion?: boolean;
   taskType?: string;
   targeted?: boolean;
@@ -219,13 +219,14 @@ export async function applyEvidenceToStudentMastery(params: {
         ? evidence.confidence * evidence.impact * 0.8
         : evidence.confidence * evidence.impact
     );
+    const maxWeight = 1.5; // allow streak bonus to speed progression to mastery
     let effectiveWeight =
       typeof evidence.weight === "number"
-        ? Math.max(0.05, Math.min(1.2, evidence.weight))
+        ? Math.max(0.05, Math.min(maxWeight, evidence.weight))
         : Math.max(
             0.05,
             Math.min(
-              1.2,
+              maxWeight,
               baseWeight(kind, opportunity) *
                 clamp01(evidence.confidence) *
                 reliabilityFactor(evidence.reliability) *
@@ -238,12 +239,12 @@ export async function applyEvidenceToStudentMastery(params: {
 
     if (score >= 0.6) effectiveWeight *= 1.1;
     else if (score < 0.4) effectiveWeight *= 0.9;
-    // Streak bonus: exponent with cap (2nd direct success ×1.15, 3rd+ ×1.20)
+    // Streak bonus: exponent with cap (2nd ×1.15, 3rd ×1.32, 4th+ ×1.5)
     if (directSuccess && directSuccessStreak >= 1) {
-      const streakMultiplier = Math.min(1.2, 1.15 ** Math.min(directSuccessStreak, 2));
+      const streakMultiplier = Math.min(1.5, 1.15 ** Math.min(directSuccessStreak, 3));
       effectiveWeight *= streakMultiplier;
     }
-    effectiveWeight = Math.max(0.05, Math.min(1.2, effectiveWeight));
+    effectiveWeight = Math.max(0.05, Math.min(maxWeight, effectiveWeight));
 
     const alphaAfter = alphaBefore + effectiveWeight * score;
     const betaAfter = betaBefore + effectiveWeight * (1 - score);

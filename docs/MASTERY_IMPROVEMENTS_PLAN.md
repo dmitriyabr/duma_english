@@ -30,8 +30,8 @@ Implement evidence-based behaviour: **systematically correct → speed up; error
 - **Что говорят модели:** В PFA веса правильных/неправильных ответов часто линейны по *количеству* попыток; в spaced repetition (FSRS и др.) множители после серии успехов восстанавливаются постепенно и ограничены сверху, чтобы не раздувать интервалы без предела. Итого: разумно не давать неограниченный рост бонуса — либо **линейный рост до потолка**, либо **экспонента с cap** (второй успех +15%, третий ещё +≈15% от базы, дальше cap).
 - Реализация: **экспонента с потолком.** Если текущее свидетельство — прямой успех и предыдущая серия ≥ 1:
   - множитель = `min(STREAK_BONUS_CAP, STREAK_BONUS_BASE ** min(prevStreak, STREAK_BONUS_STEPS))`;
-  - константы: база 1.15, потолок множителя 1.20, «шагов» 2 → 2-й успех подряд ×1.15, 3-й и далее ×1.20 (1.15² ≈ 1.32 → обрезаем до 1.20).
-- Итоговый вес по-прежнему clamp [0.05, 1.2].
+  - константы: база 1.15, потолок множителя **1.5**, шагов 3 → 2-й успех ×1.15, 3-й ×1.32, 4-й и далее ×1.5 (1.15³ ≈ 1.52 → cap 1.5).
+- Итоговый вес clamp [0.05, **1.5**]: чтобы прогрессия к mastery не занимала вечность, максимум поднят с 1.2 до 1.5 (один evidence с весом 1.5 всё равно даёт ограниченный сдвиг Beta).
 
 ### 3) N-CCR-style early verification
 
@@ -44,14 +44,14 @@ Implement evidence-based behaviour: **systematically correct → speed up; error
 - After base weight (and before or after streak bonus; we do after streak):
   - If `score >= 0.6`: multiply effective weight by **1.1**.
   - If `score < 0.4`: multiply by **0.9**.
-- Keeps weights in [0.05, 1.2] with a final clamp.
+- Final clamp [0.05, 1.5] (max 1.5 to speed progression to mastery).
 
 ### 5) Order of application
 
 1. Base `computedWeight` (unchanged).
 2. PFA: `weight *= score >= 0.6 ? 1.1 : score < 0.4 ? 0.9 : 1`.
-3. Streak bonus: if direct success and previous streak ≥ 1, `weight *= min(1.20, 1.15^min(prevStreak, 2))` (2nd → ×1.15, 3rd+ → ×1.20).
-4. Clamp weight to [0.05, 1.2].
+3. Streak bonus: if direct success and previous streak ≥ 1, `weight *= min(1.5, 1.15^min(prevStreak, 3))` (2nd → ×1.15, 3rd → ×1.32, 4th+ → ×1.5).
+4. Clamp weight to [0.05, 1.5].
 5. Use this weight for `alphaAfter` / `betaAfter`.
 6. Verification: (a) existing one-shot pass, or (b) nextStreak >= 2 and direct success → verified.
 

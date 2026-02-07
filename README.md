@@ -19,18 +19,19 @@ Web MVP for an AI speaking trainer: student login via class code, record speech,
 `docker run --rm --entrypoint sh minio/mc -c "mc alias set local http://host.docker.internal:9000 minioadmin minioadmin && mc mb -p local/duma-audio || true"`
 3. Stop services when done: `docker compose down`
 
-## Admin setup
+## Teacher flow
 
-Admin endpoints are protected by basic auth.
+1. Open `/teacher` (or `/teacher/login`) and sign up (email, password, name) or sign in.
+2. On the dashboard, create a class and open it.
+3. Add students by name and/or generate a class code to share.
+4. Students use the class code on `/login` with their name. Teacher sees students and their profiles (progress, GSE nodes) on the class page and via “Profile” per student.
 
-- Set `ADMIN_USER` and `ADMIN_PASS`
-- Open `/admin` in the browser
-- Create a class and generate a class code
+(Optional: `/admin` with basic auth still exists for legacy “create class + generate code” without teacher account.)
 
-## MVP flow
+## MVP flow (student)
 
 1. Student opens `/login`
-2. Enters class code + name
+2. Enters class code + name (+ age group)
 3. Receives a task at `/task`
 4. Records audio at `/record`
 5. Results show at `/results`
@@ -47,7 +48,8 @@ Admin endpoints are protected by basic auth.
 
 ## Brain docs (current truth)
 
-- `/Users/skyeng/Desktop/duma_english/TASKS.MD`
-- `/Users/skyeng/Desktop/duma_english/docs/BRAIN_RUNTIME.md`
-- `/Users/skyeng/Desktop/duma_english/docs/BRAIN_ROADMAP.md`
-- `/Users/skyeng/Desktop/duma_english/docs/DEBUG_PLAYBOOK.md`
+- `TASKS.MD`
+- `docs/BRAIN_RUNTIME.md`
+- `docs/BRAIN_ROADMAP.md`
+- `docs/DEBUG_PLAYBOOK.md`
+- `docs/TEACHER_STUDENT_UI_PLAN.md` — план интерфейса учителя и ученика (ветка `feature/teacher-student-ui`)

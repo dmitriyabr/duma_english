@@ -23,20 +23,21 @@ Build an autonomous speaking trainer where every learning decision is based on G
 - attempts/progress/task-next return GSE-specific reasons and node targets.
 
 ## 3) What was just fixed
-1. Task generator prompt no longer sends raw GSE node IDs to the LLM:
+1. Skill progress (direct evidence): For target_vocab, "word used" is now checked against required words from the prompt that are bound to each target node by descriptor/alias. So when the prompt says "Use: school, learn" and the target node has descriptor or alias "school", the learner saying "school" counts as vocab_target_used (direct evidence). Previously we only matched node descriptor/sourceKey, so we almost always wrote vocab_target_missing. Script: `npx tsx src/scripts/inspect_recent_tasks.ts` to inspect evidence by kind (direct vs supporting vs negative).
+2. Task generator prompt no longer sends raw GSE node IDs to the LLM:
    - Planner returns `targetNodeDescriptors` (human-readable objectives); task/next passes them as `targetNodeLabels` to the generator.
    - Prompt uses "Target learning objectives" with descriptors and instructs the model to copy given IDs into `target_nodes`.
    - Grammar nodes with missing descriptor show as "Grammar accuracy at this level" instead of "No grammar descriptor available."
-2. Vocab matching bug fixed:
+3. Vocab matching bug fixed:
 - no more matching by technical `sourceKey` IDs.
 - matching now uses descriptor/alias lexical forms.
-3. Alias coverage fixed:
+4. Alias coverage fixed:
 - auto alias generation added.
 - full alias backfill script executed locally.
-4. Grammar capture strengthened:
+5. Grammar capture strengthened:
 - positive and negative incidental grammar signals are emitted.
 - agreement-type errors are explicitly captured.
-5. Validation status:
+6. Validation status:
 - `npm test` pass
 - `npm run lint` pass
 - `npm run build` pass
@@ -90,8 +91,14 @@ Build an autonomous speaking trainer where every learning decision is based on G
 3. No stage promotion from incidental-only evidence.
 4. No UI display of raw `gse:...` codes as primary text.
 
-## 8) Docs Index
+## 8) Teacher / Student UI (feature branch) — implemented
+- Branch: `feature/teacher-student-ui`
+- Plan: `docs/TEACHER_STUDENT_UI_PLAN.md`
+- Done: Teacher auth (email + password, signup/login), dashboard, classes, add students, generate codes, student profile (updates, dynamics, GSE nodes). Student login unchanged (code + name). Landing links to `/teacher` instead of `/admin`.
+
+## 9) Docs Index
 Authoritative docs are in:
 1. `docs/BRAIN_RUNTIME.md`
 2. `docs/BRAIN_ROADMAP.md`
 3. `docs/DEBUG_PLAYBOOK.md`
+4. `docs/TEACHER_STUDENT_UI_PLAN.md` (teacher/student UI)

@@ -1,7 +1,16 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import type { CEFRStage } from "@/lib/curriculum";
+import { getBundleNodeIdsForStage } from "./bundles";
 import { computeDecayedMastery } from "./mastery";
 import { mapStageToGseRange } from "./utils";
+
+const STAGE_ORDER: CEFRStage[] = ["A0", "A1", "A2", "B1", "B2", "C1", "C2"];
+function nextStage(stage: string): CEFRStage {
+  const i = STAGE_ORDER.indexOf(stage as CEFRStage);
+  if (i < 0 || i >= STAGE_ORDER.length - 1) return (stage as CEFRStage) || "A1";
+  return STAGE_ORDER[i + 1];
+}
 
 type DomainKey = "vocab" | "grammar" | "lo";
 
@@ -569,7 +578,8 @@ export async function planNextTaskDecision(params: {
       ? candidateTaskTypes
       : ["read_aloud", "target_vocab", "qa_prompt", "role_play", "topic_talk", "filler_control", "speech_builder"];
 
-  const [nodeStates, recentAttempts, recentInstances] = await Promise.all([
+  const targetStage = nextStage(params.stage);
+  const [nodeStates, recentAttempts, recentInstances, targetStageBundleNodeIds] = await Promise.all([
     loadNodeState({
       studentId: params.studentId,
       stage: params.stage,
@@ -588,6 +598,7 @@ export async function planNextTaskDecision(params: {
       orderBy: { createdAt: "desc" },
       take: 6,
     }),
+    getBundleNodeIdsForStage(targetStage),
   ]);
   const verificationTargetNodeIds = nodeStates
     .filter((node) => node.activationState === "candidate_for_verification")
@@ -614,9 +625,11 @@ export async function planNextTaskDecision(params: {
   const recentVerificationHit = recentInstances
     .slice(0, 2)
     .some((item) => item.targetNodeIds.some((nodeId) => verificationTargetNodeIds.includes(nodeId)));
+  // Verification first, then target-stage bundle nodes (so exercises align with progress), then other preferred
   const mergedPreferredNodeIds = dedupe([
-    ...(params.preferredNodeIds || []),
     ...verificationTargetNodeIds,
+    ...targetStageBundleNodeIds,
+    ...(params.preferredNodeIds || []),
   ]);
   const scored = taskTypes.map((taskType) =>
     scoreCandidate({

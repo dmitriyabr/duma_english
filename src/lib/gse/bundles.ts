@@ -82,6 +82,20 @@ export type StageBundleReadiness = {
   bundleRows: BundleReadinessRow[];
 };
 
+/** Node IDs from all bundles for a given stage (for planner: prefer these to align tasks with progress). */
+export async function getBundleNodeIdsForStage(stage: CEFRStage): Promise<string[]> {
+  await ensureDefaultGseBundles();
+  const bundles = await prisma.gseBundle.findMany({
+    where: { active: true, stage },
+    include: { nodes: { select: { nodeId: true } } },
+  });
+  return dedupe(bundles.flatMap((b) => b.nodes.map((n) => n.nodeId)));
+}
+
+function dedupe<T>(arr: T[]): T[] {
+  return Array.from(new Set(arr));
+}
+
 export async function ensureDefaultGseBundles() {
   const existingCount = await prisma.gseBundle.count({ where: { active: true } });
   if (existingCount >= STAGES.length * DOMAINS.length) return;

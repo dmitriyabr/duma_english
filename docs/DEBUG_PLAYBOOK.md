@@ -12,7 +12,7 @@ So a word (e.g. "feel" or "feeling") must be observed **≥ 3 times** in total, 
 
 **Decay impact negative:** If UI shows "decay impact -6.5", the stored decayed score was above the current mean (alpha/beta had been corrected down). That’s stale state, not “strong decay”. We now cap so decay impact is never negative (shows as 0). **По-человечески:** в базе лежал «показываемый балл» 76, а внутренняя оценка уже упала до 69.5 — мы догнали отображение до реальности, поэтому балл «хуже». Не из‑за времени (decay), а потому что убрали устаревшее завышенное значение.
 
-Then the planner prioritises that node for a **verification** task (explicit target). When the learner passes that with **direct** evidence (score ≥ 0.7, confidence ≥ 0.75), the node becomes **verified**. So: incidental → candidate → (explicit target pass) → verified.
+Then the planner prioritises that node for a **verification** task (explicit target). The node becomes **verified** when either: (1) one **direct** evidence with score ≥ 0.7, confidence ≥ 0.75, explicit target; or (2) **N-CCR early verification:** 2 direct successes in a row (score ≥ 0.7 each), even if mean &lt; 70. Streak is stored in `spacingStateJson.directSuccessStreak`; 2nd+ direct success in a row gets a 15% weight bonus (PFA-style: correct ≥0.6 → ×1.1, incorrect &lt;0.4 → ×0.9). So: incidental → candidate → (explicit target pass or 2 direct hits) → verified.
 
 ## B) Why skills don’t progress (no direct evidence)
 ## A2) How "too: +0.8" relates to mastery (why many pluses, low mastery)

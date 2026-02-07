@@ -23,24 +23,25 @@ Build an autonomous speaking trainer where every learning decision is based on G
 - attempts/progress/task-next return GSE-specific reasons and node targets.
 
 ## 3) What was just fixed
-1. **Planner spread and fast credit:** (a) Planner: at most 2 of 3 target nodes from preferred set (verification + bundle), so other nodes get a slot; penalty for recently targeted nodes (0.28 per node in last 3 tasks) to rotate away from same descriptor; preferredBoost 0.4→0.18, verificationGain 1.15→0.55 per hit. (b) Fast credit for lower-level bundles: when placement is above a bundle stage, node counts as covered if value≥50 and ≥1 direct evidence (no need for verified+70), so path-to-next-level bar moves without grinding.
-2. **Placement-driven promotion and bundle alignment:** If placement (evidence from all nodes) is above bundle-based promotion, we set promotion = placement so the UI shows the real level (e.g. B1) instead of A0. Planner now prefers target-stage bundle nodes (after verification queue) so exercises align with "path to next level". See DEBUG_PLAYBOOK § E3.
-3. Profile inspection script: `npx tsx src/scripts/inspect_teacher_profile.ts [studentId]` explains (1) why 0 nodes are closed (verified & value≥70 per bundle), (2) why blocking nodes (GSE bundle descriptors) differ from words in tasks (vocab queue), (3) exact readiness score breakdown (e.g. 17% = 0+8+3+6). See DEBUG_PLAYBOOK § E2.
-4. Skill progress (direct evidence): For target_vocab, "word used" is now checked against required words from the prompt that are bound to each target node by descriptor/alias. So when the prompt says "Use: school, learn" and the target node has descriptor or alias "school", the learner saying "school" counts as vocab_target_used (direct evidence). Previously we only matched node descriptor/sourceKey, so we almost always wrote vocab_target_missing. Script: `npx tsx src/scripts/inspect_recent_tasks.ts` to inspect evidence by kind (direct vs supporting vs negative).
-5. Task generator prompt no longer sends raw GSE node IDs to the LLM:
+1. **Mastery improvements (streak + N-CCR + PFA):** In `applyEvidenceToStudentMastery`: (a) **Streak:** `directSuccessStreak` in `spacingStateJson`; 2nd+ direct success in a row gets weight ×1.15. (b) **N-CCR:** 2 direct successes in a row → set **verified** even if mean &lt; 70. (c) **PFA-style:** score ≥ 0.6 → weight ×1.1; score &lt; 0.4 → weight ×0.9. Plan: `docs/MASTERY_IMPROVEMENTS_PLAN.md`.
+2. **Planner spread and fast credit:** (a) Planner: at most 2 of 3 target nodes from preferred set (verification + bundle), so other nodes get a slot; penalty for recently targeted nodes (0.28 per node in last 3 tasks) to rotate away from same descriptor; preferredBoost 0.4→0.18, verificationGain 1.15→0.55 per hit. (b) Fast credit for lower-level bundles: when placement is above a bundle stage, node counts as covered if value≥50 and ≥1 direct evidence (no need for verified+70), so path-to-next-level bar moves without grinding.
+3. **Placement-driven promotion and bundle alignment:** If placement (evidence from all nodes) is above bundle-based promotion, we set promotion = placement so the UI shows the real level (e.g. B1) instead of A0. Planner now prefers target-stage bundle nodes (after verification queue) so exercises align with "path to next level". See DEBUG_PLAYBOOK § E3.
+4. Profile inspection script: `npx tsx src/scripts/inspect_teacher_profile.ts [studentId]` explains (1) why 0 nodes are closed (verified & value≥70 per bundle), (2) why blocking nodes (GSE bundle descriptors) differ from words in tasks (vocab queue), (3) exact readiness score breakdown (e.g. 17% = 0+8+3+6). See DEBUG_PLAYBOOK § E2.
+5. Skill progress (direct evidence): For target_vocab, "word used" is now checked against required words from the prompt that are bound to each target node by descriptor/alias. So when the prompt says "Use: school, learn" and the target node has descriptor or alias "school", the learner saying "school" counts as vocab_target_used (direct evidence). Previously we only matched node descriptor/sourceKey, so we almost always wrote vocab_target_missing. Script: `npx tsx src/scripts/inspect_recent_tasks.ts` to inspect evidence by kind (direct vs supporting vs negative).
+6. Task generator prompt no longer sends raw GSE node IDs to the LLM:
    - Planner returns `targetNodeDescriptors` (human-readable objectives); task/next passes them as `targetNodeLabels` to the generator.
    - Prompt uses "Target learning objectives" with descriptors and instructs the model to copy given IDs into `target_nodes`.
    - Grammar nodes with missing descriptor show as "Grammar accuracy at this level" instead of "No grammar descriptor available."
-6. Vocab matching bug fixed:
+7. Vocab matching bug fixed:
 - no more matching by technical `sourceKey` IDs.
 - matching now uses descriptor/alias lexical forms.
-7. Alias coverage fixed:
+8. Alias coverage fixed:
 - auto alias generation added.
 - full alias backfill script executed locally.
-8. Grammar capture strengthened:
+9. Grammar capture strengthened:
 - positive and negative incidental grammar signals are emitted.
 - agreement-type errors are explicitly captured.
-9. Validation status:
+10. Validation status:
 - `npm test` pass
 - `npm run lint` pass
 - `npm run build` pass

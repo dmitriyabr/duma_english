@@ -87,6 +87,7 @@ type MasteryRow = {
 type NodeOutcomeRow = {
   descriptor: string;
   nodeId: string;
+  stage?: string;
   deltaMastery: number;
   decayImpact: number;
   previousMean?: number;
@@ -391,7 +392,8 @@ export default function TeacherStudentProfilePage() {
               <ul style={{ listStyle: "none", paddingLeft: 0 }}>
                 {(data.recentNodeOutcomes ?? []).slice(0, 50).map((item, i) => (
                   <li key={`${item.nodeId}-${i}`} style={{ padding: "4px 0", color: "var(--ink-2)", fontFamily: "var(--font-body)" }}>
-                    {item.descriptor}:{" "}
+                    {item.descriptor}
+                    {item.stage ? <span style={{ color: "var(--ink-3)", fontWeight: 500 }}> ({item.stage})</span> : null}:{" "}
                     {typeof item.previousMean === "number" && typeof item.nextMean === "number"
                       ? `${Math.round(item.previousMean)} → ${Math.round(item.nextMean)} (+${item.deltaMastery.toFixed(1)})`
                       : `${item.deltaMastery >= 0 ? "+" : ""}${item.deltaMastery.toFixed(1)}`}

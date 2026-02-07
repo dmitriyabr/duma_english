@@ -105,6 +105,7 @@ export async function GET(
   const recentNodeOutcomes: Array<{
     descriptor: string;
     nodeId: string;
+    stage: string;
     deltaMastery: number;
     decayImpact: number;
     previousMean?: number;
@@ -116,23 +117,37 @@ export async function GET(
     const outcomes = Array.isArray(a.nodeOutcomesJson) ? (a.nodeOutcomesJson as NodeOutcome[]) : [];
     for (const o of outcomes) nodeIdsFromOutcomes.add(o.nodeId);
   }
-  const nodeIdToDescriptor =
+  function gseBandFromCenter(value: number | null | undefined): string {
+    if (typeof value !== "number") return "A0";
+    if (value <= 29) return "A1";
+    if (value <= 42) return "A2";
+    if (value <= 58) return "B1";
+    if (value <= 75) return "B2";
+    if (value <= 84) return "C1";
+    return "C2";
+  }
+
+  const nodeIdToInfo =
     nodeIdsFromOutcomes.size > 0
       ? await prisma.gseNode
           .findMany({
             where: { nodeId: { in: Array.from(nodeIdsFromOutcomes) } },
-            select: { nodeId: true, descriptor: true },
+            select: { nodeId: true, descriptor: true, gseCenter: true },
           })
-          .then((rows) => new Map(rows.map((r) => [r.nodeId, r.descriptor])))
-      : new Map<string, string>();
+          .then((rows) =>
+            new Map(rows.map((r) => [r.nodeId, { descriptor: r.descriptor, stage: gseBandFromCenter(r.gseCenter) }]))
+          )
+      : new Map<string, { descriptor: string; stage: string }>();
 
   for (const a of attemptsWithOutcomes) {
     const outcomes = Array.isArray(a.nodeOutcomesJson) ? (a.nodeOutcomesJson as NodeOutcome[]) : [];
     const attemptDate = a.createdAt.toISOString();
     for (const o of outcomes) {
+      const info = nodeIdToInfo.get(o.nodeId);
       recentNodeOutcomes.push({
-        descriptor: nodeIdToDescriptor.get(o.nodeId) ?? o.nodeId,
+        descriptor: info?.descriptor ?? o.nodeId,
         nodeId: o.nodeId,
+        stage: info?.stage ?? "A0",
         deltaMastery: o.deltaMastery,
         decayImpact: o.decayImpact,
         previousMean: o.previousMean,

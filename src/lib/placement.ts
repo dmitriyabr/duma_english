@@ -1,6 +1,8 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "./db";
 import { SkillKey } from "./curriculum";
+import { mapStageToGseRange } from "./gse/utils";
+import { projectLearnerStageFromGse, refreshLearnerProfileFromGse } from "./gse/stageProjection";
 
 export type PlacementItemView = {
   id: string;
@@ -90,16 +92,6 @@ function stageFromTheta(theta: number) {
   if (theta < 1.6) return "B2";
   if (theta < 2.35) return "C1";
   return "C2";
-}
-
-function rangeForStage(stage: string) {
-  if (stage === "A0") return { min: 10, max: 21 };
-  if (stage === "A1") return { min: 22, max: 29 };
-  if (stage === "A2") return { min: 30, max: 42 };
-  if (stage === "B1") return { min: 43, max: 58 };
-  if (stage === "B2") return { min: 59, max: 75 };
-  if (stage === "C1") return { min: 76, max: 84 };
-  return { min: 85, max: 90 };
 }
 
 function scoreFromObserved(skillKey: SkillKey, observed?: PlacementAnswerInput["observedMetrics"]) {
@@ -198,22 +190,6 @@ function confidenceFromSigma(params: { sigma: number; skillCoverage: number }) {
   return round(clamp(confidence, 0, 0.99), 2);
 }
 
-function stageAverageFromSnapshot(snapshot: Record<string, number>) {
-  const values = Object.values(snapshot);
-  if (values.length === 0) return 0;
-  return round(values.reduce((s, v) => s + v, 0) / values.length, 2);
-}
-
-function inferStageFromAverage(value: number) {
-  if (value >= 93) return "C2";
-  if (value >= 88) return "C1";
-  if (value >= 80) return "B2";
-  if (value >= 70) return "B1";
-  if (value >= 58) return "A2";
-  if (value >= 45) return "A1";
-  return "A0";
-}
-
 function taskTypeForSkill(skill: SkillKey) {
   if (skill === "pronunciation") return "read_aloud";
   if (skill === "vocabulary") return "target_vocab";
@@ -280,8 +256,42 @@ function expectedMinWords(stage: string) {
 }
 
 function gseTargetsForStage(stage: string) {
-  const range = rangeForStage(stage);
-  return [`gse-range:${range.min}-${range.max}`];
+  const range = mapStageToGseRange(stage);
+  return { min: range.min, max: range.max };
+}
+
+function skillsForPlacementSkill(skill: SkillKey) {
+  if (skill === "vocabulary") return ["vocabulary", "speaking"];
+  if (skill === "pronunciation") return ["speaking", "grammar"];
+  if (skill === "tempo_control") return ["speaking"];
+  if (skill === "task_completion") return ["speaking", "writing", "listening", "grammar"];
+  return ["speaking", "listening"];
+}
+
+async function resolvePlacementTargets(params: { stage: string; skill: SkillKey; ageBand?: string | null }) {
+  const audience = params.ageBand === "6-8" || params.ageBand === "9-11" || params.ageBand === "12-14" ? "YL" : "AL";
+  const range = gseTargetsForStage(params.stage);
+  const skillHints = skillsForPlacementSkill(params.skill);
+  const preferred = await prisma.gseNode.findMany({
+    where: {
+      audience: { in: [audience, "AL", "AE"] },
+      skill: { in: skillHints },
+      gseCenter: { gte: range.min - 2, lte: range.max + 2 },
+    },
+    orderBy: [{ gseCenter: "asc" }, { updatedAt: "desc" }],
+    select: { nodeId: true },
+    take: 4,
+  });
+  if (preferred.length > 0) return preferred.map((row) => row.nodeId);
+  const fallback = await prisma.gseNode.findMany({
+    where: {
+      gseCenter: { gte: range.min - 5, lte: range.max + 5 },
+    },
+    orderBy: [{ gseCenter: "asc" }],
+    select: { nodeId: true },
+    take: 4,
+  });
+  return fallback.map((row) => row.nodeId);
 }
 
 function buildDefaultItemBank() {
@@ -301,7 +311,7 @@ function buildDefaultItemBank() {
         maxDurationSec: taskType === "read_aloud" ? 30 : stageIndex(stage) >= 4 ? 90 : 60,
         difficulty: difficultyForStage(stage),
         discrimination: discriminationForSkill(skill),
-        gseTargets: gseTargetsForStage(stage),
+        gseTargets: [],
       });
     }
   }
@@ -309,11 +319,24 @@ function buildDefaultItemBank() {
 }
 
 async function ensurePlacementItemBank() {
-  const count = await prisma.placementItem.count({ where: { active: true } });
+  const activeItems = await prisma.placementItem.findMany({
+    where: { active: true },
+    select: { id: true, stageBand: true, skillKey: true, ageBand: true, gseTargets: true },
+  });
+  const count = activeItems.length;
   if (count >= 25) return;
   const defaults = buildDefaultItemBank();
+  const resolvedDefaults = await Promise.all(
+    defaults.map(async (item) => ({
+      ...item,
+      gseTargets: await resolvePlacementTargets({
+        stage: item.stageBand,
+        skill: item.skillKey,
+      }),
+    }))
+  );
   await prisma.placementItem.createMany({
-    data: defaults.map((item) => ({
+    data: resolvedDefaults.map((item) => ({
       skillKey: item.skillKey,
       stageBand: item.stageBand,
       taskType: item.taskType,
@@ -329,6 +352,28 @@ async function ensurePlacementItemBank() {
       active: true,
     })),
   });
+}
+
+async function normalizePlacementTargets() {
+  const items = await prisma.placementItem.findMany({
+    where: { active: true },
+    select: { id: true, stageBand: true, skillKey: true, ageBand: true, gseTargets: true },
+  });
+  for (const item of items) {
+    const hasInvalidTargets =
+      !item.gseTargets?.length || item.gseTargets.some((target) => target.startsWith("gse-range:"));
+    if (!hasInvalidTargets) continue;
+    const targets = await resolvePlacementTargets({
+      stage: item.stageBand,
+      skill: item.skillKey as SkillKey,
+      ageBand: item.ageBand,
+    });
+    if (!targets.length) continue;
+    await prisma.placementItem.update({
+      where: { id: item.id },
+      data: { gseTargets: targets },
+    });
+  }
 }
 
 function mapItem(row: {
@@ -503,6 +548,8 @@ async function applyCarryoverIfNeeded(params: {
 }
 
 export function computePlacementResult(responses: Record<string, PlacementAnswerInput>) {
+  let theta = -0.85;
+  let sigma = 1;
   const pseudoSnapshot: Record<SkillKey, number> = {
     pronunciation: 0,
     fluency: 0,
@@ -540,6 +587,16 @@ export function computePlacementResult(responses: Record<string, PlacementAnswer
       },
       answer
     );
+    const itemScore = clamp(score / 100, 0, 1);
+    const estimate = updateAbility({
+      theta,
+      sigma,
+      itemDifficulty: item.difficulty,
+      itemDiscrimination: item.discrimination,
+      itemScore,
+    });
+    theta = estimate.theta;
+    sigma = estimate.sigma;
     const skill = fallbackSkill as SkillKey;
     pseudoSnapshot[skill] += score;
     countBySkill[skill] += 1;
@@ -549,11 +606,11 @@ export function computePlacementResult(responses: Record<string, PlacementAnswer
     pseudoSnapshot[skill] =
       countBySkill[skill] > 0 ? round(pseudoSnapshot[skill] / countBySkill[skill], 2) : 45;
   }
-  const average = stageAverageFromSnapshot(pseudoSnapshot);
-  const stage = inferStageFromAverage(average);
   const coverage = Object.values(countBySkill).filter((v) => v > 0).length / CORE_SKILLS.length;
-  const confidence = confidenceFromSigma({ sigma: 0.5, skillCoverage: coverage });
-  return { stage, average, confidence, skillSnapshot: pseudoSnapshot };
+  const confidence = confidenceFromSigma({ sigma, skillCoverage: coverage });
+  const stage = stageFromTheta(theta);
+  const average = round(clamp(((theta + 3) / 6) * 100, 0, 100), 2);
+  return { stage, average, confidence, theta, sigma, skillSnapshot: pseudoSnapshot };
 }
 
 export function getPlacementQuestions() {
@@ -578,6 +635,7 @@ export function getPlacementQuestions() {
 
 export async function startPlacement(studentId: string) {
   await ensurePlacementItemBank();
+  await normalizePlacementTargets();
   const profile = await prisma.learnerProfile.findUnique({ where: { studentId } });
   const ageBand = profile?.ageBand || "9-11";
 
@@ -750,18 +808,14 @@ export async function finishPlacement(sessionId: string) {
       carryoverApplied: boolean;
       carryoverNodes: string[];
       uncertainNodes: string[];
+      coverage: number | null;
+      reliability: number | null;
     };
   }
 
   if (session.questionCount < 1) throw new Error("Placement has no responses yet");
 
   const skillSnapshot = await computeSkillSnapshot(session.id);
-  const average = stageAverageFromSnapshot(skillSnapshot);
-  const stageByTheta = stageFromTheta(session.theta);
-  const stageByAverage = inferStageFromAverage(average);
-  const stage = stageIndex(stageByTheta) >= stageIndex(stageByAverage) ? stageByTheta : stageByAverage;
-  const skillCoverage = Object.values(skillSnapshot).filter((v) => v > 45).length / CORE_SKILLS.length;
-  const confidence = confidenceFromSigma({ sigma: session.sigma, skillCoverage });
   const uncertainRows = await prisma.placementResponse.findMany({
     where: { sessionId: session.id, itemScore: { gte: 0.35, lte: 0.7 } },
     include: { item: true },
@@ -771,122 +825,69 @@ export async function finishPlacement(sessionId: string) {
   const uncertainNodes = Array.from(
     new Set(uncertainRows.flatMap((row) => row.item.gseTargets || []))
   ).slice(0, 12);
-
+  const beforeProjection = await projectLearnerStageFromGse(session.studentId);
   const carryover = await applyCarryoverIfNeeded({
     studentId: session.studentId,
-    stage,
-    confidence,
+    stage: beforeProjection.stage,
+    confidence: beforeProjection.confidence,
   });
-
-  await prisma.learnerProfile.upsert({
+  const stageProjection = await refreshLearnerProfileFromGse({
+    studentId: session.studentId,
+    reason: "placement_finish",
+    placementFresh: true,
+    uncertainNodeIds: uncertainNodes,
+    carryoverSummary: {
+      carryoverApplied: carryover.carryoverApplied,
+      carryoverNodes: carryover.carryoverNodes.slice(0, 30),
+    },
+  });
+  await prisma.learnerProfile.update({
     where: { studentId: session.studentId },
-    update: {
-      stage,
-      placementScore: average,
-      placementConfidence: confidence,
-      placementFresh: true,
+    data: {
       placementCompletedAt: new Date(),
-      placementUncertainNodeIds: uncertainNodes,
-      placementCarryoverJson: {
-        carryoverApplied: carryover.carryoverApplied,
-        carryoverNodes: carryover.carryoverNodes.slice(0, 30),
-      } as Prisma.InputJsonValue,
-      cycleWeek: 1,
-    },
-    create: {
-      studentId: session.studentId,
-      stage,
-      placementScore: average,
-      placementConfidence: confidence,
-      placementFresh: true,
-      placementCompletedAt: new Date(),
-      placementUncertainNodeIds: uncertainNodes,
-      placementCarryoverJson: {
-        carryoverApplied: carryover.carryoverApplied,
-        carryoverNodes: carryover.carryoverNodes.slice(0, 30),
-      } as Prisma.InputJsonValue,
       cycleWeek: 1,
     },
   });
-
-  const day = new Date();
-  day.setHours(0, 0, 0, 0);
-  for (const [skillKey, value] of Object.entries(skillSnapshot) as Array<[SkillKey, number]>) {
-    await prisma.studentSkillMastery.upsert({
-      where: {
-        studentId_skillKey: {
-          studentId: session.studentId,
-          skillKey,
-        },
-      },
-      update: {
-        masteryScore: value,
-        reliability: "medium",
-        evidenceCount: { increment: 1 },
-        lastAssessedAt: new Date(),
-      },
-      create: {
-        studentId: session.studentId,
-        skillKey,
-        masteryScore: value,
-        reliability: "medium",
-        evidenceCount: 1,
-        lastAssessedAt: new Date(),
-      },
-    });
-
-    await prisma.studentSkillDaily.upsert({
-      where: {
-        studentId_date_skillKey: {
-          studentId: session.studentId,
-          date: day,
-          skillKey,
-        },
-      },
-      update: {
-        value,
-        reliability: "medium",
-        sampleCount: { increment: 1 },
-      },
-      create: {
-        studentId: session.studentId,
-        date: day,
-        skillKey,
-        value,
-        reliability: "medium",
-        sampleCount: 1,
-      },
-    });
-  }
 
   await prisma.promotionAudit.create({
     data: {
       studentId: session.studentId,
       fromStage: session.student.profile?.stage || "A0",
-      targetStage: stage,
-      promoted: stageIndex(stage) >= stageIndex(session.student.profile?.stage || "A0"),
-      blockedByNodes: uncertainNodes,
+      targetStage: stageProjection.stage,
+      promoted: stageIndex(stageProjection.stage) > stageIndex(session.student.profile?.stage || "A0"),
+      blockedByNodes: stageProjection.blockedByNodes,
       reasonsJson: {
         placement: true,
+        source: "gse_only",
         theta: session.theta,
         sigma: session.sigma,
-        confidence,
+        confidence: stageProjection.confidence,
+        currentStageStats: stageProjection.currentStageStats,
+        targetStageStats: stageProjection.targetStageStats,
         carryoverApplied: carryover.carryoverApplied,
       },
-      readinessScore: Math.round(confidence * 100),
+      readinessScore: stageProjection.score,
     },
   });
 
   const result = {
-    stage,
-    average,
-    confidence,
+    stage: stageProjection.stage,
+    average: stageProjection.score,
+    confidence: stageProjection.confidence,
     theta: session.theta,
     sigma: session.sigma,
     skillSnapshot,
     carryoverApplied: carryover.carryoverApplied,
     carryoverNodes: carryover.carryoverNodes.slice(0, 40),
     uncertainNodes,
+    coverage:
+      stageProjection.targetStageStats.coverage70 === null
+        ? null
+        : Number((stageProjection.targetStageStats.coverage70 * 100).toFixed(1)),
+    reliability:
+      stageProjection.targetStageStats.reliabilityRatio === null
+        ? null
+        : Number((stageProjection.targetStageStats.reliabilityRatio * 100).toFixed(1)),
   };
 
   await prisma.placementSession.update({

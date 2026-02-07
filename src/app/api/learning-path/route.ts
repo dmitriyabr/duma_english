@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getStudentFromRequest } from "@/lib/auth";
 import { buildLearningPlan } from "@/lib/adaptive";
-import { prisma } from "@/lib/db";
+import { projectLearnerStageFromGse } from "@/lib/gse/stageProjection";
 
 export async function GET(req: Request) {
   const student = await getStudentFromRequest();
@@ -15,10 +15,7 @@ export async function GET(req: Request) {
     studentId: student.studentId,
     requestedType,
   });
-  const mastery = await prisma.studentSkillMastery.findMany({
-    where: { studentId: student.studentId },
-    orderBy: { masteryScore: "asc" },
-  });
+  const projection = await projectLearnerStageFromGse(student.studentId);
 
   return NextResponse.json({
     studentId: student.studentId,
@@ -30,11 +27,12 @@ export async function GET(req: Request) {
     recommendedTaskTypes: plan.recommendedTaskTypes,
     nextTaskReason: plan.nextTaskReason,
     skillMatrix: plan.skillMatrix,
-    mastery: mastery.map((row) => ({
+    mastery: projection.derivedSkills.map((row) => ({
       skillKey: row.skillKey,
-      masteryScore: row.masteryScore,
+      masteryScore: row.current,
       reliability: row.reliability,
-      evidenceCount: row.evidenceCount,
+      evidenceCount: row.sampleCount,
+      source: row.source,
     })),
   });
 }

@@ -168,23 +168,31 @@ export async function assignTaskTargetsFromCatalog(params: {
   }
 
   const selected = candidateNodes.slice(0, 3);
-  if (selected.length > 0) {
-    await prisma.taskGseTarget.createMany({
-      data: selected.map((node, index) => ({
-        taskId: params.taskId,
-        nodeId: node.nodeId,
-        weight: index === 0 ? 1 : 0.7,
-        required: index === 0,
-      })),
-      skipDuplicates: true,
+  let targetNodeIds = selected.map((node) => node.nodeId);
+  if (targetNodeIds.length === 0) {
+    const hardFallback = await prisma.gseNode.findMany({
+      where: {
+        gseCenter: { gte: stageRange.min - 8, lte: stageRange.max + 8 },
+      },
+      orderBy: [{ gseCenter: "asc" }],
+      select: { nodeId: true },
+      take: 3,
     });
+    targetNodeIds = hardFallback.map((row) => row.nodeId);
   }
-
-  const targetNodeIds = selected.map((node) => node.nodeId);
-  const selectionReason =
-    targetNodeIds.length > 0
-      ? `Selected ${targetNodeIds.length} GSE nodes for ${params.taskType} at ${params.stage}${params.studentId ? " using weakest-node targeting" : ""}.`
-      : "No matching GSE nodes found for current stage; fallback to skill planner.";
+  if (targetNodeIds.length === 0) {
+    throw new Error("Planner could not resolve GSE targets for task assignment.");
+  }
+  await prisma.taskGseTarget.createMany({
+    data: targetNodeIds.map((nodeId, index) => ({
+      taskId: params.taskId,
+      nodeId,
+      weight: index === 0 ? 1 : 0.7,
+      required: index === 0,
+    })),
+    skipDuplicates: true,
+  });
+  const selectionReason = `Selected ${targetNodeIds.length} GSE nodes for ${params.taskType} at ${params.stage}${params.studentId ? " using weakest-node targeting" : ""}.`;
 
   return { targetNodeIds, selectionReason };
 }
@@ -323,6 +331,7 @@ function scoreCandidate(params: {
   nodes: NodeState[];
   stage: string;
   fatigueTypes: string[];
+  recentTaskTypes: string[];
   preferredNodeIds?: string[];
 }) {
   const relevantSkills = skillHintsForTaskType(params.taskType);
@@ -362,6 +371,14 @@ function scoreCandidate(params: {
       ? perNode.reduce((sum, item) => sum + item.node.masterySigma, 0) / perNode.length
       : 25;
   const engagementRisk = params.fatigueTypes.slice(0, 2).includes(params.taskType) ? 0.28 : 0.08;
+  let sameTypeStreak = 0;
+  for (const type of params.recentTaskTypes) {
+    if (type !== params.taskType) break;
+    sameTypeStreak += 1;
+  }
+  const sameTypeCountInRecent = params.recentTaskTypes.filter((type) => type === params.taskType).length;
+  const repetitionPenalty =
+    sameTypeStreak >= 2 ? 2.2 : sameTypeStreak === 1 ? 0.9 : sameTypeCountInRecent >= 3 ? 0.8 : 0;
   const tokenCost =
     params.taskType === "speech_builder" || params.taskType === "role_play" ? 1.3 : 0.9;
   const latencyRisk = params.taskType === "speech_builder" ? 0.22 : 0.1;
@@ -370,13 +387,15 @@ function scoreCandidate(params: {
   const utility =
     expectedGain -
     engagementRisk * 1.6 -
+    repetitionPenalty -
     tokenCost * 0.6 -
     latencyRisk * 0.8 +
     explorationBonus * 1.4 +
     preferredBoost;
   const weakest = targetNodes[0];
+  const weakestLabel = weakest?.descriptor?.trim() || "priority learning objective";
   const selectionReason = weakest
-    ? `Targets weak node ${weakest.nodeId} (${Math.round(weakest.decayedMastery)}) with expected gain ${round(expectedGain)}.`
+    ? `Targets weak objective "${weakestLabel}" (${Math.round(weakest.decayedMastery)}) with expected gain ${round(expectedGain)}.`
     : `No node evidence yet; using stage ${params.stage} defaults.`;
 
   return {
@@ -408,7 +427,7 @@ export async function planNextTaskDecision(params: {
   ).filter(Boolean);
   let taskTypes = candidateTaskTypes.length > 0 ? candidateTaskTypes : ["topic_talk"];
 
-  const [nodeStates, recentAttempts] = await Promise.all([
+  const [nodeStates, recentAttempts, recentInstances] = await Promise.all([
     loadNodeState({
       studentId: params.studentId,
       stage: params.stage,
@@ -420,6 +439,12 @@ export async function planNextTaskDecision(params: {
       include: { task: true },
       orderBy: { createdAt: "desc" },
       take: 3,
+    }),
+    prisma.taskInstance.findMany({
+      where: { studentId: params.studentId },
+      select: { taskType: true },
+      orderBy: { createdAt: "desc" },
+      take: 6,
     }),
   ]);
 
@@ -434,17 +459,22 @@ export async function planNextTaskDecision(params: {
   }
 
   const fatigueTypes = recentAttempts.map((attempt) => attempt.task.type);
+  const recentTaskTypes = recentInstances.map((item) => item.taskType);
   const scored = taskTypes.map((taskType) =>
     scoreCandidate({
       taskType,
       nodes: nodeStates,
       stage: params.stage,
       fatigueTypes,
+      recentTaskTypes,
       preferredNodeIds: params.preferredNodeIds,
     })
   );
   scored.sort((a, b) => b.utility - a.utility);
   const chosen = scored[0];
+  if (!chosen || chosen.targetNodeIds.length === 0) {
+    throw new Error("Planner decision failed: no GSE targets resolved.");
+  }
 
   const overdueCount = nodeStates.filter((node) => node.daysSinceEvidence > node.halfLifeDays).length;
   const weakCount = nodeStates.filter((node) => node.decayedMastery < 55).length;

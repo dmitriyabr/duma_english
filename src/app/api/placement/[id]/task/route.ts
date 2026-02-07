@@ -4,39 +4,12 @@ import { getStudentFromRequest } from "@/lib/auth";
 import { getPlacementSession } from "@/lib/placement";
 import { prisma } from "@/lib/db";
 import { generateTaskSpec } from "@/lib/taskGenerator";
+import { buildTaskTemplate } from "@/lib/taskTemplates";
+import { extractReferenceText, extractRequiredWords } from "@/lib/taskText";
 
 type PlacementTaskRouteContext = {
   params: Promise<{ id: string }>;
 };
-
-function inferReferenceText(prompt: string) {
-  const text = (prompt || "").trim();
-  if (!text) return "";
-  const quoted = text.match(/['"]([^'"]{3,260})['"]/);
-  if (quoted && quoted[1]) return quoted[1].trim();
-  const afterColon = text.split(":").slice(1).join(":").trim();
-  if (afterColon.length >= 3) return afterColon;
-  return text;
-}
-
-function inferTargetWords(prompt: string) {
-  const text = (prompt || "").trim();
-  const match = text.match(
-    /use\s+(?:these|those|the)\s+words(?:\s+in\s+(?:your\s+)?(?:short\s+)?(?:talk|answer))?\s*:?\s*([^.\n]+)/i
-  );
-  const source = match?.[1] || "";
-  if (!source) return [] as string[];
-  return source
-    .split(/,|\band\b/i)
-    .map((word) =>
-      word
-        .trim()
-        .toLowerCase()
-        .replace(/["'.!?;:()[\]{}]/g, "")
-    )
-    .filter((word) => /^[a-z][a-z'-]*$/.test(word))
-    .slice(0, 20);
-}
 
 export async function GET(_: Request, context: PlacementTaskRouteContext) {
   const { id } = await context.params;
@@ -86,7 +59,7 @@ export async function POST(_: Request, context: PlacementTaskRouteContext) {
     select: { ageBand: true },
   });
   const basePromptWords =
-    question.taskType === "target_vocab" ? inferTargetWords(question.prompt) : [];
+    question.taskType === "target_vocab" ? extractRequiredWords(question.prompt) : [];
   const generated = await generateTaskSpec({
     taskType: question.taskType,
     stage: question.stageBand,
@@ -97,18 +70,40 @@ export async function POST(_: Request, context: PlacementTaskRouteContext) {
     plannerReason: "Placement calibration step",
     primaryGoal: "placement_measurement",
   });
-  const prompt = generated.prompt || question.prompt;
+  let prompt = generated.prompt || question.prompt;
   const referenceText =
     question.taskType === "read_aloud"
-      ? inferReferenceText(prompt) || inferReferenceText(question.prompt)
+      ? extractReferenceText(prompt) || extractReferenceText(question.prompt)
+      : null;
+  if (question.taskType === "read_aloud" && !referenceText) {
+    prompt = buildTaskTemplate("read_aloud", {
+      stage: question.stageBand,
+      reason: "Placement calibration step",
+      focusSkills: [question.skillKey],
+    }).prompt;
+  }
+  const effectiveReferenceText =
+    question.taskType === "read_aloud"
+      ? extractReferenceText(prompt) || extractReferenceText(question.prompt)
       : null;
   const requiredWords =
     question.taskType === "target_vocab"
       ? (() => {
-          const fromPrompt = inferTargetWords(prompt);
+          const fromPrompt = extractRequiredWords(prompt);
           return fromPrompt.length > 0 ? fromPrompt : basePromptWords;
         })()
       : [];
+  const effectiveAssessmentMode = question.assessmentMode;
+  const effectiveConstraints = {
+    minSeconds: Math.max(5, Math.min(question.maxDurationSec, generated.constraints?.minSeconds || 8)),
+    maxSeconds: Math.max(
+      10,
+      Math.min(
+        question.maxDurationSec,
+        Math.max(generated.constraints?.maxSeconds || question.maxDurationSec, generated.constraints?.minSeconds || 8)
+      )
+    ),
+  };
   const task = await prisma.task.create({
     data: {
       type: question.taskType,
@@ -119,8 +114,9 @@ export async function POST(_: Request, context: PlacementTaskRouteContext) {
         placementItemId: question.id,
         placementSkillKey: question.skillKey,
         isPlacement: true,
-        supportsPronAssessment: question.assessmentMode === "pa",
-        referenceText,
+        supportsPronAssessment: effectiveAssessmentMode === "pa",
+        assessmentMode: effectiveAssessmentMode,
+        referenceText: effectiveReferenceText,
         requiredWords: requiredWords.length > 0 ? requiredWords : undefined,
         maxDurationSec: question.maxDurationSec,
         gseTargets: question.gseTargets,
@@ -138,12 +134,9 @@ export async function POST(_: Request, context: PlacementTaskRouteContext) {
     taskId: task.id,
     type: task.type,
     prompt: task.prompt,
-    assessmentMode: generated.assessmentMode || question.assessmentMode,
+    assessmentMode: effectiveAssessmentMode,
     maxDurationSec: question.maxDurationSec,
-    constraints: {
-      minSeconds: generated.constraints?.minSeconds || 8,
-      maxSeconds: Math.min(question.maxDurationSec, generated.constraints?.maxSeconds || question.maxDurationSec),
-    },
+    constraints: effectiveConstraints,
     placement: {
       itemId: question.id,
       skillKey: question.skillKey,

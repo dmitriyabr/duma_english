@@ -25,12 +25,14 @@ export async function POST(req: NextRequest) {
 
     const taskMeta = (task.metaJson || {}) as {
       supportsPronAssessment?: boolean;
+      assessmentMode?: "pa" | "stt";
       maxDurationSec?: number;
     };
+    const taskMode = taskMeta.assessmentMode === "pa" ? "pa" : "stt";
     const taskMaxDuration =
       typeof taskMeta.maxDurationSec === "number"
         ? taskMeta.maxDurationSec
-        : taskMeta.supportsPronAssessment
+        : taskMode === "pa" || taskMeta.supportsPronAssessment
         ? 30
         : 60;
 

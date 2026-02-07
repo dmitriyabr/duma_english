@@ -11,6 +11,7 @@ type Skill = {
   trend: "up" | "down" | "flat" | "insufficient";
   reliability: "high" | "medium" | "low";
   sampleCount: number;
+  source?: string;
 };
 
 type ProgressData = {
@@ -68,7 +69,7 @@ type ProgressData = {
     targetStage: string;
     ready: boolean;
     readinessScore: number;
-    coverageRatio: number;
+    coverageRatio: number | null;
     blockedByNodes: string[];
     blockedByNodeDescriptors?: string[];
   };
@@ -163,7 +164,8 @@ export default function ProgressPage() {
                       7d: {deltaLabel(skill.delta7)} | 28d: {deltaLabel(skill.delta28)}
                     </p>
                     <p className="subtitle">
-                      Trend: {skill.trend} | Reliability: {skill.reliability} | Samples: {skill.sampleCount}
+                      Trend: {skill.trend} | Reliability: {skill.reliability} | Samples: {skill.sampleCount} | Source:{" "}
+                      {skill.source || "gse-derived"}
                     </p>
                   </div>
                 ))}
@@ -221,7 +223,10 @@ export default function ProgressPage() {
                     <span>Promotion readiness</span>
                     <p className="subtitle">
                       {data.promotionReadiness.currentStage} → {data.promotionReadiness.targetStage} | Score:{" "}
-                      {data.promotionReadiness.readinessScore} | Coverage: {data.promotionReadiness.coverageRatio}%
+                      {data.promotionReadiness.readinessScore} | Coverage:{" "}
+                      {data.promotionReadiness.coverageRatio === null
+                        ? "n/a"
+                        : `${data.promotionReadiness.coverageRatio}%`}
                     </p>
                     <p className="subtitle">
                       Status: {data.promotionReadiness.ready ? "Ready" : "Blocked"}

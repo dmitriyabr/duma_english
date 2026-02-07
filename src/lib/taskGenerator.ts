@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { buildTaskTemplate } from "./taskTemplates";
+import { extractReferenceText, extractRequiredWords } from "./taskText";
 
 const generatedTaskSchema = z.object({
   task_type: z.string().min(2),
@@ -25,6 +26,7 @@ type GenerateTaskSpecInput = {
   focusSkills: string[];
   plannerReason: string;
   primaryGoal: string;
+  recentPrompts?: string[];
 };
 
 export type GeneratedTaskSpec = {
@@ -69,8 +71,9 @@ function fallbackTaskSpec(input: GenerateTaskSpecInput): GeneratedTaskSpec {
 }
 
 function coerceMode(value: unknown, taskType: string): "pa" | "stt" {
-  if (value === "pa" || value === "stt") return value;
-  return taskType === "read_aloud" ? "pa" : "stt";
+  if (taskType === "read_aloud") return "pa";
+  if (value === "stt") return "stt";
+  return "stt";
 }
 
 function coerceDifficulty(value: unknown, stage: string) {
@@ -103,6 +106,108 @@ function coerceStringArray(value: unknown) {
   return [];
 }
 
+function countWords(text: string) {
+  return text
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean).length;
+}
+
+function includesBannedPhrase(text: string) {
+  const normalized = text.toLowerCase().replace(/\s+/g, " ").trim();
+  const banned = [
+    "read this short story about a team playing a game",
+    "try to speak clearly and use good expression",
+  ];
+  return banned.some((phrase) => normalized.includes(phrase));
+}
+
+function normalizePromptText(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isTooSimilarPrompt(prompt: string, recentPrompts: string[]) {
+  const normalized = normalizePromptText(prompt);
+  if (!normalized) return false;
+  const tokens = new Set(normalized.split(" ").filter((v) => v.length > 2));
+  for (const previous of recentPrompts) {
+    const prev = normalizePromptText(previous);
+    if (!prev) continue;
+    if (prev === normalized) return true;
+    const prevTokens = new Set(prev.split(" ").filter((v) => v.length > 2));
+    if (prevTokens.size === 0 || tokens.size === 0) continue;
+    let intersect = 0;
+    for (const token of tokens) {
+      if (prevTokens.has(token)) intersect += 1;
+    }
+    const overlap = intersect / Math.max(tokens.size, prevTokens.size);
+    if (overlap >= 0.82) return true;
+  }
+  return false;
+}
+
+function taskTypeQualityGuidance(input: GenerateTaskSpecInput) {
+  if (input.taskType === "read_aloud") {
+    return [
+      "Task quality rules for read_aloud:",
+      "1) Instruction must contain one exact sentence in quotes.",
+      "2) That quoted sentence must be 6-14 words, everyday school/life English, A-level appropriate.",
+      "3) Do not use generic filler text like 'short story' or 'team playing a game'.",
+      "4) Format exactly: Read this aloud clearly: '...'.",
+    ];
+  }
+  if (input.taskType === "target_vocab") {
+    return [
+      "Task quality rules for target_vocab:",
+      "1) Include explicit word list in instruction.",
+      "2) Use at least 2 provided target words in that list.",
+      "3) Keep task concrete and child-friendly.",
+    ];
+  }
+  if (input.taskType === "speech_builder") {
+    return [
+      "Task quality rules for speech_builder:",
+      "1) Use child wording: topic, main idea, one example, clear ending.",
+      "2) Avoid method terms (hook, point, close).",
+    ];
+  }
+  return [
+    "Task quality rules:",
+    "1) Make instruction concrete, age-appropriate, and immediately actionable.",
+    "2) Avoid vague generic wording.",
+  ];
+}
+
+function validatePromptQuality(spec: GeneratedTaskSpec, input: GenerateTaskSpecInput) {
+  const prompt = (spec.prompt || "").trim();
+  if (!prompt) return { ok: false, reason: "empty_prompt" };
+  if (includesBannedPhrase(prompt)) return { ok: false, reason: "banned_generic_phrase" };
+  if (countWords(prompt) < 6) return { ok: false, reason: "prompt_too_short" };
+
+  if (input.taskType === "read_aloud") {
+    const reference = extractReferenceText(prompt);
+    if (!reference) return { ok: false, reason: "missing_reference_text" };
+    const words = countWords(reference);
+    if (words < 6 || words > 14) return { ok: false, reason: "bad_reference_length" };
+    if (/short story|team playing a game/i.test(reference)) {
+      return { ok: false, reason: "low_quality_reference_text" };
+    }
+  }
+
+  if (input.taskType === "target_vocab" && input.targetWords.length >= 2) {
+    const parsedWords = extractRequiredWords(prompt);
+    const provided = new Set(input.targetWords.map((w) => w.toLowerCase().trim()));
+    const overlap = parsedWords.filter((w) => provided.has(w)).length;
+    if (overlap < 2) return { ok: false, reason: "target_words_not_respected" };
+  }
+
+  return { ok: true, reason: null as string | null };
+}
+
 function normalizeGeneratedPayload(
   payload: unknown,
   input: GenerateTaskSpecInput,
@@ -110,7 +215,7 @@ function normalizeGeneratedPayload(
 ): GeneratedTaskSpec | null {
   if (!payload || typeof payload !== "object") return null;
   const row = payload as Record<string, unknown>;
-  const taskType = typeof row.task_type === "string" ? row.task_type : input.taskType;
+  const taskType = input.taskType;
   const instruction =
     typeof row.instruction === "string" && row.instruction.trim().length >= 20
       ? row.instruction.trim()
@@ -164,6 +269,11 @@ export async function generateTaskSpec(input: GenerateTaskSpecInput): Promise<Ge
     `Target node IDs: ${input.targetNodeIds.join(", ") || "none"}`,
     `Focus skills: ${input.focusSkills.join(", ") || "speaking"}`,
     `Planner reason: ${input.plannerReason}`,
+    `Avoid repeating recent prompts: ${(input.recentPrompts || []).slice(0, 5).join(" || ") || "none"}`,
+    input.taskType === "read_aloud"
+      ? "For read_aloud: instruction MUST include exact text to read in quotes, e.g. Read this aloud clearly: '...'."
+      : "For non-read_aloud: do not ask learner to read a reference sentence.",
+    ...taskTypeQualityGuidance(input),
   ].join("\n");
 
   try {
@@ -250,6 +360,25 @@ export async function generateTaskSpec(input: GenerateTaskSpecInput): Promise<Ge
       return {
         ...fallback,
         fallbackReason: "openai_invalid_payload",
+      };
+    }
+    if (normalized.taskType === "read_aloud" && !extractReferenceText(normalized.prompt)) {
+      return {
+        ...fallback,
+        fallbackReason: "openai_missing_read_aloud_reference",
+      };
+    }
+    if (isTooSimilarPrompt(normalized.prompt, input.recentPrompts || [])) {
+      return {
+        ...fallback,
+        fallbackReason: "openai_repeated_prompt",
+      };
+    }
+    const quality = validatePromptQuality(normalized, input);
+    if (!quality.ok) {
+      return {
+        ...fallback,
+        fallbackReason: `openai_low_quality_${quality.reason || "prompt"}`,
       };
     }
     const parsed = generatedTaskSchema.parse({

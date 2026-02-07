@@ -62,6 +62,7 @@ model Student {
   plannerDecisions PlannerDecisionLog[]
   taskInstances TaskInstance[]
   promotionAudits PromotionAudit[]
+  gseStageProjections GseStageProjection[]
 
   @@index([classId])
 }
@@ -148,6 +149,8 @@ model LearnerProfile {
   id                  String   @id @default(cuid())
   studentId           String   @unique
   stage               String   @default("A0")
+  stageSource         String   @default("gse_projection")
+  stageEvidenceJson   Json?
   ageBand             String   @default("9-11")
   placementScore      Float?
   placementConfidence Float?
@@ -398,6 +401,22 @@ model StudentGseMastery {
 
   @@unique([studentId, nodeId])
   @@index([studentId, masteryScore])
+}
+
+model GseStageProjection {
+  id          String   @id @default(cuid())
+  studentId   String
+  stage       String
+  stageScore  Float
+  confidence  Float
+  source      String
+  reason      String
+  evidenceJson Json?
+  createdAt   DateTime @default(now())
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([studentId, createdAt])
 }
 
 model PlannerDecisionLog {

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { SpeechMetrics } from "./scoring";
+import { extractReferenceText, extractRequiredWords } from "./taskText";
 
 export type RubricCheck = {
   name: string;
@@ -202,40 +203,8 @@ function clamp(value: number, min = 0, max = 100) {
   return Math.max(min, Math.min(max, value));
 }
 
-function inferReferenceText(taskPrompt: string) {
-  const prompt = (taskPrompt || "").trim();
-  if (!prompt) return "";
-  const quoted = prompt.match(/['"]([^'"]{3,260})['"]/);
-  if (quoted && quoted[1]) return quoted[1].trim();
-  const afterColon = prompt.split(":").slice(1).join(":").trim();
-  if (afterColon.length >= 3) {
-    return afterColon.replace(/^read\s+this\s+aloud\s+clearly[:\s-]*/i, "").trim();
-  }
-  return prompt.replace(/^read\s+this\s+aloud\s+clearly[:\s-]*/i, "").trim();
-}
-
-function inferRequiredWords(taskPrompt: string) {
-  const prompt = (taskPrompt || "").trim();
-  if (!prompt) return [] as string[];
-  const match = prompt.match(
-    /use\s+(?:these|those|the)\s+words(?:\s+in\s+(?:your\s+)?(?:short\s+)?(?:talk|answer))?\s*:?\s*([^.\n]+)/i
-  );
-  const source = match?.[1] || "";
-  if (!source) return [] as string[];
-  return source
-    .split(/,|\band\b/i)
-    .map((word) =>
-      word
-        .trim()
-        .toLowerCase()
-        .replace(/["'.!?;:()[\]{}]/g, "")
-    )
-    .filter((word) => /^[a-z][a-z'-]*$/.test(word))
-    .slice(0, 20);
-}
-
 function resolveRequiredWords(input: EvaluationInput) {
-  const fromPrompt = inferRequiredWords(input.taskPrompt);
+  const fromPrompt = extractRequiredWords(input.taskPrompt);
   const fromMeta = Array.isArray(input.taskMeta?.requiredWords)
     ? input.taskMeta.requiredWords
         .map((word) => String(word).toLowerCase().trim())
@@ -297,7 +266,7 @@ function buildFeedbackFromEvaluation(
 }
 
 function evaluateReadAloud(input: EvaluationInput): { taskEvaluation: TaskEvaluation; feedback: FeedbackResult } {
-  const referenceText = String(input.taskMeta?.referenceText || inferReferenceText(input.taskPrompt) || "");
+  const referenceText = String(input.taskMeta?.referenceText || extractReferenceText(input.taskPrompt) || "");
   const refWords = normalizeWords(referenceText);
   const saidWords = normalizeWords(input.transcript);
   const saidSet = new Set(saidWords);

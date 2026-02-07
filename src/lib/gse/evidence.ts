@@ -73,17 +73,27 @@ export async function persistAttemptGseEvidence(input: BuildAttemptEvidenceInput
 
   const words = mapTranscriptToWordSet(input.transcript);
   if (words.length > 0) {
-    const vocabNodes = await prisma.gseNode.findMany({
-      where: {
-        type: "GSE_VOCAB",
-        OR: [{ sourceKey: { in: words } }, { descriptor: { in: words } }],
-      },
-      select: { nodeId: true },
-      take: 30,
-    });
-    for (const node of vocabNodes) {
+    const [vocabNodes, aliasRows] = await Promise.all([
+      prisma.gseNode.findMany({
+        where: {
+          type: "GSE_VOCAB",
+          sourceKey: { in: words },
+        },
+        select: { nodeId: true },
+        take: 30,
+      }),
+      prisma.gseNodeAlias.findMany({
+        where: { alias: { in: words } },
+        select: { nodeId: true },
+        take: 30,
+      }),
+    ]);
+    const matchedNodeIds = Array.from(
+      new Set([...vocabNodes.map((row) => row.nodeId), ...aliasRows.map((row) => row.nodeId)])
+    );
+    for (const nodeId of matchedNodeIds) {
       created.push({
-        nodeId: node.nodeId,
+        nodeId,
         signalType: "vocab_match",
         confidence: Number((defaultConf * 0.9).toFixed(2)),
         impact: 0.3,

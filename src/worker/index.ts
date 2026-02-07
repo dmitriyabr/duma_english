@@ -180,17 +180,6 @@ async function updateStudentVocabularyFromAttempt(studentId: string, taskEvaluat
   }
 }
 
-function reliabilityRank(value: MetricReliability) {
-  if (value === "high") return 3;
-  if (value === "medium") return 2;
-  return 1;
-}
-
-function selectBestReliability(values: MetricReliability[]) {
-  if (!values.length) return "low" as MetricReliability;
-  return values.sort((a, b) => reliabilityRank(b) - reliabilityRank(a))[0];
-}
-
 function numeric(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
@@ -220,56 +209,6 @@ async function computeRecoveryTrigger(studentId: string) {
     confidences.length >= 3 && confidences[0] + 10 < (confidences[1] + confidences[2]) / 2;
 
   return lowTaskChain || confidenceDrop;
-}
-
-async function aggregateDailySkills(studentId: string, metrics: CanonicalMetric[], createdAt: Date) {
-  const bySkill: Record<string, CanonicalMetric[]> = {
-    pronunciation: metrics.filter((m) => m.metricKey === "pronunciation_target_ref" || m.metricKey === "pronunciation_self_ref"),
-    fluency: metrics.filter((m) => m.metricKey === "fluency"),
-    tempo_control: metrics.filter((m) => m.metricKey === "tempo_stability" || m.metricKey === "tempo_wpm"),
-    vocabulary: metrics.filter((m) => m.metricKey === "vocabulary_usage" || m.metricKey === "language_score"),
-    grammar: metrics.filter((m) => m.metricKey === "grammar_accuracy"),
-    task_completion: metrics.filter((m) => m.metricKey === "task_completion"),
-  };
-
-  const day = new Date(createdAt);
-  day.setHours(0, 0, 0, 0);
-
-  for (const [skillKey, records] of Object.entries(bySkill)) {
-    if (records.length === 0) continue;
-    const value = roundMetric(records.reduce((sum, item) => sum + item.value, 0) / records.length);
-    const reliability = selectBestReliability(records.map((record) => record.reliability));
-    const existing = await prisma.studentSkillDaily.findUnique({
-      where: { studentId_date_skillKey: { studentId, date: day, skillKey } },
-    });
-
-    if (!existing) {
-      await prisma.studentSkillDaily.create({
-        data: {
-          studentId,
-          date: day,
-          skillKey,
-          value,
-          sampleCount: 1,
-          reliability,
-        },
-      });
-      continue;
-    }
-
-    const nextCount = existing.sampleCount + 1;
-    const nextValue = roundMetric((existing.value * existing.sampleCount + value) / nextCount);
-    await prisma.studentSkillDaily.update({
-      where: { id: existing.id },
-      data: {
-        value: nextValue,
-        sampleCount: nextCount,
-        reliability: selectBestReliability([existing.reliability as MetricReliability, reliability]),
-      },
-    });
-  }
-
-  console.log(JSON.stringify({ event: "progress_aggregated", studentId }));
 }
 
 async function updatePlacementFromAttempt(params: {
@@ -495,7 +434,6 @@ async function processAttempt(attemptId: string) {
         data: { placementFresh: false },
       });
     }
-    await aggregateDailySkills(attempt.studentId, canonicalMetrics, attempt.createdAt);
     await recomputeMastery(attempt.studentId);
 
     const dayKey = new Date();

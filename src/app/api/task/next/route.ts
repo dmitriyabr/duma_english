@@ -10,25 +10,8 @@ import {
   planNextTaskDecision,
 } from "@/lib/gse/planner";
 import { generateTaskSpec } from "@/lib/taskGenerator";
-
-function inferTargetWordsFromPrompt(prompt: string) {
-  const text = (prompt || "").trim();
-  const match = text.match(
-    /use\s+(?:these|those|the)\s+words(?:\s+in\s+(?:your\s+)?(?:short\s+)?(?:talk|answer))?\s*:?\s*([^.\n]+)/i
-  );
-  const source = match?.[1] || "";
-  if (!source) return [] as string[];
-  return source
-    .split(/,|\band\b/i)
-    .map((word) =>
-      word
-        .trim()
-        .toLowerCase()
-        .replace(/["'.!?;:()[\]{}]/g, "")
-    )
-    .filter((word) => /^[a-z][a-z'-]*$/.test(word))
-    .slice(0, 20);
-}
+import { buildTaskTemplate } from "@/lib/taskTemplates";
+import { extractReferenceText, extractRequiredWords } from "@/lib/taskText";
 
 export async function GET(req: Request) {
   const student = await getStudentFromRequest();
@@ -51,29 +34,72 @@ export async function GET(req: Request) {
     studentId: student.studentId,
     requestedType,
   });
+  const primaryRecommendedType = learningPlan.recommendedTaskTypes[0] || "topic_talk";
+  const candidateTaskTypes = [
+    requestedType && requestedType.length > 0 ? requestedType : primaryRecommendedType,
+  ];
   const plannerStartedAt = Date.now();
   const decision = await planNextTaskDecision({
     studentId: student.studentId,
     stage: learningPlan.currentStage,
     ageBand: learningPlan.ageBand,
-    candidateTaskTypes: learningPlan.recommendedTaskTypes,
+    candidateTaskTypes,
     requestedType,
     preferredNodeIds: profile?.placementFresh ? placementUncertainNodes : undefined,
   });
+  const recentTaskInstances = await prisma.taskInstance.findMany({
+    where: { studentId: student.studentId },
+    include: { task: { select: { prompt: true } } },
+    orderBy: { createdAt: "desc" },
+    take: 5,
+  });
+  const recentPrompts = recentTaskInstances
+    .map((item) => item.task?.prompt || "")
+    .filter((value) => value.length > 0);
   const generated = await generateTaskSpec({
     taskType: decision.chosenTaskType,
     stage: learningPlan.currentStage,
     ageBand: learningPlan.ageBand,
-    targetWords: learningPlan.targetWords,
+    targetWords: decision.chosenTaskType === "target_vocab" ? learningPlan.targetWords : [],
     targetNodeIds: decision.targetNodeIds,
     focusSkills: learningPlan.weakestSkills,
     plannerReason: learningPlan.nextTaskReason,
     primaryGoal: decision.primaryGoal,
+    recentPrompts,
   });
 
-  const selectedTaskType = generated.taskType || decision.chosenTaskType;
-  const promptTargetWords =
-    selectedTaskType === "target_vocab" ? inferTargetWordsFromPrompt(generated.prompt) : [];
+  const selectedTaskType = decision.chosenTaskType;
+  const effectiveAssessmentMode: "pa" | "stt" = selectedTaskType === "read_aloud" ? "pa" : "stt";
+  const durationCap = effectiveAssessmentMode === "pa" ? 30 : 60;
+  const effectiveMaxDurationSec = Math.max(10, Math.min(durationCap, generated.maxDurationSec));
+  const effectiveConstraints = {
+    minSeconds: Math.max(5, Math.min(effectiveMaxDurationSec, generated.constraints.minSeconds)),
+    maxSeconds: Math.max(
+      10,
+      Math.min(effectiveMaxDurationSec, Math.max(generated.constraints.maxSeconds, generated.constraints.minSeconds))
+    ),
+  };
+  let prompt = generated.prompt;
+  let promptTargetWords = selectedTaskType === "target_vocab" ? extractRequiredWords(prompt) : [];
+  if (selectedTaskType === "target_vocab" && promptTargetWords.length < 2) {
+    const fallbackWords = learningPlan.targetWords.slice(0, 6);
+    if (fallbackWords.length >= 2) {
+      prompt = `Use these words in a short talk: ${fallbackWords.join(", ")}.`;
+      promptTargetWords = fallbackWords;
+    }
+  }
+  const referenceText =
+    selectedTaskType === "read_aloud" ? extractReferenceText(prompt || generated.prompt) : null;
+  if (selectedTaskType === "read_aloud" && !referenceText) {
+    const fallbackReadAloud = buildTaskTemplate("read_aloud", {
+      stage: learningPlan.currentStage,
+      reason: learningPlan.nextTaskReason,
+      focusSkills: learningPlan.weakestSkills,
+    });
+    prompt = fallbackReadAloud.prompt;
+  }
+  const effectiveReferenceText =
+    selectedTaskType === "read_aloud" ? extractReferenceText(prompt || generated.prompt) : null;
   const taskMeta: Record<string, unknown> = {
     stage: learningPlan.currentStage,
     plannerReason: learningPlan.nextTaskReason,
@@ -81,20 +107,20 @@ export async function GET(req: Request) {
     requiredWords:
       selectedTaskType === "target_vocab"
         ? (promptTargetWords.length > 0 ? promptTargetWords : learningPlan.targetWords)
-        : learningPlan.targetWords,
+        : undefined,
     expectedArtifacts: generated.expectedArtifacts,
     scoringHooks: generated.scoringHooks,
     supportsPronAssessment: selectedTaskType === "read_aloud",
+    assessmentMode: effectiveAssessmentMode,
+    maxDurationSec: effectiveMaxDurationSec,
   };
-  if (selectedTaskType === "read_aloud") {
-    taskMeta.referenceText = generated.prompt
-      .replace(/^Read this aloud clearly:\s*/i, "")
-      .replace(/['"]/g, "");
+  if (effectiveReferenceText) {
+    taskMeta.referenceText = effectiveReferenceText;
   }
   const task = await prisma.task.create({
     data: {
       type: selectedTaskType,
-      prompt: generated.prompt,
+      prompt,
       level: Math.max(1, Math.round((generated.estimatedDifficulty || decision.estimatedDifficulty) / 20)),
       metaJson: taskMeta as Prisma.InputJsonValue,
     },
@@ -107,6 +133,12 @@ export async function GET(req: Request) {
     studentId: student.studentId,
     preferredNodeIds: generated.targetNodes.length > 0 ? generated.targetNodes : decision.targetNodeIds,
   });
+  if (gseSelection.targetNodeIds.length === 0) {
+    return NextResponse.json(
+      { error: "Planner could not resolve target GSE nodes for this task." },
+      { status: 503 }
+    );
+  }
   await createTaskInstance({
     studentId: student.studentId,
     taskId: task.id,
@@ -115,10 +147,10 @@ export async function GET(req: Request) {
     targetNodeIds: gseSelection.targetNodeIds,
     specJson: {
       taskType: selectedTaskType,
-      prompt: generated.prompt,
-      constraints: generated.constraints,
-      maxDurationSec: generated.maxDurationSec,
-      assessmentMode: generated.assessmentMode,
+      prompt,
+      constraints: effectiveConstraints,
+      maxDurationSec: effectiveMaxDurationSec,
+      assessmentMode: effectiveAssessmentMode,
       expectedArtifacts: generated.expectedArtifacts,
       scoringHooks: generated.scoringHooks,
       estimatedDifficulty: generated.estimatedDifficulty,
@@ -138,9 +170,9 @@ export async function GET(req: Request) {
     taskId: task.id,
     type: task.type,
     prompt: task.prompt,
-    assessmentMode: generated.assessmentMode,
-    maxDurationSec: generated.maxDurationSec,
-    constraints: generated.constraints,
+    assessmentMode: effectiveAssessmentMode,
+    maxDurationSec: effectiveMaxDurationSec,
+    constraints: effectiveConstraints,
     stage: learningPlan.currentStage,
     ageBand: learningPlan.ageBand,
     reason: learningPlan.nextTaskReason,

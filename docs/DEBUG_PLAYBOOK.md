@@ -22,14 +22,25 @@ Check:
 3. activation state moved (`observed` or `candidate_for_verification`).
 4. planner scheduled verification tasks.
 
-## C) Why stage did not move
+## C) Why semantic LO/Grammar incidental did not appear
+Check:
+1. `OPENAI_API_KEY` is set and `GSE_SEMANTIC_ENABLED=true`.
+2. `GseNodeEmbedding` has vectors for `GSE_LO` and `GSE_GRAMMAR` candidates.
+3. Evaluation produced LO/grammar checks (see `Attempt.taskEvaluationJson.loChecks` / `.grammarChecks`).
+4. confidence threshold was met (`GSE_SEMANTIC_CONF_THRESHOLD`, default `0.68`).
+5. matched node was not already targeted in `TaskGseTarget`.
+
+Debugging tip:
+- Enable local pipeline log: set `PIPELINE_DEBUG_LOG_ENABLED=true` and inspect `tmp/pipeline-debug.ndjson` for `semantic_parser_*`, `semantic_retrieval_*`, `evaluation_*` events.
+
+## D) Why stage did not move
 Check:
 1. `promotionStage` blockers (bundle/node labels).
 2. verified coverage by domain.
 3. reliability and stability gates.
 4. direct evidence counts.
 
-## D) Task generator: why prompt sent “garbage” (raw node IDs)
+## E) Task generator: why prompt sent “garbage” (raw node IDs)
 The task generator LLM used to receive only raw GSE node IDs (e.g. `gse:gse_grammar_glgr:...`), which are meaningless to the model. Now:
 - Planner returns **targetNodeDescriptors** (human-readable learning objectives) together with targetNodeIds.
 - The prompt sent to the LLM uses **Target learning objectives** (numbered list of descriptors) and asks to copy the given IDs into `target_nodes` in the JSON. So the model designs the task from the objectives, not from opaque IDs.
@@ -37,7 +48,7 @@ The task generator LLM used to receive only raw GSE node IDs (e.g. `gse:gse_gram
 
 If you still see bad prompts in LangSmith, check that `decision.targetNodeDescriptors` is passed into `generateTaskSpec` as `targetNodeLabels` (see `GET /api/task/next`).
 
-## E) Debugging LLM prompts (LangSmith)
+## F) Debugging LLM prompts (LangSmith)
 All OpenAI calls (evaluator + task generator) go through LangChain. To trace prompts and responses:
 
 1. Get an API key at https://smith.langchain.com (sign up free).
@@ -51,7 +62,7 @@ All OpenAI calls (evaluator + task generator) go through LangChain. To trace pro
 
 Without these env vars, the app works as before; tracing is off.
 
-## F) Mandatory checks before saying “fixed”
+## G) Mandatory checks before saying “fixed”
 1. `npm test`
 2. `npm run lint`
 3. `npm run build`

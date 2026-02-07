@@ -4,7 +4,7 @@ Web MVP for an AI speaking trainer: student login via class code, record speech,
 
 ## Quick start
 
-1. Copy `.env.example` to `.env` and fill values.
+1. Create `.env` (see required vars below).
 2. Install dependencies: `npm install`
 3. Generate Prisma client: `npx prisma generate`
 4. Run migrations (first time): `npx prisma migrate dev --name init`
@@ -45,9 +45,43 @@ Admin endpoints are protected by basic auth.
   - `AZURE_SPEECH_ENDPOINT`
   - `AZURE_SPEECH_REGION`
 
+## Semantic LO/Grammar (Incidental Evidence)
+
+The worker can detect and score incidental `GSE_LO` and `GSE_GRAMMAR` nodes from a student's transcript using:
+
+1. Parser LLM: extracts communicative intents + grammar patterns.
+2. Embedding retrieval: ranks candidate nodes within stage/audience window.
+3. Evaluation LLM: receives only the shortlisted LO/grammar options and produces structured `loChecks` / `grammarChecks` used by the evidence pipeline.
+
+This is optional and is disabled if `OPENAI_API_KEY` is not set.
+
+### Target nodes (explicit tasks)
+
+Each task has `TaskGseTarget` rows (node targets selected by the planner). The worker passes these targets into evaluation so the model:
+- always evaluates the explicit target nodes for the task (not only incidental nodes),
+- marks target grammar checks as `opportunityType=explicit_target`.
+
+### Embeddings backfill
+
+Embeddings are cached in Postgres (`GseNodeEmbedding`). For production-like usage, run a backfill after importing/updating the GSE catalog:
+
+`npm run gse:embeddings:backfill -- --all`
+
+### Env vars
+
+- Required to enable semantic pipeline:
+  - `OPENAI_API_KEY`
+- Optional controls:
+  - `GSE_SEMANTIC_ENABLED` (default: `true`)
+  - `GSE_SEMANTIC_CONF_THRESHOLD` (default: `0.68`)
+  - `GSE_SEMANTIC_MAX_CANDIDATES` (default: `24`)
+  - `GSE_EMBEDDING_MODEL` (default: `text-embedding-3-small`)
+  - `GSE_PARSER_MODEL` (default: `OPENAI_MODEL` or `gpt-4.1-mini`)
+  - `GSE_ASSESSOR_MODEL` (default: `OPENAI_MODEL` or `gpt-4.1-mini`)
+
 ## Brain docs (current truth)
 
-- `/Users/skyeng/Desktop/duma_english/TASKS.MD`
-- `/Users/skyeng/Desktop/duma_english/docs/BRAIN_RUNTIME.md`
-- `/Users/skyeng/Desktop/duma_english/docs/BRAIN_ROADMAP.md`
-- `/Users/skyeng/Desktop/duma_english/docs/DEBUG_PLAYBOOK.md`
+- `TASKS.md`
+- `docs/BRAIN_RUNTIME.md`
+- `docs/BRAIN_ROADMAP.md`
+- `docs/DEBUG_PLAYBOOK.md`

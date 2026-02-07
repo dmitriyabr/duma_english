@@ -1,9 +1,9 @@
 import { z } from "zod";
 import { SpeechMetrics } from "./scoring";
 import { extractReferenceText, extractRequiredWords } from "./taskText";
-import { prisma } from "./db";
-import { mapStageToGseRange } from "./gse/utils";
 import { chatJson } from "./llm";
+import { buildSemanticEvaluationContext } from "./gse/semanticAssessor";
+import { appendPipelineDebugEvent, previewText } from "./pipelineDebugLog";
 
 export type RubricCheck = {
   name: string;
@@ -72,12 +72,24 @@ export type EvaluationDebugInfo = {
 };
 
 export type EvaluationInput = {
+  taskId?: string;
   taskType: string;
   taskPrompt: string;
   transcript: string;
   speechMetrics: SpeechMetrics;
   constraints?: { minSeconds?: number; maxSeconds?: number } | null;
   taskMeta?: Record<string, unknown> | null;
+  taskTargets?: Array<{
+    nodeId: string;
+    weight: number;
+    required: boolean;
+    node: {
+      nodeId: string;
+      type: "GSE_LO" | "GSE_VOCAB" | "GSE_GRAMMAR";
+      sourceKey: string;
+      descriptor: string;
+    };
+  }>;
 };
 
 const MODEL_VERSION = "eval-v2";
@@ -316,7 +328,7 @@ function deriveLoChecks(taskEvaluation: TaskEvaluation, transcript: string): LoC
   return fallback.slice(0, 8);
 }
 
-function deriveGrammarChecks(taskEvaluation: TaskEvaluation, _transcript: string): GrammarCheck[] {
+function deriveGrammarChecks(taskEvaluation: TaskEvaluation): GrammarCheck[] {
   const fromModel = Array.isArray(taskEvaluation.grammarChecks) ? taskEvaluation.grammarChecks : [];
   if (fromModel.length > 0) return fromModel.slice(0, 10);
   // Grammar node updates are model-driven only.
@@ -327,7 +339,7 @@ function attachStructuredChecks(taskEvaluation: TaskEvaluation, transcript: stri
   return {
     ...taskEvaluation,
     loChecks: deriveLoChecks(taskEvaluation, transcript),
-    grammarChecks: deriveGrammarChecks(taskEvaluation, transcript),
+    grammarChecks: deriveGrammarChecks(taskEvaluation),
   };
 }
 
@@ -893,151 +905,6 @@ function buildTaskSpecificPrompt(taskType: string) {
   return rubricMap[taskType] || rubricMap.topic_talk;
 }
 
-function buildTaskTypeJsonExample(taskType: string) {
-  if (taskType === "read_aloud") {
-    return {
-      taskEvaluation: {
-        taskType: "read_aloud",
-        taskScore: 86,
-        languageScore: 82,
-        artifacts: {
-          referenceCoverage: 96,
-          omittedWords: ["because"],
-          insertedWords: [],
-          mispronouncedHotspots: ["learn"],
-        },
-        rubricChecks: [
-          { name: "reference_coverage", pass: true, reason: "Most target words were read.", weight: 0.4 },
-          { name: "pronunciation_accuracy", pass: false, reason: "One key word was unclear.", weight: 0.35 },
-          { name: "reading_fluency", pass: true, reason: "Pace was mostly smooth.", weight: 0.25 },
-        ],
-        loChecks: [
-          {
-            checkId: "reading_accuracy",
-            label: "Reading accuracy",
-            pass: false,
-            confidence: 0.82,
-            severity: "medium",
-            evidenceSpan: "One key word was unclear.",
-          },
-        ],
-        grammarChecks: [
-          {
-            checkId: "grammar_incidental_usage",
-            descriptorId: "55af74fed6c1560c41c6a2e6",
-            label: "Grammar in context",
-            pass: true,
-            confidence: 0.66,
-            opportunityType: "incidental",
-          },
-        ],
-        evidence: ["I like going to school because I learn new things."],
-        modelVersion: "eval-v2+openai",
-      },
-      feedback: {
-        summary: "Good reading with one pronunciation point to fix.",
-        whatWentWell: ["You kept the sentence complete.", "Your pace was steady."],
-        whatToFixNow: ["Say 'learn' more clearly."],
-        exampleBetterAnswer: "I like going to school because I learn new things.",
-        nextMicroTask: "Read the sentence once more and stress 'learn' clearly.",
-      },
-    };
-  }
-  if (taskType === "target_vocab") {
-    return {
-      taskEvaluation: {
-        taskType: "target_vocab",
-        taskScore: 78,
-        languageScore: 75,
-        artifacts: {
-          requiredWordsUsed: ["happy", "learn", "friend"],
-          missingWords: ["share"],
-          wordUsageCorrectness: 84,
-          inflectedFormsAccepted: [],
-        },
-        rubricChecks: [
-          { name: "required_words_usage", pass: false, reason: "One required word is missing.", weight: 0.6 },
-          { name: "context_fit", pass: true, reason: "Used words fit the topic.", weight: 0.4 },
-        ],
-        loChecks: [
-          {
-            checkId: "required_words_usage",
-            label: "Required words usage",
-            pass: false,
-            confidence: 0.88,
-            severity: "high",
-          },
-        ],
-        grammarChecks: [
-          {
-            checkId: "grammar_incidental_usage",
-            descriptorId: "55af74fed6c1560c41c6a2e6",
-            label: "Grammar in context",
-            pass: true,
-            confidence: 0.64,
-            opportunityType: "incidental",
-          },
-        ],
-        evidence: ["I feel happy when I learn with my friend."],
-        modelVersion: "eval-v2+openai",
-      },
-      feedback: {
-        summary: "Nice vocabulary use. Add the last required word next time.",
-        whatWentWell: ["You used most target words correctly."],
-        whatToFixNow: ["Include the missing word 'share' in your answer."],
-        exampleBetterAnswer: "I feel happy when I learn and share ideas with my friend.",
-        nextMicroTask: "Retry with all required words in one short answer.",
-      },
-    };
-  }
-  return {
-    taskEvaluation: {
-      taskType,
-      taskScore: 74,
-      languageScore: 72,
-      artifacts: {
-        mainPointDetected: true,
-        supportingDetailCount: 1,
-        offTopicRatio: 0.1,
-        coherenceSignals: ["because", "so"],
-      },
-      rubricChecks: [
-        { name: "task_alignment", pass: true, reason: "Main point is relevant.", weight: 0.5 },
-        { name: "supporting_detail", pass: false, reason: "Needs one more concrete detail.", weight: 0.3 },
-        { name: "clarity", pass: true, reason: "Message is understandable.", weight: 0.2 },
-      ],
-      loChecks: [
-        {
-          checkId: "task_alignment",
-          label: "Task alignment",
-          pass: true,
-          confidence: 0.78,
-          severity: "low",
-        },
-      ],
-      grammarChecks: [
-        {
-          checkId: "grammar_incidental_usage",
-          descriptorId: "55af74fed6c1560c41c6a2e6",
-          label: "Grammar in context",
-          pass: true,
-          confidence: 0.62,
-          opportunityType: "incidental",
-        },
-      ],
-      evidence: ["I like school because I learn new things."],
-      modelVersion: "eval-v2+openai",
-    },
-    feedback: {
-      summary: "Good start. Add one stronger detail.",
-      whatWentWell: ["You stayed on topic."],
-      whatToFixNow: ["Give one extra specific example."],
-      exampleBetterAnswer: "I like school because I learn new things, especially science experiments.",
-      nextMicroTask: "Retry and add one concrete example.",
-    },
-  };
-}
-
 function buildOpenAIInput(input: EvaluationInput) {
   const transcript = (input.transcript || "").slice(0, 900);
   const taskPrompt = (input.taskPrompt || "").slice(0, 260);
@@ -1068,43 +935,6 @@ function buildOpenAIInput(input: EvaluationInput) {
       prosody: input.speechMetrics.prosody,
     },
   };
-}
-
-type GrammarDescriptorOption = {
-  descriptorId: string;
-  descriptor: string;
-};
-
-async function loadGrammarDescriptorOptions(input: EvaluationInput): Promise<GrammarDescriptorOption[]> {
-  const stageRaw =
-    typeof input.taskMeta?.stage === "string" && input.taskMeta.stage.trim().length > 0
-      ? input.taskMeta.stage
-      : "A2";
-  const stageRange = mapStageToGseRange(stageRaw);
-  const rows = await prisma.gseNode.findMany({
-    where: {
-      type: "GSE_GRAMMAR",
-      gseCenter: { gte: stageRange.min - 12, lte: stageRange.max + 12 },
-      descriptor: { notIn: ["", "No grammar descriptor available."] },
-    },
-    select: {
-      sourceKey: true,
-      descriptor: true,
-    },
-    orderBy: [{ gseCenter: "asc" }],
-    take: 80,
-  });
-
-  const deduped = new Map<string, GrammarDescriptorOption>();
-  for (const row of rows) {
-    const descriptorId = row.sourceKey?.trim();
-    const descriptor = row.descriptor?.trim();
-    if (!descriptorId || !descriptor) continue;
-    if (!deduped.has(descriptorId)) {
-      deduped.set(descriptorId, { descriptorId, descriptor });
-    }
-  }
-  return Array.from(deduped.values());
 }
 
 function parseMaybeJson(content: string) {
@@ -1152,16 +982,120 @@ async function evaluateWithOpenAI(input: EvaluationInput) {
   }
 
   const compactInput = buildOpenAIInput(input);
-  const grammarOptions = await loadGrammarDescriptorOptions(input);
+  const stageRaw =
+    typeof input.taskMeta?.stage === "string" && input.taskMeta.stage.trim().length > 0
+      ? input.taskMeta.stage
+      : "A2";
+  const ageBandRaw =
+    typeof input.taskMeta?.ageBand === "string" && input.taskMeta.ageBand.trim().length > 0
+      ? input.taskMeta.ageBand
+      : null;
+  const semanticContext = await buildSemanticEvaluationContext({
+    transcript: input.transcript,
+    taskPrompt: input.taskPrompt,
+    taskType: input.taskType,
+    stage: stageRaw,
+    ageBand: ageBandRaw,
+  });
+
+  const taskTargets = Array.isArray(input.taskTargets) ? input.taskTargets : [];
+  const targetLoOptions = taskTargets
+    .filter((t) => t?.node?.type === "GSE_LO" && typeof t.nodeId === "string" && typeof t.node?.descriptor === "string")
+    .slice(0, 6)
+    .map((t) => ({ nodeId: t.nodeId, label: t.node.descriptor.slice(0, 140), required: Boolean(t.required) }));
+  const targetGrammarOptions = taskTargets
+    .filter(
+      (t) =>
+        t?.node?.type === "GSE_GRAMMAR" &&
+        typeof t.node?.sourceKey === "string" &&
+        typeof t.node?.descriptor === "string"
+    )
+    .slice(0, 6)
+    .map((t) => ({
+      descriptorId: t.node.sourceKey,
+      label: t.node.descriptor.slice(0, 140),
+      required: Boolean(t.required),
+    }));
+  const targetOtherNodes = taskTargets
+    .filter((t) => t?.node?.type !== "GSE_LO" && t?.node?.type !== "GSE_GRAMMAR")
+    .slice(0, 6)
+    .map((t) => ({
+      nodeId: String(t.nodeId || t.node?.nodeId || ""),
+      type: String(t.node?.type || ""),
+      label: String(t.node?.descriptor || "").slice(0, 140),
+      required: Boolean((t as { required?: unknown }).required),
+    }))
+    .filter((t) => t.nodeId && t.type && t.label);
+  const loOptions = semanticContext.loCandidates.slice(0, 6).map((item) => ({
+    nodeId: item.nodeId,
+    label: item.descriptor.slice(0, 140),
+  }));
+  const grammarOptions = semanticContext.grammarCandidates.slice(0, 8).map((item) => ({
+    descriptorId: item.sourceKey,
+    label: item.descriptor.slice(0, 140),
+  }));
+  const retrievalTracePayload = {
+    stage: stageRaw,
+    ageBand: ageBandRaw,
+    disabledReason: semanticContext.disabledReason || null,
+    loCandidateCount: loOptions.length,
+    grammarCandidateCount: grammarOptions.length,
+    loCandidates: loOptions,
+    grammarCandidates: grammarOptions,
+  };
+  console.log(
+    JSON.stringify({
+      event: "semantic_retrieval_candidates",
+      stage: stageRaw,
+      ageBand: ageBandRaw,
+      disabledReason: semanticContext.disabledReason || null,
+      loCandidateCount: loOptions.length,
+      grammarCandidateCount: grammarOptions.length,
+      loTop: loOptions.slice(0, 3),
+      grammarTop: grammarOptions.slice(0, 3),
+    })
+  );
+  await appendPipelineDebugEvent({
+    event: "evaluation_prompt_inputs",
+    taskType: input.taskType,
+    stage: stageRaw,
+    ageBand: ageBandRaw,
+    taskPromptPreview: previewText(input.taskPrompt, 260),
+    transcriptPreview: previewText(input.transcript, 600),
+    semanticRetrieval: retrievalTracePayload,
+    taskTargets: {
+      lo: targetLoOptions,
+      grammar: targetGrammarOptions,
+      other: targetOtherNodes,
+    },
+    compactInput,
+  });
   const prompt = [
     "Evaluate this child speaking attempt.",
-    "Return ONLY valid JSON object matching schema.",
-    "Hard type rules: taskScore:number, languageScore:number|null, rubricChecks[].pass:boolean, rubricChecks[].weight:number.",
-    "Do not output 'pass'/'fail' strings for numeric fields.",
-    "Do not invent speech metrics; use only provided speechMetrics fields.",
-    "For each grammarChecks item, include descriptorId from grammarDescriptorOptions exactly. If unsure, omit that grammar check.",
+    "Return one JSON object only. No markdown.",
+    "Use only provided speechMetrics and descriptor options.",
+    "Use boolean for pass fields and numbers for score/weight/confidence.",
+    "Scores must be 0..100 (not 0..10). Prefer integers.",
+    "Do not invent IDs: loChecks.checkId must be nodeId from loDescriptorOptions; grammarChecks.descriptorId must be from grammarDescriptorOptions.",
+    "If target descriptor options are provided, you MUST include checks for them (pass true/false).",
+    "For target grammar checks, set opportunityType=explicit_target.",
+    "Keep at most 4 loChecks and 6 grammarChecks total.",
+    "rubricChecks must have at least 2 items; each weight is 0..1 and total weight should be close to 1.",
+    "Output shape: {taskEvaluation:{taskType,taskScore,languageScore,artifacts,rubricChecks,loChecks,grammarChecks,evidence,modelVersion},feedback:{summary,whatWentWell,whatToFixNow,exampleBetterAnswer,nextMicroTask}}",
     buildTaskSpecificPrompt(input.taskType),
-    `Task-type example JSON: ${JSON.stringify(buildTaskTypeJsonExample(input.taskType))}`,
+    `Semantic retrieval status: ${JSON.stringify({
+      disabledReason: semanticContext.disabledReason || null,
+      loCandidateCount: loOptions.length,
+      grammarCandidateCount: grammarOptions.length,
+    })}`,
+    `Target LO descriptor options (nodeId + label): ${JSON.stringify(
+      targetLoOptions.map(({ nodeId, label }) => ({ nodeId, label }))
+    )}`,
+    `Target Grammar descriptor options (descriptorId + label): ${JSON.stringify(
+      targetGrammarOptions.map(({ descriptorId, label }) => ({ descriptorId, label }))
+    )}`,
+    `Other target nodes (not LO/grammar): ${JSON.stringify(targetOtherNodes)}`,
+    `LO descriptor options (nodeId + label): ${JSON.stringify(loOptions)}`,
     `Grammar descriptor options (descriptorId + descriptor): ${JSON.stringify(grammarOptions)}`,
     `Input JSON: ${JSON.stringify(compactInput)}`,
   ].join("\n");
@@ -1178,6 +1112,18 @@ async function evaluateWithOpenAI(input: EvaluationInput) {
         model,
         temperature: 0,
         maxTokens: 700,
+        runName: "gse_evaluation",
+        tags: ["gse", "evaluation"],
+        metadata: {
+          pipeline: "evaluation",
+          taskType: input.taskType,
+          semanticRetrieval: retrievalTracePayload,
+          taskTargets: {
+            lo: targetLoOptions.map(({ nodeId }) => nodeId),
+            grammar: targetGrammarOptions.map(({ descriptorId }) => descriptorId),
+            other: targetOtherNodes.map(({ nodeId }) => nodeId),
+          },
+        },
       });
     } catch (err) {
       const status = (err as { status?: number }).status;
@@ -1204,6 +1150,14 @@ async function evaluateWithOpenAI(input: EvaluationInput) {
       const normalized = normalizeModelPayload(raw, input);
       if (!normalized) throw new Error("normalized payload is invalid");
       const parsed = outputSchema.parse(normalized);
+      await appendPipelineDebugEvent({
+        event: "evaluation_model_output",
+        taskType: input.taskType,
+        model,
+        try: i + 1,
+        responsePreview: content.slice(0, 800),
+        parsed: parsed.taskEvaluation,
+      });
       attempts.push({
         try: i + 1,
         status: 200,
@@ -1223,6 +1177,14 @@ async function evaluateWithOpenAI(input: EvaluationInput) {
         },
       };
     } catch (error) {
+      await appendPipelineDebugEvent({
+        event: "evaluation_model_parse_fail",
+        taskType: input.taskType,
+        model,
+        try: i + 1,
+        errorMessage: error instanceof Error ? error.message.slice(0, 400) : String(error).slice(0, 400),
+        responsePreview: content.slice(0, 800),
+      });
       attempts.push({
         try: i + 1,
         status: 200,

@@ -25,6 +25,7 @@ type TaskEvaluation = {
   rubricChecks?: Array<{ name?: string; pass?: boolean; weight?: number; reason?: string }>;
   loChecks?: Array<{
     checkId?: string;
+    nodeId?: string;
     label?: string;
     pass?: boolean;
     confidence?: number;
@@ -352,6 +353,7 @@ function normalizedLoChecks(taskEvaluation: TaskEvaluation) {
   if (fromModel.length > 0) {
     return fromModel.map((check, index) => ({
       checkId: String(check.checkId || `lo_${index + 1}`),
+      nodeId: check.nodeId ? String(check.nodeId) : (check.checkId ? String(check.checkId) : undefined),
       label: String(check.label || `LO check ${index + 1}`),
       pass: Boolean(check.pass),
       confidence: clamp01(typeof check.confidence === "number" ? check.confidence : 0.72),
@@ -362,6 +364,7 @@ function normalizedLoChecks(taskEvaluation: TaskEvaluation) {
   const fallbackRubric = Array.isArray(taskEvaluation.rubricChecks) ? taskEvaluation.rubricChecks : [];
   return fallbackRubric.map((check, index) => ({
     checkId: `rubric_${index + 1}`,
+    nodeId: undefined,
     label: String(check.name || `rubric_${index + 1}`),
     pass: Boolean(check.pass),
     confidence: clamp01(0.6 + (typeof check.weight === "number" ? check.weight : 0.2) * 0.35),
@@ -866,6 +869,56 @@ export async function persistAttemptGseEvidence(input: BuildAttemptEvidenceInput
       );
       usedGrammarNodeIds.add(best.nodeId);
       grammarAdded += 1;
+    }
+  }
+
+  const loChecksForIncidental = normalizedLoChecks(input.taskEvaluation).filter((check) => check.confidence >= 0.66);
+  const loNodeIdCandidates = uniqueStrings(
+    loChecksForIncidental
+      .map((check) => check.nodeId || check.checkId)
+      .filter((value) => typeof value === "string" && value.startsWith("gse:"))
+  ).slice(0, 24);
+  if (loNodeIdCandidates.length > 0) {
+    const loNodes = await prisma.gseNode.findMany({
+      where: { nodeId: { in: loNodeIdCandidates }, type: "GSE_LO" },
+      select: { nodeId: true },
+    });
+    const loNodeSet = new Set(loNodes.map((row) => row.nodeId));
+    const usedLoNodeIds = new Set(created.filter((row) => row.domain === "lo").map((row) => row.nodeId));
+    let loAdded = 0;
+    for (const check of loChecksForIncidental) {
+      if (loAdded >= 6) break;
+      const nodeId = (check.nodeId || check.checkId || "").trim();
+      if (!nodeId || !loNodeSet.has(nodeId)) continue;
+      if (targetNodeIds.has(nodeId) || usedLoNodeIds.has(nodeId)) continue;
+      created.push(
+        makeEvidence({
+          nodeId,
+          signalType: check.pass ? "lo_eval_incidental_pass" : "lo_eval_incidental_fail",
+          kind: check.pass ? "supporting" : "negative",
+          opportunity: "incidental",
+          score: check.pass
+            ? Math.max(0.6, Math.min(0.92, check.confidence * 0.92))
+            : Math.max(0.08, 1 - check.confidence),
+          confidence: check.confidence,
+          impact: 0.34,
+          source: "openai",
+          domain: "lo",
+          usedForPromotion: false,
+          targeted: false,
+          activationImpact: "observed",
+          reliability: check.confidence >= 0.84 ? "high" : "medium",
+          ageBand: input.ageBand,
+          evidenceText: check.evidenceSpan || input.transcript.slice(0, 220),
+          metadataJson: {
+            checkId: check.checkId,
+            ruleVersion: EVIDENCE_RULE_VERSION,
+            severity: check.severity || null,
+          },
+        })
+      );
+      usedLoNodeIds.add(nodeId);
+      loAdded += 1;
     }
   }
 

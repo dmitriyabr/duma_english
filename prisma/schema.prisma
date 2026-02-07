@@ -272,6 +272,7 @@ model GseNode {
   bundleLinks      GseBundleNode[]
   catalogVersion   GseCatalogVersion    @relation(fields: [catalogVersionId], references: [id], onDelete: Cascade)
   aliases          GseNodeAlias[]
+  embedding        GseNodeEmbedding?
   outgoingEdges    GseNodeEdge[]        @relation("GseNodeEdgeFrom")
   incomingEdges    GseNodeEdge[]        @relation("GseNodeEdgeTo")
   mastery          StudentGseMastery[]
@@ -279,6 +280,20 @@ model GseNode {
 
   @@index([catalogVersionId, type])
   @@index([catalogVersionId, audience, skill])
+}
+
+model GseNodeEmbedding {
+  id        String   @id @default(cuid())
+  nodeId    String   @unique
+  model     String
+  textHash  String
+  vector    Json
+  dim       Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  node      GseNode  @relation(fields: [nodeId], references: [nodeId], onDelete: Cascade)
+
+  @@index([model])
 }
 
 model GseBundle {

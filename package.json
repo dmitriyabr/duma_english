@@ -12,7 +12,8 @@
     "gse:import:github": "tsx src/scripts/gse_import_from_github.ts",
     "gse:import:official": "tsx src/scripts/gse_import_from_official_api.ts",
     "gse:aliases:backfill": "tsx src/scripts/gse_backfill_aliases.ts",
-    "gse:qa": "tsx src/scripts/gse_quality_checks.ts"
+    "gse:qa": "tsx src/scripts/gse_quality_checks.ts",
+    "gse:embeddings:backfill": "tsx src/scripts/gse_backfill_semantic_embeddings.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.887.0",

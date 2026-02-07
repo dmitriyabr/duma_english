@@ -21,6 +21,14 @@ Build an autonomous speaking trainer where every learning decision is based on G
 5. Read-aloud does not directly promote lexical meaning.
 6. API explainability exists:
 - attempts/progress/task-next return GSE-specific reasons and node targets.
+7. Semantic incidental detection for LO/Grammar exists:
+- parser LLM extracts communicative intents + grammar patterns from transcript.
+- retrieval stage ranks `GSE_LO` and `GSE_GRAMMAR` candidates by embeddings within stage/audience filters.
+- evaluation LLM receives only the shortlisted options and produces structured LO/grammar checks used by the evidence pipeline.
+- embeddings are persisted in `GseNodeEmbedding` and can be backfilled via script.
+8. Explicit task targets are passed into evaluation:
+- worker loads `TaskGseTarget` rows for the task and supplies them to the evaluator.
+- evaluation is expected to include checks for these targets; target grammar checks use `opportunityType=explicit_target`.
 
 ## 3) What was just fixed
 1. Task generator prompt no longer sends raw GSE node IDs to the LLM:
@@ -40,17 +48,25 @@ Build an autonomous speaking trainer where every learning decision is based on G
 - `npm test` pass
 - `npm run lint` pass
 - `npm run build` pass
+6. Semantic LO/Grammar hardening (current iteration):
+- parser prompt upgraded for exhaustive, atomic extraction (recall-first).
+- embedding queries made topic-robust for grammar (query = pattern label only).
+- retrieval list is reordered by query coverage so top-8 options cover all extracted patterns.
+- evaluator now includes explicit task targets (not only incidental retrieval).
 
 ## 4) Critical Open Gaps (brain-level only)
 1. Incidental vocab disambiguation is still too broad:
 - one word can match many nodes.
 - need top-k resolution by stage range + context.
-2. Verification queue policy needs hard enforcement:
+2. Semantic LO/Grammar evaluation needs calibration and precision QA:
+- tune parser/evaluator prompts and thresholds from real traces.
+- add gold-set precision checks for false-positive suppression.
+3. Verification queue policy needs hard enforcement:
 - candidates must be verified within next N tasks.
 - no silent starvation.
-3. Promotion still needs stricter verified-only math by domain:
+4. Promotion still needs stricter verified-only math by domain:
 - make domain quotas explicit (`vocab`, `grammar`, `lo`).
-4. Cold-start diagnostics still over-focuses on narrow node clusters:
+5. Cold-start diagnostics still over-focuses on narrow node clusters:
 - need stronger domain balancing in first 8-12 tasks.
 
 ## 5) Active Execution Plan (no legacy work)
@@ -78,11 +94,17 @@ Build an autonomous speaking trainer where every learning decision is based on G
 2. Prevent repeated narrow targets in first diagnostic window.
 3. Add tests: no repeated same domain lock-in for new learner.
 
+### Sprint E: Semantic LO/Grammar Quality Hardening
+1. Build gold-set benchmark for LO/Grammar incidental detection.
+2. Tune confidence/retrieval thresholds and max-candidate caps.
+3. Add failure taxonomy (`parser_miss`, `retrieval_miss`, `evaluation_miss`) in debug metadata.
+4. Add regression tests for known confusion pairs.
+
 ## 6) Immediate Next Steps (in order)
-1. Implement Sprint A (disambiguation top-k + tests).
-2. Implement Sprint B (verification SLA + tests).
-3. Re-run real user attempts and inspect last 10 attempt traces.
-4. Only then tune promotion thresholds.
+1. Run `gse:embeddings:backfill -- --all` in production-like data.
+2. Execute 50 real-attempt traces and review semantic incidental precision.
+3. Implement Sprint E calibration using trace outcomes.
+4. Continue Sprint A (vocab top-k) and Sprint B (verification SLA).
 
 ## 7) Guardrails
 1. No return to legacy skill model.

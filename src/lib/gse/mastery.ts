@@ -75,15 +75,32 @@ function effectiveHalfLifeDays(base: number, evidenceCount: number, reliability:
 }
 
 function baseWeight(kind: GseEvidenceKind, opportunity: GseOpportunityType) {
+  // Позитив: сила в conf/rel/impact
   if (kind === "direct" && opportunity === "explicit_target") return 1;
-  if (kind === "direct" && opportunity === "elicited_incidental") return 0.8;
-  // Supporting = самостоятельное использование; не хуже намеренного (0.8)
-  if (kind === "supporting" && opportunity === "incidental") return 0.8;
+  if (kind === "direct" && opportunity === "elicited_incidental") return 1;
+  if (kind === "supporting" && opportunity === "incidental") return 1;
+  if (kind === "supporting") return 1;
+  // Негатив: ошибки слабее успехов (один косяк не откатывает так же сильно)
   if (kind === "negative" && opportunity === "explicit_target") return 0.9;
   if (kind === "negative" && opportunity === "incidental") return 0.4;
-  if (kind === "supporting") return 0.4;
   if (kind === "negative") return 0.55;
-  return 0.5;
+  return 1;
+}
+
+/** Для персиста/аудита: базовый вес без PFA/streak. Реальный вес считает applyEvidenceToStudentMastery. */
+export function getEvidenceBaseWeight(evidence: {
+  evidenceKind?: string;
+  opportunityType?: string;
+  confidence: number;
+  reliability: string;
+  impact: number;
+}): number {
+  const kind = (evidence.evidenceKind || "direct") as GseEvidenceKind;
+  const opportunity = (evidence.opportunityType || "explicit_target") as GseOpportunityType;
+  const conf = clamp01(evidence.confidence);
+  const rel = reliabilityFactor(evidence.reliability as GseReliability);
+  const imp = Math.max(0.2, clamp01(evidence.impact));
+  return Math.max(0.05, Math.min(2, baseWeight(kind, opportunity) * conf * rel * imp));
 }
 
 function deriveReliability(params: {
@@ -139,10 +156,11 @@ export function computeNextMasteryScore(current: number, evidence: MasteryEviden
       ? evidence.score
       : clamp01(0.5 + evidence.confidence * evidence.impact * 0.5)
   );
+  const imp = Math.max(0.2, clamp01(evidence.impact ?? 0.5));
   const weight =
     typeof evidence.weight === "number"
       ? clamp01(evidence.weight)
-      : clamp01(baseWeight(kind, opportunity) * evidence.confidence * reliabilityFactor(evidence.reliability));
+      : clamp01(baseWeight(kind, opportunity) * evidence.confidence * reliabilityFactor(evidence.reliability) * imp);
   const alpha = Math.max(1, (current / 100) * 8) + weight * score;
   const beta = Math.max(1, (1 - current / 100) * 8) + weight * (1 - score);
   return Number(clamp((alpha / (alpha + beta)) * 100).toFixed(2));
@@ -234,14 +252,9 @@ export async function applyEvidenceToStudentMastery(params: {
     const conf = clamp01(evidence.confidence);
     const rel = reliabilityFactor(evidence.reliability);
     const imp = Math.max(0.2, clamp01(evidence.impact));
-    // Reference: what one direct+explicit_target would get with same conf/rel/impact (base 1.0)
-    const refDirectWeight = 1.0 * conf * rel * imp;
     let effectiveWeight: number;
     if (typeof evidence.weight === "number") {
       effectiveWeight = Math.max(0.05, Math.min(maxWeight, evidence.weight));
-    } else if (kind === "supporting" && opportunity === "incidental") {
-      // By definition: supporting+incidental = 0.8 × direct (same conf/rel/impact)
-      effectiveWeight = 0.8 * refDirectWeight;
     } else {
       effectiveWeight = baseWeight(kind, opportunity) * conf * rel * imp;
     }

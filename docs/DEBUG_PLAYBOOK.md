@@ -26,7 +26,7 @@ Then the planner prioritises that node for a **verification** task (explicit tar
 
 2. **Spread across nodes:** Usually each attempt touches **many** nodes (too, for, play, feel, …). So each node gets 1–2 evidences per attempt → small delta per node. Lots of lines = lots of nodes, each moving a little.
 
-3. **Weight of evidence:** Mastery is updated with `alpha += weight * score`, `beta += weight * (1 - score)`. For **supporting+incidental** we set effectiveWeight = 0.8 × refDirect (same conf/rel/impact), so each supporting hit moves the mean by **0.8** of what one direct would. **Direct + explicit_target** has weight up to 1 (plus streak).
+3. **Weight of evidence:** Mastery is updated with `alpha += weight * score`, `beta += weight * (1 - score)`. **Supporting+incidental** и **direct+explicit_target** имеют baseWeight 1; effectiveWeight = baseWeight × conf × rel × impact. При одинаковых conf/rel/impact прирост одинаковый (плюс streak для direct при 2+ подряд).
 
 4. **Decay:** The number you see in "Focus (next targets)" and in the skillset table is **decayedMastery**, not raw mean. It **decreases over time** when the node isn't practiced (half-life ~14 days for vocab). So: raw mean can grow (+0.8, +0.5, …), but if the node isn't practiced again for a while, **decayed** mastery goes down. Result: many pluses in the log, but the **displayed** mastery stays low until the same node is practiced again.
 
@@ -42,10 +42,10 @@ Mastery = 100×α/(α+β). Each evidence: α += weight×score, β += weight×(1�
 
 **Fix (bounded memory):** α+β ограничены сверху (cap **12**), чтобы каждый evidence давал видимый прирост: при streak ×1.56 не +0.6, а **~2+** балла. До 70 реально добраться за 15–25 повторений.
 
-**Ориентир при cap 12:** один evidence при cap — supporting = **0.8×direct** (effectiveWeight = 0.8×refDirect), т.е. **~5–10** баллов (supporting) или **6–12** (direct + streak). Порог «closed» value ≥ 70.
+**Ориентир при cap 12:** один evidence при cap — supporting и direct при одинаковых conf/rel/impact дают одинаковый прирост (~5–12 баллов в зависимости от streak). Порог «closed» value ≥ 70.
 
 ## A3) Evidence mix and streak
-Run **`npx tsx src/scripts/inspect_profile_evidence.ts [studentId]`** to see your evidence mix. Streak applies to both direct and supporting success. Supporting weight 0.8×refDirect. Most evidence is **supporting + incidental** (word used in speech but task was not target_vocab with that word). Streak applies only when **kind=direct** and score≥0.7, so with almost no direct evidence you rarely see “streak ×1.15”. Supporting = 0.8×refDirect → each hit adds ~0.8 of direct delta. See MASTERY_METHODOLOGY.md “Why you see so few streaks”.
+Run **`npx tsx src/scripts/inspect_profile_evidence.ts [studentId]`** to see your evidence mix. Streak applies to both direct and supporting success. Supporting and direct: baseWeight 1, same formula (conf×rel×impact). Most evidence is **supporting + incidental** (word used in speech but task was not target_vocab with that word). Streak applies only when **kind=direct** and score≥0.7, so with almost no direct evidence you rarely see “streak ×1.15”. See MASTERY_METHODOLOGY for spec. See MASTERY_METHODOLOGY.md “Why you see so few streaks”.
 
 ## B) Why skills don't progress (no direct evidence)
 Progress and promotion depend on **direct** evidence (target nodes hit). Check:

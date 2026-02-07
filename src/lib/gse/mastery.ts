@@ -238,7 +238,11 @@ export async function applyEvidenceToStudentMastery(params: {
 
     if (score >= 0.6) effectiveWeight *= 1.1;
     else if (score < 0.4) effectiveWeight *= 0.9;
-    if (directSuccess && directSuccessStreak >= 1) effectiveWeight *= 1.15;
+    // Streak bonus: exponent with cap (2nd direct success ×1.15, 3rd+ ×1.20)
+    if (directSuccess && directSuccessStreak >= 1) {
+      const streakMultiplier = Math.min(1.2, 1.15 ** Math.min(directSuccessStreak, 2));
+      effectiveWeight *= streakMultiplier;
+    }
     effectiveWeight = Math.max(0.05, Math.min(1.2, effectiveWeight));
 
     const alphaAfter = alphaBefore + effectiveWeight * score;

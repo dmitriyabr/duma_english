@@ -21,7 +21,7 @@ So we **do not** currently implement “systematically correct → speed up; err
 
 ## Possible additions
 
-1. **Streak bonus on weight:** e.g. last 2–3 direct successes on this node → multiply evidence weight by 1.1–1.2 so the next hit moves mastery more.
+1. **Streak bonus on weight:** 2nd direct success in a row ×1.15, 3rd+ ×1.20 (exponent with cap; see MASTERY_IMPROVEMENTS_PLAN and spaced-repetition / PFA literature on bounded growth).
 2. **N-CCR-style early verification:** e.g. 2–3 direct passes in a row on this node → set verified even if mean < 70.
 3. **PFA-style:** Separate effective learning rates for correct vs incorrect in the alpha/beta update (correct adds more to alpha, incorrect adds more to beta / or use different weights for negative evidence after a streak of positives).
 

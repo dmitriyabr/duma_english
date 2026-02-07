@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { SpeechMetrics } from "./scoring";
 import { extractReferenceText, extractRequiredWords } from "./taskText";
+import { prisma } from "./db";
+import { mapStageToGseRange } from "./gse/utils";
 
 export type RubricCheck = {
   name: string;
@@ -20,6 +22,7 @@ export type LoCheck = {
 
 export type GrammarCheck = {
   checkId: string;
+  descriptorId?: string;
   label: string;
   pass: boolean;
   confidence: number;
@@ -124,6 +127,7 @@ const outputSchema = z.object({
       .array(
         z.object({
           checkId: z.string(),
+          descriptorId: z.string().optional(),
           label: z.string(),
           pass: z.boolean(),
           confidence: z.number().min(0).max(1),
@@ -243,6 +247,7 @@ function normalizeModelPayload(payload: unknown, input: EvaluationInput) {
             const rowItem = (item || {}) as Record<string, unknown>;
             return {
               checkId: String(rowItem.checkId || slugify(String(rowItem.label || "grammar_check"))),
+              descriptorId: rowItem.descriptorId ? String(rowItem.descriptorId) : undefined,
               label: String(rowItem.label || "Grammar check"),
               pass: toBoolean(rowItem.pass),
               confidence: toConfidence(rowItem.confidence, 0.72),
@@ -310,137 +315,11 @@ function deriveLoChecks(taskEvaluation: TaskEvaluation, transcript: string): LoC
   return fallback.slice(0, 8);
 }
 
-function deriveGrammarChecks(taskEvaluation: TaskEvaluation, transcript: string): GrammarCheck[] {
+function deriveGrammarChecks(taskEvaluation: TaskEvaluation, _transcript: string): GrammarCheck[] {
   const fromModel = Array.isArray(taskEvaluation.grammarChecks) ? taskEvaluation.grammarChecks : [];
   if (fromModel.length > 0) return fromModel.slice(0, 10);
-
-  const artifacts = taskEvaluation.artifacts || {};
-  const checks: GrammarCheck[] = [];
-  const grammarAccuracy =
-    typeof artifacts.grammarAccuracy === "number" ? Math.max(0, Math.min(100, artifacts.grammarAccuracy)) : null;
-  if (grammarAccuracy !== null) {
-    checks.push({
-      checkId: "grammar_accuracy",
-      label: "Grammar accuracy",
-      pass: grammarAccuracy >= 68,
-      confidence: 0.82,
-      opportunityType: "elicited_incidental",
-      errorType: grammarAccuracy >= 68 ? undefined : "mixed",
-      evidenceSpan: transcript.slice(0, 160),
-    });
-  }
-
-  const topErrors = Array.isArray(artifacts.topErrors)
-    ? (artifacts.topErrors as Array<Record<string, unknown>>)
-    : [];
-  for (const row of topErrors.slice(0, 3)) {
-    checks.push({
-      checkId: slugify(`grammar_error_${String(row.error || "issue")}`),
-      label: String(row.error || "Grammar issue"),
-      pass: false,
-      confidence: 0.85,
-      opportunityType: "incidental",
-      errorType: String(row.error || "mixed"),
-      evidenceSpan: row.explanation ? String(row.explanation).slice(0, 160) : transcript.slice(0, 160),
-      correction: row.correction ? String(row.correction) : undefined,
-    });
-  }
-
-  const text = transcript.toLowerCase();
-  const pushCheck = (candidate: GrammarCheck) => {
-    if (checks.some((row) => row.checkId === candidate.checkId)) return;
-    checks.push(candidate);
-  };
-
-  const hasPresentPerfect = /\b(i|you|we|they|he|she|it)\s+(have|has)\s+\w+(ed|en)\b/.test(text);
-  if (hasPresentPerfect) {
-    pushCheck({
-      checkId: "grammar_present_perfect_usage",
-      label: "Present perfect used correctly",
-      pass: true,
-      confidence: 0.8,
-      opportunityType: "incidental",
-      evidenceSpan: transcript.slice(0, 160),
-    });
-  }
-
-  const hasPastNarration = /\b(yesterday|last|ago|when i was)\b/.test(text) && /\b(was|were|did|went|had)\b/.test(text);
-  if (hasPastNarration) {
-    pushCheck({
-      checkId: "grammar_past_narration_usage",
-      label: "Past narration structure",
-      pass: true,
-      confidence: 0.76,
-      opportunityType: "incidental",
-      evidenceSpan: transcript.slice(0, 160),
-    });
-  }
-
-  const hasConditional = /\bif\b[\s\S]{0,40}\b(would|will|could|might)\b/.test(text);
-  if (hasConditional) {
-    pushCheck({
-      checkId: "grammar_conditional_usage",
-      label: "Conditional pattern used",
-      pass: true,
-      confidence: 0.78,
-      opportunityType: "incidental",
-      evidenceSpan: transcript.slice(0, 160),
-    });
-  }
-
-  if (/\b(i|you|we|they)\s+was\b/.test(text)) {
-    pushCheck({
-      checkId: "grammar_subj_verb_agreement_plural_was",
-      label: "Subject-verb agreement",
-      pass: false,
-      confidence: 0.87,
-      opportunityType: "incidental",
-      errorType: "subject_verb_agreement",
-      evidenceSpan: transcript.slice(0, 160),
-      correction: "Use 'were' with I/you/we/they in past context where needed.",
-    });
-  }
-
-  if (/\b(he|she|it)\s+were\b/.test(text)) {
-    pushCheck({
-      checkId: "grammar_subj_verb_agreement_singular_were",
-      label: "Subject-verb agreement",
-      pass: false,
-      confidence: 0.87,
-      opportunityType: "incidental",
-      errorType: "subject_verb_agreement",
-      evidenceSpan: transcript.slice(0, 160),
-      correction: "Use 'was' with he/she/it in past context.",
-    });
-  }
-
-  if (/\b[a-z]{3,}s\s+has\b/.test(text)) {
-    pushCheck({
-      checkId: "grammar_plural_subject_has",
-      label: "Plural subject with singular auxiliary",
-      pass: false,
-      confidence: 0.82,
-      opportunityType: "incidental",
-      errorType: "subject_verb_agreement",
-      evidenceSpan: transcript.slice(0, 160),
-      correction: "Use 'have' with plural nouns.",
-    });
-  }
-
-  if (checks.length === 0) {
-    const hasComplexForm =
-      /\b(was|were|had|did|have|has|will|would|could|should|might|if|because|although|while)\b/.test(text);
-    pushCheck({
-      checkId: "grammar_incidental_usage",
-      label: hasComplexForm ? "Grammar used in context" : "Basic sentence grammar",
-      pass: hasComplexForm ? true : transcript.trim().length > 20,
-      confidence: hasComplexForm ? 0.72 : 0.6,
-      opportunityType: "incidental",
-      evidenceSpan: transcript.slice(0, 160),
-    });
-  }
-
-  return checks.slice(0, 10);
+  // Grammar node updates are model-driven only.
+  return [];
 }
 
 function attachStructuredChecks(taskEvaluation: TaskEvaluation, transcript: string): TaskEvaluation {
@@ -1044,6 +923,7 @@ function buildTaskTypeJsonExample(taskType: string) {
         grammarChecks: [
           {
             checkId: "grammar_incidental_usage",
+            descriptorId: "55af74fed6c1560c41c6a2e6",
             label: "Grammar in context",
             pass: true,
             confidence: 0.66,
@@ -1090,6 +970,7 @@ function buildTaskTypeJsonExample(taskType: string) {
         grammarChecks: [
           {
             checkId: "grammar_incidental_usage",
+            descriptorId: "55af74fed6c1560c41c6a2e6",
             label: "Grammar in context",
             pass: true,
             confidence: 0.64,
@@ -1136,6 +1017,7 @@ function buildTaskTypeJsonExample(taskType: string) {
       grammarChecks: [
         {
           checkId: "grammar_incidental_usage",
+          descriptorId: "55af74fed6c1560c41c6a2e6",
           label: "Grammar in context",
           pass: true,
           confidence: 0.62,
@@ -1187,6 +1069,43 @@ function buildOpenAIInput(input: EvaluationInput) {
   };
 }
 
+type GrammarDescriptorOption = {
+  descriptorId: string;
+  descriptor: string;
+};
+
+async function loadGrammarDescriptorOptions(input: EvaluationInput): Promise<GrammarDescriptorOption[]> {
+  const stageRaw =
+    typeof input.taskMeta?.stage === "string" && input.taskMeta.stage.trim().length > 0
+      ? input.taskMeta.stage
+      : "A2";
+  const stageRange = mapStageToGseRange(stageRaw);
+  const rows = await prisma.gseNode.findMany({
+    where: {
+      type: "GSE_GRAMMAR",
+      gseCenter: { gte: stageRange.min - 12, lte: stageRange.max + 12 },
+      descriptor: { notIn: ["", "No grammar descriptor available."] },
+    },
+    select: {
+      sourceKey: true,
+      descriptor: true,
+    },
+    orderBy: [{ gseCenter: "asc" }],
+    take: 80,
+  });
+
+  const deduped = new Map<string, GrammarDescriptorOption>();
+  for (const row of rows) {
+    const descriptorId = row.sourceKey?.trim();
+    const descriptor = row.descriptor?.trim();
+    if (!descriptorId || !descriptor) continue;
+    if (!deduped.has(descriptorId)) {
+      deduped.set(descriptorId, { descriptorId, descriptor });
+    }
+  }
+  return Array.from(deduped.values());
+}
+
 function parseMaybeJson(content: string) {
   const trimmed = content.trim();
   try {
@@ -1215,7 +1134,7 @@ function parseMaybeJson(content: string) {
 
 async function evaluateWithOpenAI(input: EvaluationInput) {
   const apiKey = process.env.OPENAI_API_KEY;
-  const model = process.env.OPENAI_MODEL || "gpt-4o-mini";
+  const model = process.env.OPENAI_MODEL || "gpt-4.1-mini";
   if (!apiKey) {
     return {
       parsed: null,
@@ -1232,14 +1151,17 @@ async function evaluateWithOpenAI(input: EvaluationInput) {
   }
 
   const compactInput = buildOpenAIInput(input);
+  const grammarOptions = await loadGrammarDescriptorOptions(input);
   const prompt = [
     "Evaluate this child speaking attempt.",
     "Return ONLY valid JSON object matching schema.",
     "Hard type rules: taskScore:number, languageScore:number|null, rubricChecks[].pass:boolean, rubricChecks[].weight:number.",
     "Do not output 'pass'/'fail' strings for numeric fields.",
     "Do not invent speech metrics; use only provided speechMetrics fields.",
+    "For each grammarChecks item, include descriptorId from grammarDescriptorOptions exactly. If unsure, omit that grammar check.",
     buildTaskSpecificPrompt(input.taskType),
     `Task-type example JSON: ${JSON.stringify(buildTaskTypeJsonExample(input.taskType))}`,
+    `Grammar descriptor options (descriptorId + descriptor): ${JSON.stringify(grammarOptions)}`,
     `Input JSON: ${JSON.stringify(compactInput)}`,
   ].join("\n");
   const attempts: EvaluationDebugInfo["openai"]["attempts"] = [];
@@ -1263,109 +1185,8 @@ async function evaluateWithOpenAI(input: EvaluationInput) {
         ],
         temperature: 0,
         max_tokens: 700,
-        response_format: {
-          type: "json_schema",
-          json_schema: {
-            name: "speaking_evaluation",
-            strict: true,
-            schema: {
-              type: "object",
-              additionalProperties: false,
-              properties: {
-                taskEvaluation: {
-                  type: "object",
-                  additionalProperties: false,
-                  properties: {
-                    taskType: { type: "string" },
-                    taskScore: { type: ["number", "string"] },
-                    languageScore: { type: ["number", "string", "null"] },
-                    artifacts: { type: "object", additionalProperties: true },
-                    rubricChecks: {
-                      type: "array",
-                      items: {
-                        type: "object",
-                        additionalProperties: false,
-                        properties: {
-                          name: { type: "string" },
-                          pass: { type: ["boolean", "string"] },
-                          reason: { type: "string" },
-                          weight: { type: ["number", "string"] },
-                        },
-                        required: ["name", "pass", "reason", "weight"],
-                      },
-                    },
-                    loChecks: {
-                      type: "array",
-                      items: {
-                        type: "object",
-                        additionalProperties: false,
-                        properties: {
-                          checkId: { type: "string" },
-                          label: { type: "string" },
-                          pass: { type: ["boolean", "string"] },
-                          confidence: { type: ["number", "string"] },
-                          severity: { type: "string", enum: ["low", "medium", "high"] },
-                          evidenceSpan: { type: "string" },
-                        },
-                        required: ["checkId", "label", "pass", "confidence", "severity"],
-                      },
-                    },
-                    grammarChecks: {
-                      type: "array",
-                      items: {
-                        type: "object",
-                        additionalProperties: false,
-                        properties: {
-                          checkId: { type: "string" },
-                          label: { type: "string" },
-                          pass: { type: ["boolean", "string"] },
-                          confidence: { type: ["number", "string"] },
-                          opportunityType: {
-                            type: "string",
-                            enum: ["explicit_target", "elicited_incidental", "incidental"],
-                          },
-                          errorType: { type: "string" },
-                          evidenceSpan: { type: "string" },
-                          correction: { type: "string" },
-                        },
-                        required: ["checkId", "label", "pass", "confidence", "opportunityType"],
-                      },
-                    },
-                    evidence: { type: "array", items: { type: "string" } },
-                    modelVersion: { type: "string" },
-                  },
-                  required: [
-                    "taskType",
-                    "taskScore",
-                    "artifacts",
-                    "rubricChecks",
-                    "evidence",
-                    "modelVersion",
-                  ],
-                },
-                feedback: {
-                  type: "object",
-                  additionalProperties: false,
-                  properties: {
-                    summary: { type: "string" },
-                    whatWentWell: { type: "array", items: { type: "string" } },
-                    whatToFixNow: { type: "array", items: { type: "string" } },
-                    exampleBetterAnswer: { type: "string" },
-                    nextMicroTask: { type: "string" },
-                  },
-                  required: [
-                    "summary",
-                    "whatWentWell",
-                    "whatToFixNow",
-                    "exampleBetterAnswer",
-                    "nextMicroTask",
-                  ],
-                },
-              },
-              required: ["taskEvaluation", "feedback"],
-            },
-          },
-        },
+        // Some models return 400 on json_schema; use json_object and validate with zod instead.
+        response_format: { type: "json_object" },
       }),
     });
     if (!response.ok) {

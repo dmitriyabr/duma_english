@@ -211,7 +211,9 @@ export default function ResultsPage() {
   const incidentalFindings = data?.results?.incidentalFindings || [];
   const activationTransitions = data?.results?.activationTransitions || [];
   const nodeOutcomes = data?.results?.nodeOutcomes || [];
-  const nodeLabelById = new Map(gseEvidence.map((item) => [item.nodeId, item.descriptor]));
+  const nodeLabelById = new Map(
+    gseEvidence.map((item) => [item.nodeId, item.descriptor || "Grammar pattern"])
+  );
   const uniqueNodes = Array.from(
     new Map(gseEvidence.map((item) => [item.nodeId, item])).values()
   ).slice(0, 6);

@@ -1,5 +1,3 @@
-// Prisma schema for AI Speaking Trainer MVP
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -17,92 +15,87 @@ model Teacher {
 }
 
 model Class {
-  id        String   @id @default(cuid())
+  id        String      @id @default(cuid())
   name      String
   teacherId String
-  createdAt DateTime @default(now())
-
-  teacher   Teacher   @relation(fields: [teacherId], references: [id])
+  createdAt DateTime    @default(now())
+  teacher   Teacher     @relation(fields: [teacherId], references: [id])
   codes     ClassCode[]
   students  Student[]
 }
 
 model ClassCode {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   classId   String
-  code      String   @unique
+  code      String    @unique
   expiresAt DateTime?
   maxUses   Int?
-  usesCount Int      @default(0)
-  status    String   @default("active")
-  createdAt DateTime @default(now())
-
-  class     Class    @relation(fields: [classId], references: [id])
+  usesCount Int       @default(0)
+  status    String    @default("active")
+  createdAt DateTime  @default(now())
+  class     Class     @relation(fields: [classId], references: [id])
 
   @@index([classId])
 }
 
 model Student {
-  id          String   @id @default(cuid())
-  classId     String
-  displayName String
-  createdAt   DateTime @default(now())
-
-  class      Class              @relation(fields: [classId], references: [id])
-  attempts   Attempt[]
-  progress   ProgressDaily[]
-  metrics    AttemptMetric[]
-  profile    LearnerProfile?
-  vocabulary StudentVocabulary[]
-  placementSessions PlacementSession[]
-  gseMastery StudentGseMastery[]
-  gseEvidence AttemptGseEvidence[]
-  plannerDecisions PlannerDecisionLog[]
-  taskInstances TaskInstance[]
-  promotionAudits PromotionAudit[]
+  id                  String               @id @default(cuid())
+  classId             String
+  displayName         String
+  createdAt           DateTime             @default(now())
+  attempts            Attempt[]
+  gseEvidence         AttemptGseEvidence[]
+  metrics             AttemptMetric[]
   gseStageProjections GseStageProjection[]
+  profile             LearnerProfile?
+  placementSessions   PlacementSession[]
+  plannerDecisions    PlannerDecisionLog[]
+  progress            ProgressDaily[]
+  promotionAudits     PromotionAudit[]
+  class               Class                @relation(fields: [classId], references: [id])
+  gseMastery          StudentGseMastery[]
+  vocabulary          StudentVocabulary[]
+  taskInstances       TaskInstance[]
 
   @@index([classId])
 }
 
 model Task {
-  id        String   @id @default(cuid())
-  type      String
-  prompt    String
-  level     Int      @default(1)
-  metaJson  Json?
-  createdAt DateTime @default(now())
-
-  attempts Attempt[]
-  gseTargets TaskGseTarget[]
+  id           String          @id @default(cuid())
+  type         String
+  prompt       String
+  level        Int             @default(1)
+  metaJson     Json?
+  createdAt    DateTime        @default(now())
+  attempts     Attempt[]
+  gseTargets   TaskGseTarget[]
   taskInstance TaskInstance?
 }
 
 model Attempt {
-  id               String   @id @default(cuid())
-  studentId        String
-  taskId           String
-  status           String   @default("created")
-  audioObjectKey   String?
-  durationSec      Float?
-  transcript       String?
-  speechMetricsJson Json?
+  id                 String               @id @default(cuid())
+  studentId          String
+  taskId             String
+  status             String               @default("created")
+  audioObjectKey     String?
+  transcript         String?
+  speechMetricsJson  Json?
+  scoresJson         Json?
+  feedbackJson       Json?
+  createdAt          DateTime             @default(now())
+  completedAt        DateTime?
+  durationSec        Float?
+  errorCode          String?
+  errorMessage       String?
   rawRecognitionJson Json?
   taskEvaluationJson Json?
-  aiDebugJson       Json?
-  nodeOutcomesJson  Json?
-  recoveryTriggered Boolean  @default(false)
-  scoresJson       Json?
-  feedbackJson     Json?
-  errorCode        String?
-  errorMessage     String?
-  createdAt        DateTime @default(now())
-  completedAt      DateTime?
-
-  student  Student         @relation(fields: [studentId], references: [id])
-  task     Task            @relation(fields: [taskId], references: [id])
-  metrics  AttemptMetric[]
-  gseEvidence AttemptGseEvidence[]
+  aiDebugJson        Json?
+  nodeOutcomesJson   Json?
+  recoveryTriggered  Boolean              @default(false)
+  student            Student              @relation(fields: [studentId], references: [id])
+  task               Task                 @relation(fields: [taskId], references: [id])
+  gseEvidence        AttemptGseEvidence[]
+  metrics            AttemptMetric[]
   placementResponses PlacementResponse[]
 
   @@index([studentId])
@@ -119,121 +112,115 @@ model AttemptMetric {
   reliability        String
   calculationVersion String
   createdAt          DateTime @default(now())
-
-  attempt Attempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
-  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  attempt            Attempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  student            Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@index([attemptId])
   @@index([studentId, metricKey])
 }
 
 model LearnerProfile {
-  id                  String   @id @default(cuid())
-  studentId           String   @unique
-  stage               String   @default("A0")
-  stageSource         String   @default("gse_projection")
-  stageEvidenceJson   Json?
-  ageBand             String   @default("9-11")
-  placementScore      Float?
-  placementConfidence Float?
-  placementFresh      Boolean  @default(false)
-  placementCompletedAt DateTime?
+  id                        String    @id @default(cuid())
+  studentId                 String    @unique
+  stage                     String    @default("A0")
+  ageBand                   String    @default("9-11")
+  placementScore            Float?
+  placementConfidence       Float?
+  activeTrack               String    @default("balanced_convo_speech")
+  cycleWeek                 Int       @default(1)
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
+  placementFresh            Boolean   @default(false)
+  placementCompletedAt      DateTime?
   placementUncertainNodeIds String[]
-  placementCarryoverJson Json?
-  coldStartActive     Boolean  @default(true)
-  coldStartAttempts   Int      @default(0)
-  activeTrack         String   @default("balanced_convo_speech")
-  cycleWeek           Int      @default(1)
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
-
-  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  placementCarryoverJson    Json?
+  stageSource               String    @default("gse_projection")
+  stageEvidenceJson         Json?
+  coldStartActive           Boolean   @default(true)
+  coldStartAttempts         Int       @default(0)
+  student                   Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
 }
 
 model StudentVocabulary {
-  id                String   @id @default(cuid())
-  studentId         String
-  lemma             String
-  status            String   @default("new")
-  nextReviewAt      DateTime?
-  retentionScore    Float    @default(0)
-  usageEvidenceCount Int     @default(0)
-  sourceTopicId     String?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-
-  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  id                 String    @id @default(cuid())
+  studentId          String
+  lemma              String
+  status             String    @default("new")
+  nextReviewAt       DateTime?
+  retentionScore     Float     @default(0)
+  usageEvidenceCount Int       @default(0)
+  sourceTopicId      String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  student            Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@unique([studentId, lemma])
   @@index([studentId, status, nextReviewAt])
 }
 
 model PlacementSession {
-  id           String   @id @default(cuid())
-  studentId    String
-  status       String   @default("started")
-  currentIndex Int      @default(0)
-  questionCount Int     @default(0)
-  theta        Float    @default(0)
-  sigma        Float    @default(1)
-  askedItemIds String[]
-  currentItemId String?
-  stageEstimate String?
+  id                 String              @id @default(cuid())
+  studentId          String
+  status             String              @default("started")
+  currentIndex       Int                 @default(0)
+  responsesJson      Json?
+  resultJson         Json?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  completedAt        DateTime?
+  questionCount      Int                 @default(0)
+  theta              Float               @default(0)
+  sigma              Float               @default(1)
+  askedItemIds       String[]
+  currentItemId      String?
+  stageEstimate      String?
   confidenceEstimate Float?
-  responsesJson Json?
-  resultJson   Json?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  completedAt  DateTime?
-
-  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  responses PlacementResponse[]
-  currentItem PlacementItem? @relation("PlacementCurrentItem", fields: [currentItemId], references: [id], onDelete: SetNull)
+  responses          PlacementResponse[]
+  currentItem        PlacementItem?      @relation("PlacementCurrentItem", fields: [currentItemId], references: [id])
+  student            Student             @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@index([studentId, status])
 }
 
 model PlacementItem {
-  id              String   @id @default(cuid())
-  skillKey        String
-  stageBand       String
-  taskType        String
-  promptTemplate  String
-  hint            String?
-  expectedMinWords Int     @default(12)
-  assessmentMode  String   @default("stt")
-  maxDurationSec  Int      @default(60)
-  gseTargets      String[]
-  difficulty      Float
-  discrimination  Float    @default(1)
-  ageBand         String?
-  active          Boolean  @default(true)
-  metadataJson    Json?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  responses PlacementResponse[]
-  currentInSessions PlacementSession[] @relation("PlacementCurrentItem")
+  id                String              @id @default(cuid())
+  skillKey          String
+  stageBand         String
+  taskType          String
+  promptTemplate    String
+  hint              String?
+  expectedMinWords  Int                 @default(12)
+  assessmentMode    String              @default("stt")
+  maxDurationSec    Int                 @default(60)
+  gseTargets        String[]
+  difficulty        Float
+  discrimination    Float               @default(1)
+  ageBand           String?
+  active            Boolean             @default(true)
+  metadataJson      Json?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  responses         PlacementResponse[]
+  currentInSessions PlacementSession[]  @relation("PlacementCurrentItem")
 
   @@index([active, ageBand, skillKey])
   @@index([difficulty])
 }
 
 model PlacementResponse {
-  id                String   @id @default(cuid())
-  sessionId         String
-  itemId            String
-  attemptId         String?
-  itemScore         Float
+  id                  String           @id @default(cuid())
+  sessionId           String
+  itemId              String
+  attemptId           String?
+  itemScore           Float
   observedMetricsJson Json?
-  thetaBefore       Float
-  thetaAfter        Float
-  sigmaAfter        Float
-  createdAt         DateTime @default(now())
-
-  session PlacementSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  item    PlacementItem    @relation(fields: [itemId], references: [id], onDelete: Cascade)
-  attempt Attempt?         @relation(fields: [attemptId], references: [id], onDelete: SetNull)
+  thetaBefore         Float
+  thetaAfter          Float
+  sigmaAfter          Float
+  createdAt           DateTime         @default(now())
+  attempt             Attempt?         @relation(fields: [attemptId], references: [id])
+  item                PlacementItem    @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  session             PlacementSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@index([sessionId, createdAt])
   @@index([itemId])
@@ -241,91 +228,86 @@ model PlacementResponse {
 }
 
 model ProgressDaily {
-  id         String   @id @default(cuid())
-  studentId  String
-  date       DateTime
+  id          String   @id @default(cuid())
+  studentId   String
+  date        DateTime
   metricsJson Json
-  createdAt  DateTime @default(now())
-
-  student Student @relation(fields: [studentId], references: [id])
+  createdAt   DateTime @default(now())
+  student     Student  @relation(fields: [studentId], references: [id])
 
   @@unique([studentId, date])
 }
 
 model GseCatalogVersion {
-  id          String   @id @default(cuid())
-  version     String   @unique
-  source      String
-  description String?
+  id           String    @id @default(cuid())
+  version      String    @unique
+  source       String
+  description  String?
   metadataJson Json?
-  createdAt   DateTime @default(now())
-
-  nodes GseNode[]
+  createdAt    DateTime  @default(now())
+  nodes        GseNode[]
 }
 
 model GseNode {
-  id              String   @id @default(cuid())
-  nodeId          String   @unique
-  sourceKey       String
-  type            String
-  catalog         String
-  gseMin          Int?
-  gseMax          Int?
-  gseCenter       Float?
-  cefrBand        String?
-  audience        String?
-  skill           String?
-  descriptor      String
-  source          String
-  sourceVersion   String?
-  licenseTag      String?
-  metadataJson    Json?
+  id               String               @id @default(cuid())
+  nodeId           String               @unique
+  sourceKey        String
+  type             String
+  catalog          String
+  gseMin           Int?
+  gseMax           Int?
+  gseCenter        Float?
+  cefrBand         String?
+  audience         String?
+  skill            String?
+  descriptor       String
+  source           String
+  sourceVersion    String?
+  licenseTag       String?
+  metadataJson     Json?
   catalogVersionId String
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  catalogVersion GseCatalogVersion @relation(fields: [catalogVersionId], references: [id], onDelete: Cascade)
-  aliases        GseNodeAlias[]
-  outgoingEdges  GseNodeEdge[] @relation("GseNodeEdgeFrom")
-  incomingEdges  GseNodeEdge[] @relation("GseNodeEdgeTo")
-  attemptEvidence AttemptGseEvidence[]
-  mastery         StudentGseMastery[]
-  taskTargets     TaskGseTarget[]
-  bundleLinks     GseBundleNode[]
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  attemptEvidence  AttemptGseEvidence[]
+  bundleLinks      GseBundleNode[]
+  catalogVersion   GseCatalogVersion    @relation(fields: [catalogVersionId], references: [id], onDelete: Cascade)
+  aliases          GseNodeAlias[]
+  outgoingEdges    GseNodeEdge[]        @relation("GseNodeEdgeFrom")
+  incomingEdges    GseNodeEdge[]        @relation("GseNodeEdgeTo")
+  mastery          StudentGseMastery[]
+  taskTargets      TaskGseTarget[]
 
   @@index([catalogVersionId, type])
   @@index([catalogVersionId, audience, skill])
 }
 
 model GseBundle {
-  id               String   @id @default(cuid())
-  key              String   @unique
-  stage            String
-  domain           String
-  title            String
-  requiredCoverage Float    @default(0.65)
-  minDirectEvidence Int     @default(12)
-  reliabilityGate  Float    @default(0.65)
-  active           Boolean  @default(true)
-  metadataJson     Json?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-
-  nodes GseBundleNode[]
+  id                String          @id @default(cuid())
+  key               String          @unique
+  stage             String
+  domain            String
+  title             String
+  requiredCoverage  Float           @default(0.65)
+  minDirectEvidence Int             @default(12)
+  reliabilityGate   Float           @default(0.65)
+  active            Boolean         @default(true)
+  metadataJson      Json?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  nodes             GseBundleNode[]
 
   @@index([stage, domain, active])
 }
 
 model GseBundleNode {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   bundleId  String
   nodeId    String
-  required  Boolean  @default(true)
-  weight    Float    @default(1)
-  createdAt DateTime @default(now())
-
-  bundle GseBundle @relation(fields: [bundleId], references: [id], onDelete: Cascade)
-  node   GseNode   @relation(fields: [nodeId], references: [nodeId], onDelete: Cascade)
+  required  Boolean   @default(true)
+  weight    Float     @default(1)
+  createdAt DateTime  @default(now())
+  bundle    GseBundle @relation(fields: [bundleId], references: [id], onDelete: Cascade)
+  node      GseNode   @relation(fields: [nodeId], references: [nodeId], onDelete: Cascade)
 
   @@unique([bundleId, nodeId])
   @@index([nodeId])
@@ -337,53 +319,50 @@ model GseNodeAlias {
   alias     String
   source    String
   createdAt DateTime @default(now())
-
-  node GseNode @relation(fields: [nodeId], references: [nodeId], onDelete: Cascade)
+  node      GseNode  @relation(fields: [nodeId], references: [nodeId], onDelete: Cascade)
 
   @@unique([nodeId, alias])
   @@index([alias])
 }
 
 model GseNodeEdge {
-  id         String   @id @default(cuid())
-  fromNodeId String
-  toNodeId   String
-  edgeType   String
-  weight     Float?
+  id           String   @id @default(cuid())
+  fromNodeId   String
+  toNodeId     String
+  edgeType     String
+  weight       Float?
   metadataJson Json?
-  createdAt  DateTime @default(now())
-
-  fromNode GseNode @relation("GseNodeEdgeFrom", fields: [fromNodeId], references: [nodeId], onDelete: Cascade)
-  toNode   GseNode @relation("GseNodeEdgeTo", fields: [toNodeId], references: [nodeId], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+  fromNode     GseNode  @relation("GseNodeEdgeFrom", fields: [fromNodeId], references: [nodeId], onDelete: Cascade)
+  toNode       GseNode  @relation("GseNodeEdgeTo", fields: [toNodeId], references: [nodeId], onDelete: Cascade)
 
   @@unique([fromNodeId, toNodeId, edgeType])
   @@index([toNodeId, edgeType])
 }
 
 model AttemptGseEvidence {
-  id          String   @id @default(cuid())
-  attemptId   String
-  studentId   String
-  nodeId      String
-  signalType  String
-  evidenceKind String  @default("supporting")
-  opportunityType String @default("incidental")
-  score       Float    @default(0.5)
-  weight      Float    @default(0.2)
-  confidence  Float
-  impact      Float
-  source      String   @default("rules")
-  domain      String?
-  usedForPromotion Boolean @default(false)
-  targeted    Boolean  @default(true)
-  activationImpact String @default("none")
-  evidenceText String?
-  metadataJson Json?
-  createdAt   DateTime @default(now())
-
-  attempt Attempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
-  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  node    GseNode @relation(fields: [nodeId], references: [nodeId], onDelete: Cascade)
+  id               String   @id @default(cuid())
+  attemptId        String
+  studentId        String
+  nodeId           String
+  signalType       String
+  confidence       Float
+  impact           Float
+  evidenceText     String?
+  metadataJson     Json?
+  createdAt        DateTime @default(now())
+  evidenceKind     String   @default("supporting")
+  opportunityType  String   @default("incidental")
+  score            Float    @default(0.5)
+  weight           Float    @default(0.2)
+  source           String   @default("rules")
+  domain           String?
+  usedForPromotion Boolean  @default(false)
+  activationImpact String   @default("none")
+  targeted         Boolean  @default(true)
+  attempt          Attempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  node             GseNode  @relation(fields: [nodeId], references: [nodeId], onDelete: Cascade)
+  student          Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@index([attemptId])
   @@index([studentId, nodeId])
@@ -391,35 +370,34 @@ model AttemptGseEvidence {
 }
 
 model StudentGseMastery {
-  id               String   @id @default(cuid())
-  studentId        String
-  nodeId           String
-  masteryScore     Float
-  alpha            Float    @default(1)
-  beta             Float    @default(1)
-  masteryMean      Float?
-  masterySigma     Float?
-  uncertainty      Float?
-  decayedMastery   Float?
-  halfLifeDays     Float?
-  evidenceCount    Int      @default(0)
-  directEvidenceCount Int   @default(0)
-  supportingEvidenceCount Int @default(0)
-  negativeEvidenceCount Int @default(0)
-  crossTaskEvidenceCount Int @default(0)
-  incidentalTaskTypeCount Int @default(0)
-  activationState String @default("observed")
-  verificationDueAt DateTime?
-  reliability      String
-  lastEvidenceAt   DateTime?
-  decayStateJson   Json?
-  spacingStateJson Json?
-  calculationVersion String
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-
-  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  node    GseNode @relation(fields: [nodeId], references: [nodeId], onDelete: Cascade)
+  id                      String    @id @default(cuid())
+  studentId               String
+  nodeId                  String
+  masteryScore            Float
+  evidenceCount           Int       @default(0)
+  reliability             String
+  lastEvidenceAt          DateTime?
+  decayStateJson          Json?
+  spacingStateJson        Json?
+  calculationVersion      String
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+  masteryMean             Float?
+  masterySigma            Float?
+  decayedMastery          Float?
+  halfLifeDays            Float?
+  alpha                   Float     @default(1)
+  beta                    Float     @default(1)
+  uncertainty             Float?
+  directEvidenceCount     Int       @default(0)
+  negativeEvidenceCount   Int       @default(0)
+  crossTaskEvidenceCount  Int       @default(0)
+  activationState         String    @default("observed")
+  supportingEvidenceCount Int       @default(0)
+  incidentalTaskTypeCount Int       @default(0)
+  verificationDueAt       DateTime?
+  node                    GseNode   @relation(fields: [nodeId], references: [nodeId], onDelete: Cascade)
+  student                 Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@unique([studentId, nodeId])
   @@index([studentId, masteryScore])
@@ -427,60 +405,57 @@ model StudentGseMastery {
 }
 
 model GseStageProjection {
-  id          String   @id @default(cuid())
-  studentId   String
-  stage       String
-  stageScore  Float
-  confidence  Float
-  source      String
-  reason      String
+  id           String   @id @default(cuid())
+  studentId    String
+  stage        String
+  stageScore   Float
+  confidence   Float
+  source       String
+  reason       String
   evidenceJson Json?
-  createdAt   DateTime @default(now())
-
-  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+  student      Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@index([studentId, createdAt])
 }
 
 model PlannerDecisionLog {
-  id               String   @id @default(cuid())
-  studentId        String
-  decisionTs       DateTime @default(now())
-  candidateSetJson Json
-  chosenTaskType   String
-  utilityJson      Json
-  fallbackUsed     Boolean  @default(false)
-  latencyMs        Int?
-  expectedGain     Float?
-  targetNodeIds    String[]
-  selectionReason  String
-  primaryGoal      String?
+  id                  String        @id @default(cuid())
+  studentId           String
+  decisionTs          DateTime      @default(now())
+  candidateSetJson    Json
+  chosenTaskType      String
+  utilityJson         Json
+  fallbackUsed        Boolean       @default(false)
+  latencyMs           Int?
+  expectedGain        Float?
+  targetNodeIds       String[]
+  selectionReason     String
+  primaryGoal         String?
   estimatedDifficulty Float?
-  domainsTargeted  String[]
-  diagnosticMode   Boolean  @default(false)
-  createdAt        DateTime @default(now())
-
-  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  taskInstance TaskInstance?
+  createdAt           DateTime      @default(now())
+  domainsTargeted     String[]      @default([])
+  diagnosticMode      Boolean       @default(false)
+  student             Student       @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  taskInstance        TaskInstance?
 
   @@index([studentId, decisionTs])
 }
 
 model TaskInstance {
-  id                String   @id @default(cuid())
-  studentId         String
-  taskId            String   @unique
-  decisionLogId     String?  @unique
-  taskType          String
-  targetNodeIds     String[]
-  specJson          Json
-  fallbackUsed      Boolean  @default(false)
+  id                  String              @id @default(cuid())
+  studentId           String
+  taskId              String              @unique
+  decisionLogId       String?             @unique
+  taskType            String
+  targetNodeIds       String[]
+  specJson            Json
+  fallbackUsed        Boolean             @default(false)
   estimatedDifficulty Float?
-  createdAt         DateTime @default(now())
-
-  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  decisionLog PlannerDecisionLog? @relation(fields: [decisionLogId], references: [id], onDelete: SetNull)
+  createdAt           DateTime            @default(now())
+  decisionLog         PlannerDecisionLog? @relation(fields: [decisionLogId], references: [id])
+  student             Student             @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  task                Task                @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
   @@index([studentId, createdAt])
   @@index([decisionLogId])
@@ -496,8 +471,7 @@ model PromotionAudit {
   reasonsJson    Json
   readinessScore Float
   createdAt      DateTime @default(now())
-
-  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  student        Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@index([studentId, createdAt])
 }
@@ -509,9 +483,8 @@ model TaskGseTarget {
   weight    Float    @default(1)
   required  Boolean  @default(false)
   createdAt DateTime @default(now())
-
-  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  node GseNode @relation(fields: [nodeId], references: [nodeId], onDelete: Cascade)
+  node      GseNode  @relation(fields: [nodeId], references: [nodeId], onDelete: Cascade)
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
   @@unique([taskId, nodeId])
   @@index([nodeId])

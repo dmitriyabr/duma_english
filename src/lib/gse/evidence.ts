@@ -33,6 +33,7 @@ type TaskEvaluation = {
   }>;
   grammarChecks?: Array<{
     checkId?: string;
+    descriptorId?: string;
     label?: string;
     pass?: boolean;
     confidence?: number;
@@ -374,6 +375,7 @@ function normalizedGrammarChecks(taskEvaluation: TaskEvaluation, transcript: str
   if (fromModel.length > 0) {
     return fromModel.map((check, index) => ({
       checkId: String(check.checkId || `grammar_${index + 1}`),
+      descriptorId: check.descriptorId ? String(check.descriptorId) : undefined,
       label: String(check.label || `Grammar check ${index + 1}`),
       pass: Boolean(check.pass),
       confidence: clamp01(typeof check.confidence === "number" ? check.confidence : 0.72),
@@ -392,6 +394,7 @@ function normalizedGrammarChecks(taskEvaluation: TaskEvaluation, transcript: str
     return [
       {
         checkId: "grammar_accuracy",
+        descriptorId: undefined,
         label: "Grammar accuracy",
         pass: grammarAccuracy >= 0.68,
         confidence: 0.8,
@@ -405,6 +408,7 @@ function normalizedGrammarChecks(taskEvaluation: TaskEvaluation, transcript: str
   return [
     {
       checkId: "grammar_incidental_usage",
+      descriptorId: undefined,
       label: "Grammar in context",
       pass: transcript.trim().length >= 20,
       confidence: 0.62,
@@ -414,19 +418,6 @@ function normalizedGrammarChecks(taskEvaluation: TaskEvaluation, transcript: str
       correction: undefined,
     },
   ];
-}
-
-function grammarComplexityScore(transcript: string, artifacts?: Record<string, unknown>) {
-  if (typeof artifacts?.grammarAccuracy === "number") {
-    return clamp01(artifacts.grammarAccuracy / 100);
-  }
-  const text = transcript.toLowerCase();
-  let score = 0.35;
-  if (/\b(i have|she has|they have)\b/.test(text)) score += 0.1;
-  if (/\b(was|were|had|did)\b/.test(text)) score += 0.15;
-  if (/\b(will|going to|would|could|should|might)\b/.test(text)) score += 0.2;
-  if (/\b(if|although|because|while|when|after|before)\b/.test(text)) score += 0.1;
-  return clamp01(score);
 }
 
 function makeEvidence(params: {
@@ -621,12 +612,13 @@ export function buildOpportunityEvidence(input: BuildOpportunityEvidenceInput) {
     }
 
     if (nodeType === "GSE_GRAMMAR") {
-      const targetHint = `${target.node.descriptor} ${input.taskPrompt}`;
       const selectedCheck =
-        [...grammarChecks]
-          .sort((a, b) => overlapScore(b.label, targetHint) - overlapScore(a.label, targetHint))[0] || null;
-      const grammarScore = selectedCheck ? selectedCheck.confidence : grammarComplexityScore(input.transcript, input.taskEvaluation.artifacts);
-      const correctEnough = selectedCheck ? selectedCheck.pass : grammarScore >= 0.62;
+        grammarChecks
+          .filter((check) => check.descriptorId && check.descriptorId === target.node.sourceKey)
+          .sort((a, b) => b.confidence - a.confidence)[0] || null;
+      if (!selectedCheck) continue;
+      const grammarScore = selectedCheck.confidence;
+      const correctEnough = selectedCheck.pass;
       created.push(
         makeEvidence({
           nodeId: target.nodeId,
@@ -823,9 +815,8 @@ export async function persistAttemptGseEvidence(input: BuildAttemptEvidenceInput
     }
   }
 
-  const grammarChecks = normalizedGrammarChecks(input.taskEvaluation, input.transcript).filter((check) =>
-    check.confidence >= 0.68
-  );
+  const grammarChecksRaw = normalizedGrammarChecks(input.taskEvaluation, input.transcript);
+  const grammarChecks = grammarChecksRaw.filter((check) => check.confidence >= 0.68 && check.descriptorId);
   if (grammarChecks.length > 0) {
     const stageRaw = typeof input.taskMeta?.stage === "string" ? input.taskMeta.stage : "A2";
     const stageRange = mapStageToGseRange(stageRaw);
@@ -833,9 +824,10 @@ export async function persistAttemptGseEvidence(input: BuildAttemptEvidenceInput
       where: {
         type: "GSE_GRAMMAR",
         gseCenter: { gte: stageRange.min - 10, lte: stageRange.max + 10 },
+        descriptor: { notIn: ["", "No grammar descriptor available."] },
       },
       orderBy: [{ gseCenter: "asc" }],
-      select: { nodeId: true, descriptor: true },
+      select: { nodeId: true, descriptor: true, sourceKey: true },
       take: 220,
     });
 
@@ -843,11 +835,8 @@ export async function persistAttemptGseEvidence(input: BuildAttemptEvidenceInput
     let grammarAdded = 0;
     for (const check of grammarChecks) {
       if (grammarAdded >= 6) break;
-      const checkText = `${check.label} ${check.errorType || ""}`;
-      const best = grammarCandidates
-        .map((node) => ({ nodeId: node.nodeId, descriptor: node.descriptor, score: overlapScore(checkText, node.descriptor) }))
-        .sort((a, b) => b.score - a.score)[0];
-      if (!best || best.score < 0.24) continue;
+      const best = grammarCandidates.find((node) => node.sourceKey === check.descriptorId);
+      if (!best) continue;
       if (targetNodeIds.has(best.nodeId) || usedGrammarNodeIds.has(best.nodeId)) continue;
       const pass = check.pass;
       created.push(
@@ -870,7 +859,7 @@ export async function persistAttemptGseEvidence(input: BuildAttemptEvidenceInput
           metadataJson: {
             checkId: check.checkId,
             ruleVersion: EVIDENCE_RULE_VERSION,
-            matchScore: Number(best.score.toFixed(4)),
+            matchScore: 1,
             errorType: check.errorType || null,
           },
         })

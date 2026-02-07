@@ -186,17 +186,25 @@ export async function applyEvidenceToStudentMastery(params: {
       : [];
     const activationStateBefore = normalizeActivationState(existing?.activationState);
 
-    const previousMean = existing?.masteryMean ?? existing?.masteryScore ?? 25;
+    // Trust alpha/beta as the single source of truth when they exist; fall back to stored mean otherwise.
+    const storedMean = existing?.masteryMean ?? existing?.masteryScore ?? 25;
+    const alphaFromStore = typeof existing?.alpha === "number" && existing.alpha > 0 ? existing.alpha : null;
+    const betaFromStore = typeof existing?.beta === "number" && existing.beta > 0 ? existing.beta : null;
+    const meanFromAlphaBeta =
+      alphaFromStore && betaFromStore
+        ? clamp((alphaFromStore / (alphaFromStore + betaFromStore)) * 100)
+        : null;
+
+    // If alpha/beta imply a different mean, prefer that to avoid fake drops when the cached mean drifted.
+    const previousMean =
+      meanFromAlphaBeta !== null && Math.abs(meanFromAlphaBeta - storedMean) > 0.25
+        ? meanFromAlphaBeta
+        : storedMean;
+
     const previousScore01 = clamp01(previousMean / 100);
     const priorStrength = Math.max(4, (existing?.evidenceCount ?? 0) + 4);
-    const alphaBefore =
-      typeof existing?.alpha === "number" && existing.alpha > 0
-        ? existing.alpha
-        : Math.max(1, previousScore01 * priorStrength);
-    const betaBefore =
-      typeof existing?.beta === "number" && existing.beta > 0
-        ? existing.beta
-        : Math.max(1, (1 - previousScore01) * priorStrength);
+    const alphaBefore = alphaFromStore ?? Math.max(1, previousScore01 * priorStrength);
+    const betaBefore = betaFromStore ?? Math.max(1, (1 - previousScore01) * priorStrength);
 
     const kind: GseEvidenceKind = evidence.evidenceKind || "direct";
     const opportunity: GseOpportunityType = evidence.opportunityType || "explicit_target";

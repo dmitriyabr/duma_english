@@ -44,3 +44,10 @@ Admin endpoints are protected by basic auth.
   - `AZURE_SPEECH_KEY`
   - `AZURE_SPEECH_ENDPOINT`
   - `AZURE_SPEECH_REGION`
+
+## Brain docs (current truth)
+
+- `/Users/skyeng/Desktop/duma_english/TASKS.MD`
+- `/Users/skyeng/Desktop/duma_english/docs/BRAIN_RUNTIME.md`
+- `/Users/skyeng/Desktop/duma_english/docs/BRAIN_ROADMAP.md`
+- `/Users/skyeng/Desktop/duma_english/docs/DEBUG_PLAYBOOK.md`

@@ -40,6 +40,7 @@ export async function GET(_: Request, context: AttemptRouteContext) {
             select: {
               nodeId: true,
               descriptor: true,
+              metadataJson: true,
               gseCenter: true,
               skill: true,
               type: true,
@@ -244,27 +245,39 @@ export async function GET(_: Request, context: AttemptRouteContext) {
     wordCount: metrics.wordCount,
     provider: process.env.SPEECH_PROVIDER || "mock",
   };
-  const gseEvidence = attempt.gseEvidence.map((row) => ({
-    nodeId: row.nodeId,
-    signal: row.signalType,
-    evidenceKind: row.evidenceKind,
-    opportunityType: row.opportunityType,
-    score: row.score,
-    confidence: row.confidence,
-    impact: row.impact,
-    weight: row.weight,
-    source: row.source,
-    domain: row.domain,
-    usedForPromotion: row.usedForPromotion,
-    targeted: row.targeted,
-    activationImpact: row.activationImpact,
-    evidenceText: row.evidenceText,
-    metadataJson: row.metadataJson,
-    descriptor: row.node.descriptor,
-    gseCenter: row.node.gseCenter,
-    skill: row.node.skill,
-    type: row.node.type,
-  }));
+  const gseEvidence = attempt.gseEvidence.map((row) => {
+    const meta = row.node.metadataJson as Record<string, unknown> | null;
+    const fallbackLabel =
+      (meta && typeof meta.label === "string" && meta.label) ||
+      (meta && typeof meta.name === "string" && meta.name) ||
+      (row.node.type === "GSE_GRAMMAR" ? "Grammar pattern" : "GSE item");
+    const descriptor =
+      row.node.descriptor && row.node.descriptor.trim().length > 0
+        ? row.node.descriptor
+        : fallbackLabel;
+
+    return {
+      nodeId: row.nodeId,
+      signal: row.signalType,
+      evidenceKind: row.evidenceKind,
+      opportunityType: row.opportunityType,
+      score: row.score,
+      confidence: row.confidence,
+      impact: row.impact,
+      weight: row.weight,
+      source: row.source,
+      domain: row.domain,
+      usedForPromotion: row.usedForPromotion,
+      targeted: row.targeted,
+      activationImpact: row.activationImpact,
+      evidenceText: row.evidenceText,
+      metadataJson: row.metadataJson,
+      descriptor,
+      gseCenter: row.node.gseCenter,
+      skill: row.node.skill,
+      type: row.node.type,
+    };
+  });
   const evidenceMatrix = gseEvidence.map((row) => ({
     nodeId: row.nodeId,
     nodeLabel: row.descriptor,

@@ -48,6 +48,16 @@ test("spontaneous grammar can produce direct grammar evidence", () => {
       taskScore: 78,
       artifacts: {},
       rubricChecks: [{ pass: true, weight: 1 }],
+      grammarChecks: [
+        {
+          checkId: "grammar_present_perfect_usage",
+          descriptorId: "complex_tense",
+          label: "Present perfect used correctly",
+          pass: true,
+          confidence: 0.81,
+          opportunityType: "incidental",
+        },
+      ],
     },
     scoreReliability: "medium",
     taskTargets: [
@@ -118,6 +128,16 @@ test("age-band calibration lowers incidental grammar weight for 6-8 vs 12-14", (
       taskScore: 80,
       artifacts: {},
       rubricChecks: [{ pass: true, weight: 1 }],
+      grammarChecks: [
+        {
+          checkId: "grammar_present_simple",
+          descriptorId: "present_simple",
+          label: "Present simple in context",
+          pass: true,
+          confidence: 0.74,
+          opportunityType: "incidental",
+        },
+      ],
     },
     scoreReliability: "medium" as const,
     taskTargets: [

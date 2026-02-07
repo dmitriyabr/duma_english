@@ -292,7 +292,7 @@ function normalizeGeneratedPayload(
 
 export async function generateTaskSpec(input: GenerateTaskSpecInput): Promise<GeneratedTaskSpec> {
   const apiKey = process.env.OPENAI_API_KEY;
-  const model = process.env.OPENAI_MODEL || "gpt-4o-mini";
+  const model = process.env.OPENAI_MODEL || "gpt-4.1-mini";
   const fallback = fallbackTaskSpec(input);
   if (!apiKey) return fallback;
 
@@ -335,47 +335,8 @@ export async function generateTaskSpec(input: GenerateTaskSpecInput): Promise<Ge
         ],
         temperature: 0.25,
         max_tokens: 420,
-        response_format: {
-          type: "json_schema",
-          json_schema: {
-            name: "generated_task",
-            strict: true,
-            schema: {
-              type: "object",
-              additionalProperties: false,
-              properties: {
-                task_type: { type: "string" },
-                instruction: { type: "string" },
-                constraints: {
-                  type: "object",
-                  additionalProperties: false,
-                  properties: {
-                    minSeconds: { type: "number" },
-                    maxSeconds: { type: "number" },
-                  },
-                  required: ["minSeconds", "maxSeconds"],
-                },
-                maxDurationSec: { type: "number" },
-                assessmentMode: { type: "string", enum: ["pa", "stt"] },
-                expected_artifacts: { type: "array", items: { type: "string" } },
-                scoring_hooks: { type: "array", items: { type: "string" } },
-                estimated_difficulty: { type: "number" },
-                target_nodes: { type: "array", items: { type: "string" } },
-              },
-              required: [
-                "task_type",
-                "instruction",
-                "constraints",
-                "maxDurationSec",
-                "assessmentMode",
-                "expected_artifacts",
-                "scoring_hooks",
-                "estimated_difficulty",
-                "target_nodes",
-              ],
-            },
-          },
-        },
+        // json_schema can 400 on some models; json_object + manual zod validation is more robust.
+        response_format: { type: "json_object" },
       }),
     });
     if (!response.ok) {

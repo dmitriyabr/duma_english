@@ -317,6 +317,11 @@ async function loadNodeState(params: {
     const masteryMean = row.masteryMean ?? row.masteryScore;
     const masterySigma = row.masterySigma ?? 24;
     const halfLifeDays = row.halfLifeDays ?? (row.node.type === "GSE_VOCAB" ? 14 : row.node.type === "GSE_GRAMMAR" ? 21 : 10);
+    const descriptor = row.node.descriptor?.trim()
+      ? row.node.descriptor
+      : row.node.type === "GSE_GRAMMAR"
+      ? "Grammar pattern"
+      : "GSE item";
     const decayedMastery =
       row.decayedMastery ??
       computeDecayedMastery({
@@ -332,7 +337,7 @@ async function loadNodeState(params: {
       : 999;
     return {
       nodeId: row.nodeId,
-      descriptor: row.node.descriptor,
+      descriptor,
       skill: row.node.skill,
       type: row.node.type,
       domain: nodeDomain(row.node.type),
@@ -371,9 +376,14 @@ async function loadNodeState(params: {
 
   for (const node of fallbackNodes) {
     if (states.some((row) => row.nodeId === node.nodeId)) continue;
+    const descriptor = node.descriptor?.trim()
+      ? node.descriptor
+      : node.type === "GSE_GRAMMAR"
+      ? "Grammar pattern"
+      : "GSE item";
     states.push({
       nodeId: node.nodeId,
-      descriptor: node.descriptor,
+      descriptor,
       skill: node.skill,
       type: node.type,
       domain: nodeDomain(node.type),

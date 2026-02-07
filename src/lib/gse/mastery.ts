@@ -76,11 +76,12 @@ function effectiveHalfLifeDays(base: number, evidenceCount: number, reliability:
 
 function baseWeight(kind: GseEvidenceKind, opportunity: GseOpportunityType) {
   if (kind === "direct" && opportunity === "explicit_target") return 1;
-  if (kind === "direct" && opportunity === "elicited_incidental") return 0.65;
-  if (kind === "supporting" && opportunity === "incidental") return 0.35;
+  if (kind === "direct" && opportunity === "elicited_incidental") return 0.8;
+  // Supporting = самостоятельное использование; не хуже намеренного (0.8)
+  if (kind === "supporting" && opportunity === "incidental") return 0.8;
   if (kind === "negative" && opportunity === "explicit_target") return 0.9;
   if (kind === "negative" && opportunity === "incidental") return 0.4;
-  if (kind === "supporting") return 0.3;
+  if (kind === "supporting") return 0.4;
   if (kind === "negative") return 0.55;
   return 0.5;
 }
@@ -209,8 +210,16 @@ export async function applyEvidenceToStudentMastery(params: {
 
     const previousScore01 = clamp01(previousMean / 100);
     const priorStrength = Math.max(4, (existing?.evidenceCount ?? 0) + 4);
-    const alphaBefore = alphaFromStore ?? Math.max(1, previousScore01 * priorStrength);
-    const betaBefore = betaFromStore ?? Math.max(1, (1 - previousScore01) * priorStrength);
+    let alphaBefore = alphaFromStore ?? Math.max(1, previousScore01 * priorStrength);
+    let betaBefore = betaFromStore ?? Math.max(1, (1 - previousScore01) * priorStrength);
+
+    const POSTERIOR_STRENGTH_CAP = 12;
+    const sumBefore = alphaBefore + betaBefore;
+    if (sumBefore > POSTERIOR_STRENGTH_CAP) {
+      const scale = POSTERIOR_STRENGTH_CAP / sumBefore;
+      alphaBefore = alphaBefore * scale;
+      betaBefore = betaBefore * scale;
+    }
 
     const kind: GseEvidenceKind = evidence.evidenceKind || "direct";
     const opportunity: GseOpportunityType = evidence.opportunityType || "explicit_target";
@@ -221,46 +230,47 @@ export async function applyEvidenceToStudentMastery(params: {
         ? evidence.confidence * evidence.impact * 0.8
         : evidence.confidence * evidence.impact
     );
-    const maxWeight = 1.5; // allow streak bonus to speed progression to mastery
-    let effectiveWeight =
-      typeof evidence.weight === "number"
-        ? Math.max(0.05, Math.min(maxWeight, evidence.weight))
-        : Math.max(
-            0.05,
-            Math.min(
-              maxWeight,
-              baseWeight(kind, opportunity) *
-                clamp01(evidence.confidence) *
-                reliabilityFactor(evidence.reliability) *
-                Math.max(0.2, clamp01(evidence.impact))
-            )
-          );
+    const maxWeight = 2; // allow higher streak bonus to speed progression
+    const conf = clamp01(evidence.confidence);
+    const rel = reliabilityFactor(evidence.reliability);
+    const imp = Math.max(0.2, clamp01(evidence.impact));
+    // Reference: what one direct+explicit_target would get with same conf/rel/impact (base 1.0)
+    const refDirectWeight = 1.0 * conf * rel * imp;
+    let effectiveWeight: number;
+    if (typeof evidence.weight === "number") {
+      effectiveWeight = Math.max(0.05, Math.min(maxWeight, evidence.weight));
+    } else if (kind === "supporting" && opportunity === "incidental") {
+      // By definition: supporting+incidental = 0.8 × direct (same conf/rel/impact)
+      effectiveWeight = 0.8 * refDirectWeight;
+    } else {
+      effectiveWeight = baseWeight(kind, opportunity) * conf * rel * imp;
+    }
+    effectiveWeight = Math.max(0.05, Math.min(maxWeight, effectiveWeight));
 
+    // Success = direct (score≥0.7) OR supporting (score≥0.6). Уместное использование слова засчитывается и даёт стрик.
     const directSuccess = kind === "direct" && score >= 0.7;
-    const nextStreak = directSuccess ? directSuccessStreak + 1 : 0;
+    const supportingSuccess = kind === "supporting" && score >= 0.6;
+    const success = directSuccess || supportingSuccess;
+    const nextStreak = success ? directSuccessStreak + 1 : 0;
 
     if (score >= 0.6) effectiveWeight *= 1.1;
     else if (score < 0.4) effectiveWeight *= 0.9;
-    // Repeated supporting success: after 5+ supporting hits on this node, next supporting+incidental with score≥0.6 gets 1.5× so "used the word many times" accumulates faster
-    const supportingCountBefore = existing?.supportingEvidenceCount ?? 0;
-    if (
-      kind === "supporting" &&
-      opportunity === "incidental" &&
-      score >= 0.6 &&
-      supportingCountBefore >= 5
-    ) {
-      effectiveWeight *= 1.5;
-    }
-    // Streak bonus: exponent with cap (2nd ×1.15, 3rd ×1.32, 4th+ ×1.5)
+    // Streak bonus: 2nd in a row ×1.25, 3rd ×1.56, 4th+ ×1.8 (base 1.25, cap 1.8)
     let streakMultiplierApplied: number | undefined;
-    if (directSuccess && directSuccessStreak >= 1) {
-      streakMultiplierApplied = Math.min(1.5, 1.15 ** Math.min(directSuccessStreak, 3));
+    if (success && directSuccessStreak >= 1) {
+      streakMultiplierApplied = Math.min(1.8, 1.25 ** Math.min(directSuccessStreak, 3));
       effectiveWeight *= streakMultiplierApplied;
     }
     effectiveWeight = Math.max(0.05, Math.min(maxWeight, effectiveWeight));
 
-    const alphaAfter = alphaBefore + effectiveWeight * score;
-    const betaAfter = betaBefore + effectiveWeight * (1 - score);
+    let alphaAfter = alphaBefore + effectiveWeight * score;
+    let betaAfter = betaBefore + effectiveWeight * (1 - score);
+    const total = alphaAfter + betaAfter;
+    if (total > POSTERIOR_STRENGTH_CAP) {
+      const scale = POSTERIOR_STRENGTH_CAP / total;
+      alphaAfter = alphaAfter * scale;
+      betaAfter = betaAfter * scale;
+    }
     const nextMean = Number(clamp((alphaAfter / (alphaAfter + betaAfter)) * 100).toFixed(2));
     const nextUncertainty = Number((1 / Math.sqrt(Math.max(2, alphaAfter + betaAfter))).toFixed(4));
 

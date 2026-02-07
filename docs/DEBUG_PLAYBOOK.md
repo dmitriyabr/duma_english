@@ -26,14 +26,26 @@ Then the planner prioritises that node for a **verification** task (explicit tar
 
 2. **Spread across nodes:** Usually each attempt touches **many** nodes (too, for, play, feel, …). So each node gets 1–2 evidences per attempt → small delta per node. Lots of lines = lots of nodes, each moving a little.
 
-3. **Weight of evidence:** Mastery is updated with `alpha += weight * score`, `beta += weight * (1 - score)`. For **incidental/supporting** evidence, `weight` is ~0.2–0.35, so each evidence moves the mean only a bit. **Direct + explicit_target** has weight up to 1, so one strong hit can add several points.
+3. **Weight of evidence:** Mastery is updated with `alpha += weight * score`, `beta += weight * (1 - score)`. For **supporting+incidental** we set effectiveWeight = 0.8 × refDirect (same conf/rel/impact), so each supporting hit moves the mean by **0.8** of what one direct would. **Direct + explicit_target** has weight up to 1 (plus streak).
 
 4. **Decay:** The number you see in "Focus (next targets)" and in the skillset table is **decayedMastery**, not raw mean. It **decreases over time** when the node isn't practiced (half-life ~14 days for vocab). So: raw mean can grow (+0.8, +0.5, …), but if the node isn't practiced again for a while, **decayed** mastery goes down. Result: many pluses in the log, but the **displayed** mastery stays low until the same node is practiced again.
 
 **Summary:** The pluses are real increments to the 0–100 mean. They are small per evidence and spread across many nodes; decay then reduces the **shown** value. To see high mastery: same nodes need repeated practice (many +0.5s on the same node) and/or strong direct evidence; otherwise decay will keep the displayed number low.
 
-## A3) Why so few streaks and small deltas (+0.6, +1.0)
-Run **`npx tsx src/scripts/inspect_profile_evidence.ts [studentId]`** to see your evidence mix. Typically most evidence is **supporting + incidental** (word used in speech but task was not target_vocab with that word). Streak applies only when **kind=direct** and score≥0.7, so with almost no direct evidence you rarely see “streak ×1.15”. Small deltas: supporting weight 0.35 → each hit adds ~0.5–1.0 to the mean; many such hits still leave value low. See MASTERY_METHODOLOGY.md “Why you see so few streaks”.
+**Why +10.9 on "think" but +0.5 on "play" if weight is only 2× different?**  
+See "Why old nodes grow so slowly" below.
+
+**Why do old nodes (play, for, too) grow so slowly?**  
+Mastery = 100×α/(α+β). Each evidence: α += weight×score, β += weight×(1−score), so **α+β каждый раз растёт**.  
+1. **Мало доказательств (новая нода):** α+β маленькая → прирост большой (+10).  
+2. **Много доказательств (старая нода):** α+β большая → прирост маленький (+0.5).  
+
+**Fix (bounded memory):** α+β ограничены сверху (cap **12**), чтобы каждый evidence давал видимый прирост: при streak ×1.56 не +0.6, а **~2+** балла. До 70 реально добраться за 15–25 повторений.
+
+**Ориентир при cap 12:** один evidence при cap — supporting = **0.8×direct** (effectiveWeight = 0.8×refDirect), т.е. **~5–10** баллов (supporting) или **6–12** (direct + streak). Порог «closed» value ≥ 70.
+
+## A3) Evidence mix and streak
+Run **`npx tsx src/scripts/inspect_profile_evidence.ts [studentId]`** to see your evidence mix. Streak applies to both direct and supporting success. Supporting weight 0.8×refDirect. Most evidence is **supporting + incidental** (word used in speech but task was not target_vocab with that word). Streak applies only when **kind=direct** and score≥0.7, so with almost no direct evidence you rarely see “streak ×1.15”. Supporting = 0.8×refDirect → each hit adds ~0.8 of direct delta. See MASTERY_METHODOLOGY.md “Why you see so few streaks”.
 
 ## B) Why skills don't progress (no direct evidence)
 Progress and promotion depend on **direct** evidence (target nodes hit). Check:
@@ -82,7 +94,7 @@ Check:
 
 3. **What exactly gives 17%?**  
    Readiness score formula:  
-   - `coverage * 60` (0 if no nodes at 70+ verified)  
+   - `coverage * 60` (0 if no nodes verified with value≥70)  
    - `+ (reliability >= 0.65 ? 20 : 8)`  
    - `+ (stability >= 0.5 ? 10 : 3)`  
    - `+ min(10, round(confidence * 10))`  

@@ -3,6 +3,7 @@ import { SpeechMetrics } from "./scoring";
 import { extractReferenceText, extractRequiredWords } from "./taskText";
 import { prisma } from "./db";
 import { mapStageToGseRange } from "./gse/utils";
+import { chatJson } from "./llm";
 
 export type RubricCheck = {
   name: string;
@@ -1166,47 +1167,32 @@ async function evaluateWithOpenAI(input: EvaluationInput) {
   ].join("\n");
   const attempts: EvaluationDebugInfo["openai"]["attempts"] = [];
 
+  const systemContent =
+    "You are a strict speaking evaluator for children. Output one JSON object only. No markdown. No comments. No text outside JSON.";
+
   for (let i = 0; i < 2; i += 1) {
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
+    let content: string;
+    try {
+      content = await chatJson(systemContent, prompt, {
+        openaiApiKey: apiKey,
         model,
-        messages: [
-          {
-            role: "system",
-            content:
-              "You are a strict speaking evaluator for children. Output one JSON object only. No markdown. No comments. No text outside JSON.",
-          },
-          { role: "user", content: prompt },
-        ],
         temperature: 0,
-        max_tokens: 700,
-        // Some models return 400 on json_schema; use json_object and validate with zod instead.
-        response_format: { type: "json_object" },
-      }),
-    });
-    if (!response.ok) {
+        maxTokens: 700,
+      });
+    } catch (err) {
+      const status = (err as { status?: number }).status;
       attempts.push({
         try: i + 1,
-        status: response.status,
+        status: status ?? null,
         ok: false,
         parseOk: false,
       });
       continue;
     }
-
-    const data = (await response.json()) as {
-      choices?: { message?: { content?: string } }[];
-    };
-    const content = data.choices?.[0]?.message?.content;
-    if (!content) {
+    if (!content || !content.trim()) {
       attempts.push({
         try: i + 1,
-        status: response.status,
+        status: 200,
         ok: true,
         parseOk: false,
       });
@@ -1220,7 +1206,7 @@ async function evaluateWithOpenAI(input: EvaluationInput) {
       const parsed = outputSchema.parse(normalized);
       attempts.push({
         try: i + 1,
-        status: response.status,
+        status: 200,
         ok: true,
         parseOk: true,
         responsePreview: content.slice(0, 500),
@@ -1239,7 +1225,7 @@ async function evaluateWithOpenAI(input: EvaluationInput) {
     } catch (error) {
       attempts.push({
         try: i + 1,
-        status: response.status,
+        status: 200,
         ok: true,
         parseOk: false,
         parseError: error instanceof Error ? error.message.slice(0, 200) : "JSON parse failed",

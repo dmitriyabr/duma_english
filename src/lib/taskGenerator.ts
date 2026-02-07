@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { buildTaskTemplate } from "./taskTemplates";
 import { extractReferenceText, extractRequiredWords } from "./taskText";
+import { chatJson } from "./llm";
 
 const generatedTaskSchema = z.object({
   task_type: z.string().min(2),
@@ -316,40 +317,17 @@ export async function generateTaskSpec(input: GenerateTaskSpecInput): Promise<Ge
     ...taskTypeQualityGuidance(input),
   ].join("\n");
 
+  const systemContent =
+    "You design child English speaking tasks. Return strict JSON only with requested schema. No markdown.";
+
   try {
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          {
-            role: "system",
-            content:
-              "You design child English speaking tasks. Return strict JSON only with requested schema. No markdown.",
-          },
-          { role: "user", content: prompt },
-        ],
-        temperature: 0.25,
-        max_tokens: 420,
-        // json_schema can 400 on some models; json_object + manual zod validation is more robust.
-        response_format: { type: "json_object" },
-      }),
+    const content = await chatJson(systemContent, prompt, {
+      openaiApiKey: apiKey,
+      model,
+      temperature: 0.25,
+      maxTokens: 420,
     });
-    if (!response.ok) {
-      return {
-        ...fallback,
-        fallbackReason: `openai_http_${response.status}`,
-      };
-    }
-    const payload = (await response.json()) as {
-      choices?: Array<{ message?: { content?: string } }>;
-    };
-    const content = payload.choices?.[0]?.message?.content;
-    if (!content) {
+    if (!content || !content.trim()) {
       return {
         ...fallback,
         fallbackReason: "openai_empty_content",

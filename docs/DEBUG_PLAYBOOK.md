@@ -29,7 +29,21 @@ Check:
 3. reliability and stability gates.
 4. direct evidence counts.
 
-## D) Mandatory checks before saying “fixed”
+## E) Debugging LLM prompts (LangSmith)
+All OpenAI calls (evaluator + task generator) go through LangChain. To trace prompts and responses:
+
+1. Get an API key at https://smith.langchain.com (sign up free).
+2. In `.env` set:
+   - `LANGCHAIN_TRACING_V2=true`
+   - `LANGCHAIN_API_KEY=<your_langsmith_api_key>`
+   - Optionally `LANGCHAIN_PROJECT=duma_english` (project name in LangSmith).
+3. Restart dev server and/or worker. Each LLM run will appear in LangSmith: full prompt, response, latency, token usage.
+4. **Проверка:** открой в браузере `GET /api/debug/langsmith-test` (например http://localhost:3000/api/debug/langsmith-test). Это сделает один тестовый вызов LLM; через несколько секунд он должен появиться в LangSmith. В ответе API будет подсказка, включён ли трейсинг и задан ли ключ.
+5. Use filters by run name or project to find evaluator vs task-generator runs.
+
+Without these env vars, the app works as before; tracing is off.
+
+## F) Mandatory checks before saying “fixed”
 1. `npm test`
 2. `npm run lint`
 3. `npm run build`

@@ -41,6 +41,25 @@ async function main() {
   const targetStage = projection.targetStage;
   const targetRow = bundleReadiness.stageRows.find((r) => r.stage === targetStage);
 
+  console.log("=== 0) Your stage (why A2?) ===\n");
+  console.log("  Placement (evidence-weighted level):", projection.placementStage, `(confidence ${(projection.placementConfidence * 100).toFixed(0)}%)`);
+  console.log("  Promotion (current level shown in UI):", projection.promotionStage);
+  console.log("  Target (next level):", projection.targetStage);
+  if (projection.placementStage !== projection.promotionStage) {
+    const order = ["A0", "A1", "A2", "B1", "B2", "C1", "C2"];
+    const pIdx = order.indexOf(projection.placementStage);
+    const bIdx = order.indexOf(projection.promotionStage);
+    if (pIdx > bIdx) {
+      console.log("  → Promotion was LIFTED to placement (you show skills from higher-level nodes, so we don't show a lower level).");
+    }
+  }
+  console.log("\n  Node coverage by band (mastered = value≥80):");
+  const bands = projection.nodeCoverageByBand ?? {};
+  for (const [band, stat] of Object.entries(bands)) {
+    console.log(`    ${band}: ${stat.mastered}/${stat.total} mastered`);
+  }
+  console.log("");
+
   console.log("=== 1) Why 0 nodes closed? ===\n");
   console.log("Target stage:", targetStage);
   console.log("A node counts as 'closed' for promotion when: verified AND mastery value >= 70.\n");

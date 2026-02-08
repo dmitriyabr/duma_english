@@ -61,5 +61,6 @@
 
 ---
 
-## 5. Скрипт для просмотра нод
-`npx tsx src/scripts/inspect_gse_nodes.ts` — выборка по типам (descriptor, sourceKey, skill, gseCenter) и счётчики.
+## 5. Скрипты
+- `npx tsx src/scripts/inspect_gse_nodes.ts` — ноды по типам в диапазоне stage.
+- `npx tsx src/scripts/gse_fetch_api_sample.ts` — сырой ответ API → `scripts/data/gse_api_sample.json`.

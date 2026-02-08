@@ -47,7 +47,7 @@ export type StageProjection = {
     reason: string;
     blockers: Array<{ nodeId: string; descriptor: string; value: number }>;
   }>;
-  /** Per-bundle achieved count for target stage (X/Y nodes at 70+ verified). */
+  /** Per-bundle achieved count and list for target stage (X/Y nodes at 70+ verified). */
   targetStageBundleProgress: Array<{
     bundleKey: string;
     title: string;
@@ -55,6 +55,7 @@ export type StageProjection = {
     coveredCount: number;
     totalRequired: number;
     ready: boolean;
+    achieved: Array<{ nodeId: string; descriptor: string; value: number }>;
   }>;
   /** 0..1: value-weighted progress toward 70 for target stage nodes (min(value,70)/70). Used so progress bar moves with every evidence. */
   targetStageValueProgress: number;
@@ -365,6 +366,7 @@ export async function projectLearnerStageFromGse(studentId: string): Promise<Sta
     coveredCount: row.coveredCount,
     totalRequired: row.totalRequired,
     ready: row.ready,
+    achieved: row.achieved ?? [],
   }));
 
   const targetStageValueProgress =

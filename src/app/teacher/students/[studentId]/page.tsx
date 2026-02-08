@@ -57,6 +57,7 @@ type Progress = {
       coveredCount: number;
       totalRequired: number;
       ready: boolean;
+      achieved?: Array<{ nodeId: string; descriptor: string; value: number }>;
     }>;
   };
 };
@@ -516,76 +517,47 @@ export default function TeacherStudentProfilePage() {
                 </p>
               )}
 
-              {/* Achieved for target stage (X/Y nodes per bundle) */}
+              {/* All target-stage nodes by bundle: achieved first, then blocking */}
               {(pr.targetStageBundleProgress ?? []).length > 0 && (
-                <div style={{ marginBottom: 16 }}>
+                <div style={{ borderTop: "1px solid rgba(16,22,47,0.08)", paddingTop: 16 }}>
                   <strong style={{ fontFamily: "var(--font-display)", fontSize: "0.95rem" }}>
-                    Achieved for {pr.targetStage} (nodes at 70+ and verified)
+                    GSE nodes for {pr.targetStage} (by bundle)
                   </strong>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 8 }}>
-                    {(pr.targetStageBundleProgress ?? []).map((b) => (
+                  <p className="subtitle" style={{ marginTop: 4, marginBottom: 12, fontSize: "0.9rem" }}>
+                    Achieved = 70+ and verified. Below = not yet; bar shows current mastery.
+                  </p>
+                  {(pr.targetStageBundleProgress ?? []).map((b) => {
+                    const blocked = (pr.blockedBundlesReadable ?? pr.blockedBundles ?? []).find(
+                      (x) => x.bundleKey === b.bundleKey
+                    );
+                    const blockers = blocked?.blockers ?? [];
+                    return (
                       <div
                         key={b.bundleKey}
                         style={{
-                          padding: "8px 12px",
-                          background: b.ready ? "rgba(45,212,160,0.12)" : "rgba(16,22,47,0.05)",
+                          marginBottom: 16,
+                          padding: 12,
+                          background: b.ready ? "rgba(45,212,160,0.06)" : "rgba(16,22,47,0.03)",
                           borderRadius: "var(--radius-sm)",
-                          fontSize: "0.9rem",
                         }}
                       >
-                        <span style={{ fontWeight: 600 }}>{b.title}</span>
-                        <span style={{ color: "var(--ink-2)", marginLeft: 6 }}>
-                          {b.coveredCount} / {b.totalRequired}
-                        </span>
-                        {b.ready && <span style={{ marginLeft: 6, color: "#0d9668" }}>✓</span>}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Blocked bundles with node breakdown */}
-              {!pr.ready && (pr.blockedBundlesReadable ?? pr.blockedBundles ?? []).length > 0 && (
-                <div style={{ borderTop: "1px solid rgba(16,22,47,0.08)", paddingTop: 16 }}>
-                  <strong style={{ fontFamily: "var(--font-display)", fontSize: "0.95rem" }}>
-                    Blocking GSE nodes (by bundle)
-                  </strong>
-                  <p className="subtitle" style={{ marginTop: 4, marginBottom: 12, fontSize: "0.9rem" }}>
-                    Nodes below threshold (70) or not yet verified. Bar shows current mastery.
-                  </p>
-                  {(pr.blockedBundlesReadable ?? pr.blockedBundles ?? []).map((bundle) => (
-                    <div
-                      key={bundle.bundleKey}
-                      style={{
-                        marginBottom: 16,
-                        padding: 12,
-                        background: "rgba(16,22,47,0.03)",
-                        borderRadius: "var(--radius-sm)",
-                      }}
-                    >
-                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                        <span style={{ fontFamily: "var(--font-display)", fontWeight: 600, fontSize: "0.95rem" }}>
-                          {bundle.title}
-                        </span>
-                        <span
-                          style={{
-                            fontSize: "0.8rem",
-                            color: "var(--ink-2)",
-                            textTransform: "capitalize",
-                          }}
-                        >
-                          {bundle.domain}
-                        </span>
-                        {"reasonLabel" in bundle && typeof (bundle as { reasonLabel?: string }).reasonLabel === "string" && (
-                          <span style={{ fontSize: "0.8rem", color: "var(--accent-1)" }}>
-                            ({(bundle as { reasonLabel: string }).reasonLabel})
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                          <span style={{ fontFamily: "var(--font-display)", fontWeight: 600, fontSize: "0.95rem" }}>
+                            {b.title}
                           </span>
-                        )}
-                      </div>
-                      <ul style={{ listStyle: "none", paddingLeft: 0, margin: 0 }}>
-                        {(bundle.blockers ?? []).map((node) => {
-                          const pct = Math.min(100, (node.value / 70) * 100);
-                          return (
+                          <span style={{ fontSize: "0.9rem", color: "var(--ink-2)" }}>
+                            {b.coveredCount} / {b.totalRequired}
+                          </span>
+                          {b.ready && <span style={{ color: "#0d9668" }}>✓</span>}
+                          {"reasonLabel" in (blocked ?? {}) &&
+                            typeof (blocked as { reasonLabel?: string }).reasonLabel === "string" && (
+                              <span style={{ fontSize: "0.8rem", color: "var(--accent-1)" }}>
+                                ({(blocked as { reasonLabel: string }).reasonLabel})
+                              </span>
+                            )}
+                        </div>
+                        <ul style={{ listStyle: "none", paddingLeft: 0, margin: 0 }}>
+                          {(b.achieved ?? []).map((node) => (
                             <li
                               key={node.nodeId}
                               style={{
@@ -596,11 +568,11 @@ export default function TeacherStudentProfilePage() {
                                 fontSize: "0.9rem",
                               }}
                             >
-                              <span style={{ minWidth: 100 }}>{node.descriptor}</span>
+                              <span style={{ color: "#0d9668", minWidth: 24 }}>✓</span>
+                              <span style={{ minWidth: 100, flex: 1 }}>{node.descriptor}</span>
                               <div
                                 style={{
-                                  flex: 1,
-                                  maxWidth: 200,
+                                  width: 200,
                                   height: 8,
                                   borderRadius: 4,
                                   background: "rgba(16,22,47,0.1)",
@@ -609,23 +581,61 @@ export default function TeacherStudentProfilePage() {
                               >
                                 <div
                                   style={{
-                                    width: `${pct}%`,
+                                    width: "100%",
                                     height: "100%",
-                                    background: node.value >= 70 ? "var(--accent-2)" : "var(--accent-3)",
+                                    background: "#0d9668",
                                     borderRadius: 4,
-                                  } as React.CSSProperties}
+                                  }}
                                 />
                               </div>
-                              <span style={{ minWidth: 32, color: "var(--ink-2)", fontWeight: 600 }}>
-                                {Math.round(node.value)}
+                              <span style={{ minWidth: 40, color: "var(--ink-2)", fontWeight: 600 }}>
+                                {Math.round(node.value)} / 70
                               </span>
-                              <span style={{ fontSize: "0.8rem", color: "var(--ink-2)" }}>{"/ 70"}</span>
                             </li>
-                          );
-                        })}
-                      </ul>
-                    </div>
-                  ))}
+                          ))}
+                          {blockers.map((node) => {
+                            const pct = Math.min(100, (node.value / 70) * 100);
+                            return (
+                              <li
+                                key={node.nodeId}
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 10,
+                                  marginBottom: 6,
+                                  fontSize: "0.9rem",
+                                }}
+                              >
+                                <span style={{ minWidth: 24 }} />
+                                <span style={{ minWidth: 100, flex: 1 }}>{node.descriptor}</span>
+                                <div
+                                  style={{
+                                    width: 200,
+                                    height: 8,
+                                    borderRadius: 4,
+                                    background: "rgba(16,22,47,0.1)",
+                                    overflow: "hidden",
+                                  }}
+                                >
+                                  <div
+                                    style={{
+                                      width: `${pct}%`,
+                                      height: "100%",
+                                      background: node.value >= 70 ? "var(--accent-2)" : "var(--accent-3)",
+                                      borderRadius: 4,
+                                    } as React.CSSProperties}
+                                  />
+                                </div>
+                                <span style={{ minWidth: 40, color: "var(--ink-2)", fontWeight: 600 }}>
+                                  {Math.round(node.value)} / 70
+                                </span>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>

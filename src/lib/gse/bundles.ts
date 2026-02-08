@@ -66,6 +66,8 @@ export type BundleReadinessRow = {
   uncertaintyAvg: number;
   ready: boolean;
   blockers: Array<{ nodeId: string; descriptor: string; value: number }>;
+  /** Nodes that count as credited (70+ and verified, or placement above + value≥50 + direct). */
+  achieved: Array<{ nodeId: string; descriptor: string; value: number }>;
 };
 
 export type StageBundleReadiness = {
@@ -243,10 +245,10 @@ export async function computeStageBundleReadiness(studentId: string, placementSt
 
     // Fast credit: when placement is above this bundle's stage, count node as covered if value≥50 and ≥1 direct (no need to grind to verified+70)
     const placementAbove = isPlacementAboveStage(placementStage, bundle.stage as CEFRStage);
-    const coveredCount = scored.filter(
-      (row) =>
-        (row.verified && row.value >= 70) || (placementAbove && row.value >= 50 && row.direct >= 1)
-    ).length;
+    const isCredited = (row: (typeof scored)[0]) =>
+      (row.verified && row.value >= 70) || (placementAbove && row.value >= 50 && row.direct >= 1);
+    const achievedRows = scored.filter(isCredited).sort((a, b) => b.value - a.value);
+    const coveredCount = achievedRows.length;
     const coverage = totalRequired > 0 ? coveredCount / totalRequired : 0;
     const valueProgress =
       totalRequired > 0
@@ -285,14 +287,19 @@ export async function computeStageBundleReadiness(studentId: string, placementSt
       uncertaintyAvg: Number(clamp01(uncertaintyAvg).toFixed(4)),
       ready,
       blockers: scored
-        .filter((row) => !row.verified || row.value < 60)
+        .filter((row) => !isCredited(row))
         .sort((a, b) => a.value - b.value)
-        .slice(0, 5)
+        .slice(0, 20)
         .map((row) => ({
           nodeId: row.nodeId,
           descriptor: row.descriptor,
           value: Number(row.value.toFixed(2)),
         })),
+      achieved: achievedRows.map((row) => ({
+        nodeId: row.nodeId,
+        descriptor: row.descriptor,
+        value: Number(row.value.toFixed(2)),
+      })),
     };
   });
 

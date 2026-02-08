@@ -367,6 +367,12 @@ function normalizedVocabChecks(taskEvaluation: TaskEvaluation, transcript: strin
   }).filter((row) => Boolean(row.nodeId));
 }
 
+/** Single rule for negative evidence: mastery uses score as "success signal"; for negative we need low score so beta grows. */
+function scoreForNegativeEvidence(confidenceThatFailed: number | undefined): number {
+  const c = typeof confidenceThatFailed === "number" ? confidenceThatFailed : 1;
+  return clamp01(1 - c);
+}
+
 function makeEvidence(params: {
   nodeId: string;
   signalType: string;
@@ -430,7 +436,6 @@ export function buildOpportunityEvidence(input: BuildOpportunityEvidenceInput) {
 
   for (const target of input.taskTargets) {
     const nodeType = target.node.type;
-    const impact = Math.max(0.2, Math.min(1, target.weight || 1));
 
     if (nodeType === "GSE_LO") {
       const targetHint = `${target.node.descriptor} ${input.taskPrompt}`;
@@ -439,10 +444,10 @@ export function buildOpportunityEvidence(input: BuildOpportunityEvidenceInput) {
           .sort((a, b) => overlapScore(b.label, targetHint) - overlapScore(a.label, targetHint))[0] || null;
       const positive = selectedCheck ? selectedCheck.pass : passRatio >= 0.55;
       const score = selectedCheck
-        ? (selectedCheck.pass ? selectedCheck.confidence : 1 - selectedCheck.confidence)
+        ? (selectedCheck.pass ? selectedCheck.confidence : scoreForNegativeEvidence(selectedCheck.confidence))
         : positive
         ? passRatio
-        : 1 - passRatio;
+        : scoreForNegativeEvidence(passRatio);
       created.push(
         makeEvidence({
           nodeId: target.nodeId,
@@ -451,7 +456,7 @@ export function buildOpportunityEvidence(input: BuildOpportunityEvidenceInput) {
           opportunity: "explicit_target",
           score,
           confidence: selectedCheck ? selectedCheck.confidence : defaultConf,
-          impact,
+          impact: 1,
           source: "rules",
           domain: "lo",
           usedForPromotion: true,
@@ -496,7 +501,7 @@ export function buildOpportunityEvidence(input: BuildOpportunityEvidenceInput) {
             opportunity: "incidental",
             score: wasUsed ? 0.55 : 0.35,
             confidence: defaultConf * 0.6,
-            impact: Math.min(0.2, impact),
+            impact: 1,
             source: "rules",
             domain: "vocab",
             usedForPromotion: false,
@@ -519,9 +524,9 @@ export function buildOpportunityEvidence(input: BuildOpportunityEvidenceInput) {
             signalType: wasUsed ? "vocab_target_used" : "vocab_target_missing",
             kind: wasUsed ? "direct" : "negative",
             opportunity: "explicit_target",
-            score: wasUsed ? 1 : 0,
+            score: wasUsed ? 1 : scoreForNegativeEvidence(1),
             confidence: selectedCheck ? selectedCheck.confidence : defaultConf,
-            impact,
+            impact: 1,
             source: "rules",
             domain: "vocab",
             usedForPromotion: true,
@@ -543,8 +548,8 @@ export function buildOpportunityEvidence(input: BuildOpportunityEvidenceInput) {
             kind: "supporting",
             opportunity: "incidental",
             score: 0.7,
-            confidence: selectedCheck ? selectedCheck.confidence : defaultConf * 0.75,
-            impact: Math.min(0.45, impact),
+            confidence: defaultConf,
+            impact: 1,
             source: "rules",
             domain: "vocab",
             usedForPromotion: false,
@@ -570,6 +575,7 @@ export function buildOpportunityEvidence(input: BuildOpportunityEvidenceInput) {
       if (!selectedCheck) continue;
       const grammarScore = selectedCheck.confidence;
       const correctEnough = selectedCheck.pass;
+      const score = correctEnough ? grammarScore : scoreForNegativeEvidence(grammarScore);
       created.push(
         makeEvidence({
           nodeId: target.nodeId,
@@ -580,9 +586,9 @@ export function buildOpportunityEvidence(input: BuildOpportunityEvidenceInput) {
             : input.taskType === "read_aloud"
             ? "incidental"
             : "elicited_incidental",
-          score: grammarScore,
+          score,
           confidence: selectedCheck ? selectedCheck.confidence : defaultConf,
-          impact,
+          impact: 1,
           source: "rules",
           domain: "grammar",
           usedForPromotion: true,
@@ -600,20 +606,23 @@ export function buildOpportunityEvidence(input: BuildOpportunityEvidenceInput) {
     }
   }
 
-  // Incidental vocab checks from evaluator (LLM-verified). This replaces the older alias-scan fallback when present.
+  // Incidental vocab: same rule as grammar/LO incidental — only when evidenced in transcript; pass → supporting, !pass → negative.
   const incidentalVocab = vocabChecks
-    .filter((c) => c.opportunityType !== "explicit_target" && c.pass && c.confidence >= 0.66 && !targetNodeIds.has(c.nodeId))
+    .filter((c) => c.opportunityType !== "explicit_target" && c.confidence >= 0.66 && !targetNodeIds.has(c.nodeId))
     .slice(0, 12);
   for (const check of incidentalVocab) {
+    const pass = check.pass;
     created.push(
       makeEvidence({
         nodeId: check.nodeId,
-        signalType: "vocab_incidental_usage",
-        kind: "supporting",
+        signalType: pass ? "vocab_incidental_usage" : "vocab_incidental_error",
+        kind: pass ? "supporting" : "negative",
         opportunity: "incidental",
-        score: Math.max(0.6, Math.min(0.92, check.confidence * 0.92)),
+        score: pass
+          ? Math.max(0.6, Math.min(0.92, check.confidence * 0.92))
+          : scoreForNegativeEvidence(check.confidence),
         confidence: check.confidence,
-        impact: 0.25,
+        impact: 1,
         source: "rules",
         domain: "vocab",
         usedForPromotion: false,
@@ -623,7 +632,7 @@ export function buildOpportunityEvidence(input: BuildOpportunityEvidenceInput) {
         ageBand: input.ageBand,
         evidenceText: check.evidenceSpan || input.transcript.slice(0, 220),
         metadataJson: {
-          checkId: "vocab_incidental_usage",
+          checkId: pass ? "vocab_incidental_usage" : "vocab_incidental_error",
           matchedPhrase: check.matchedPhrase || null,
           label: check.label,
           ruleVersion: EVIDENCE_RULE_VERSION,
@@ -645,9 +654,9 @@ export function buildOpportunityEvidence(input: BuildOpportunityEvidenceInput) {
           signalType: "lo_check_negative_required",
           kind: "negative",
           opportunity: "explicit_target",
-          score: 0.2,
+          score: scoreForNegativeEvidence(0.8),
           confidence: 0.92,
-          impact: Math.max(0.35, Math.min(1, firstLo.weight || 1)),
+          impact: 1,
           source: "rules",
           domain: "lo",
           usedForPromotion: true,
@@ -824,7 +833,7 @@ export async function persistAttemptGseEvidence(input: BuildAttemptEvidenceInput
           opportunity: "incidental",
           score: 0.68,
           confidence: incidentalDefaultConf,
-          impact: 0.8,
+          impact: 1,
           source: "rules",
           domain: "vocab",
           usedForPromotion: false,
@@ -874,9 +883,9 @@ export async function persistAttemptGseEvidence(input: BuildAttemptEvidenceInput
           signalType: pass ? "grammar_incidental_discovery" : "grammar_incidental_error",
           kind: pass ? "supporting" : "negative",
           opportunity: "incidental",
-          score: pass ? Math.max(0.62, Math.min(0.9, check.confidence * 0.92)) : Math.max(0.1, 1 - check.confidence),
+          score: pass ? Math.max(0.62, Math.min(0.9, check.confidence * 0.92)) : scoreForNegativeEvidence(check.confidence),
           confidence: check.confidence,
-          impact: 0.8,
+          impact: 1,
           source: "rules",
           domain: "grammar",
           usedForPromotion: false,
@@ -925,9 +934,9 @@ export async function persistAttemptGseEvidence(input: BuildAttemptEvidenceInput
           opportunity: "incidental",
           score: check.pass
             ? Math.max(0.6, Math.min(0.92, check.confidence * 0.92))
-            : Math.max(0.08, 1 - check.confidence),
+            : scoreForNegativeEvidence(check.confidence),
           confidence: check.confidence,
-          impact: 0.34,
+          impact: 1,
           source: "openai",
           domain: "lo",
           usedForPromotion: false,
@@ -966,7 +975,7 @@ export async function persistAttemptGseEvidence(input: BuildAttemptEvidenceInput
         opportunity: "elicited_incidental",
         score: clamp01(signal.score / 100),
         confidence: conf,
-        impact: 0.5,
+        impact: 1,
         source: "azure",
         domain: node.type === "GSE_GRAMMAR" ? "grammar" : "lo",
         usedForPromotion: true,
@@ -992,7 +1001,29 @@ export async function persistAttemptGseEvidence(input: BuildAttemptEvidenceInput
     const prev = deduped.get(key);
     if (!prev || getEvidenceBaseWeight(row) > getEvidenceBaseWeight(prev)) deduped.set(key, row);
   }
-  const rows = Array.from(deduped.values());
+  let rows = Array.from(deduped.values());
+
+  const nodeIds = [...new Set(rows.map((r) => r.nodeId))];
+  const existingNodes = await prisma.gseNode.findMany({
+    where: { nodeId: { in: nodeIds } },
+    select: { nodeId: true },
+  });
+  const existingNodeIds = new Set(existingNodes.map((n) => n.nodeId));
+  const missing = nodeIds.filter((id) => !existingNodeIds.has(id));
+  if (missing.length > 0) {
+    console.warn(
+      JSON.stringify({
+        event: "gse_evidence_node_id_not_in_catalog",
+        attemptId: input.attemptId,
+        missingNodeIds: missing,
+        source: "log and fix the source; do not add more filters",
+      })
+    );
+  }
+  rows = rows.filter((r) => existingNodeIds.has(r.nodeId));
+  if (rows.length === 0) {
+    return { evidenceCount: 0, nodeOutcomes: [] as NodeMasteryOutcome[] };
+  }
 
   await prisma.attemptGseEvidence.createMany({
     data: rows.map((row) => ({

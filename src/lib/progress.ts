@@ -276,6 +276,8 @@ export async function getStudentProgress(studentId: string) {
         projection.targetStageStats.coverage70 === null
           ? null
           : Number((projection.targetStageStats.coverage70 * 100).toFixed(1)),
+      /** 0..1: value-weighted progress (min(value,70)/70) for target stage nodes; bar uses max(score, this*100) so it moves with every evidence. */
+      valueProgress: projection.targetStageValueProgress,
       blockedByNodes: projection.blockedByNodes,
       blockedByNodeDescriptors: projection.blockedByNodeDescriptors,
       blockedBundles: projection.blockedBundles,
@@ -283,6 +285,7 @@ export async function getStudentProgress(studentId: string) {
         ...item,
         reasonLabel: readableBundleReason(item.reason),
       })),
+      targetStageBundleProgress: projection.targetStageBundleProgress ?? [],
     },
     blockedByNodes: projection.blockedByNodes,
     weeklyFocusReason,

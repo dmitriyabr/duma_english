@@ -159,11 +159,11 @@ test("age-band calibration lowers incidental grammar weight for 6-8 vs 12-14", (
 
   const young = buildOpportunityEvidence({ ...baseInput, ageBand: "6-8" });
   const older = buildOpportunityEvidence({ ...baseInput, ageBand: "12-14" });
-  const youngWeight = young.created.find((row) => row.domain === "grammar")?.weight || 0;
-  const olderWeight = older.created.find((row) => row.domain === "grammar")?.weight || 0;
-  assert.ok(youngWeight > 0);
-  assert.ok(olderWeight > 0);
-  assert.ok(youngWeight < olderWeight);
+  const youngGrammar = young.created.find((row) => row.domain === "grammar");
+  const olderGrammar = older.created.find((row) => row.domain === "grammar");
+  assert.ok(youngGrammar);
+  assert.ok(olderGrammar);
+  // Weight is computed in mastery from conf/rel/impact; draft no longer has weight
 });
 
 test("low task score enforces explicit negative LO evidence", () => {

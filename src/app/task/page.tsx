@@ -53,23 +53,26 @@ export default function TaskPage() {
 
   useEffect(() => {
     let active = true;
+    const controller = new AbortController();
     const requestedType =
       typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("type") : null;
     const endpoint = requestedType
       ? `/api/task/next?type=${encodeURIComponent(requestedType)}`
       : "/api/task/next";
-    fetch(endpoint)
+    fetch(endpoint, { signal: controller.signal })
       .then((res) => (res.ok ? res.json() : Promise.reject(res)))
       .then((json: TaskResponse) => {
         if (!active) return;
         setTask(json);
         localStorage.setItem("currentTask", JSON.stringify(json));
       })
-      .catch(() => {
+      .catch((err) => {
+        if (err.name === "AbortError") return;
         if (active) setError("Unable to load a task. Please login again.");
       });
     return () => {
       active = false;
+      controller.abort();
     };
   }, []);
 

@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import {
   applyEvidenceToStudentMastery,
   EvidenceActivationImpact,
+  getEvidenceBaseWeight,
   GseEvidenceKind,
   GseOpportunityType,
   MasteryEvidence,
@@ -66,7 +67,7 @@ type EvidenceDraft = {
   score: number;
   confidence: number;
   impact: number;
-  weight: number;
+  weight?: number;
   source: string;
   domain: "vocab" | "grammar" | "lo";
   usedForPromotion: boolean;
@@ -76,8 +77,6 @@ type EvidenceDraft = {
   reliability: "high" | "medium" | "low";
   metadataJson?: Record<string, unknown> | null;
 };
-
-type AgeBand = "6-8" | "9-11" | "12-14";
 
 export type BuildAttemptEvidenceInput = {
   attemptId: string;
@@ -103,13 +102,10 @@ export type BuildOpportunityEvidenceInput = {
   scoreReliability: "high" | "medium" | "low";
   taskTargets: TargetNode[];
   ageBand?: string | null;
+  /** For target_vocab: required words from prompt that match each node (by descriptor/alias). Enables "word used" = direct evidence. */
+  targetNodeIdToExtraLexicalForms?: Record<string, { lemmas: string[]; phrases: string[] }>;
 };
 
-const SOURCE_RELIABILITY_FACTOR: Record<"high" | "medium" | "low", number> = {
-  high: 1,
-  medium: 0.8,
-  low: 0.6,
-};
 const EVIDENCE_RULE_VERSION = "gse-evidence-v2.1";
 const STOPWORDS = new Set([
   "the",
@@ -134,27 +130,6 @@ const STOPWORDS = new Set([
   "like",
 ]);
 
-const AGE_DOMAIN_CALIBRATION: Record<
-  AgeBand,
-  Record<"vocab" | "grammar" | "lo", { direct: number; supporting: number; negative: number; incidental: number }>
-> = {
-  "6-8": {
-    vocab: { direct: 1.0, supporting: 0.75, negative: 0.85, incidental: 0.9 },
-    grammar: { direct: 0.9, supporting: 0.7, negative: 0.8, incidental: 0.85 },
-    lo: { direct: 1.0, supporting: 0.8, negative: 0.9, incidental: 0.9 },
-  },
-  "9-11": {
-    vocab: { direct: 1.0, supporting: 1.0, negative: 1.0, incidental: 1.0 },
-    grammar: { direct: 1.0, supporting: 1.0, negative: 1.0, incidental: 1.0 },
-    lo: { direct: 1.0, supporting: 1.0, negative: 1.0, incidental: 1.0 },
-  },
-  "12-14": {
-    vocab: { direct: 1.0, supporting: 0.9, negative: 1.0, incidental: 0.95 },
-    grammar: { direct: 1.1, supporting: 0.95, negative: 1.05, incidental: 1.0 },
-    lo: { direct: 1.05, supporting: 0.9, negative: 1.0, incidental: 0.95 },
-  },
-};
-
 function clamp01(value: number) {
   return Math.max(0, Math.min(1, value));
 }
@@ -169,58 +144,6 @@ export function mapTranscriptToWordSet(input: string) {
         .filter(Boolean)
     )
   );
-}
-
-function baseWeight(kind: GseEvidenceKind, opportunity: GseOpportunityType) {
-  if (kind === "direct" && opportunity === "explicit_target") return 1;
-  if (kind === "direct" && opportunity === "elicited_incidental") return 0.65;
-  if (kind === "supporting" && opportunity === "incidental") return 0.35;
-  if (kind === "negative" && opportunity === "explicit_target") return 0.9;
-  if (kind === "negative" && opportunity === "incidental") return 0.4;
-  return 0.3;
-}
-
-function normalizeAgeBand(value?: string | null): AgeBand {
-  if (value === "6-8" || value === "12-14") return value;
-  return "9-11";
-}
-
-function calibrationFactor(params: {
-  ageBand?: string | null;
-  domain: "vocab" | "grammar" | "lo";
-  kind: GseEvidenceKind;
-  opportunity: GseOpportunityType;
-}) {
-  const ageBand = normalizeAgeBand(params.ageBand);
-  const matrix = AGE_DOMAIN_CALIBRATION[ageBand][params.domain];
-  const kindFactor =
-    params.kind === "direct" ? matrix.direct : params.kind === "negative" ? matrix.negative : matrix.supporting;
-  const incidentalFactor =
-    params.opportunity === "explicit_target" ? 1 : params.opportunity === "elicited_incidental" ? 0.95 : matrix.incidental;
-  return Number((kindFactor * incidentalFactor).toFixed(4));
-}
-
-function computeWeight(params: {
-  kind: GseEvidenceKind;
-  opportunity: GseOpportunityType;
-  confidence: number;
-  reliability: "high" | "medium" | "low";
-  impact: number;
-  domain: "vocab" | "grammar" | "lo";
-  ageBand?: string | null;
-}) {
-  const raw =
-    baseWeight(params.kind, params.opportunity) *
-    clamp01(params.confidence) *
-    SOURCE_RELIABILITY_FACTOR[params.reliability] *
-    Math.max(0.2, clamp01(params.impact)) *
-    calibrationFactor({
-      ageBand: params.ageBand,
-      domain: params.domain,
-      kind: params.kind,
-      opportunity: params.opportunity,
-    });
-  return Number(Math.max(0.05, Math.min(1.2, raw)).toFixed(4));
 }
 
 function normalizeWord(word: string) {
@@ -446,15 +369,6 @@ function makeEvidence(params: {
     score: Number(clamp01(params.score).toFixed(4)),
     confidence: Number(clamp01(params.confidence).toFixed(4)),
     impact: Number(Math.max(0.1, Math.min(1, params.impact)).toFixed(4)),
-    weight: computeWeight({
-      kind: params.kind,
-      opportunity: params.opportunity,
-      confidence: params.confidence,
-      reliability: params.reliability,
-      impact: params.impact,
-      domain: params.domain,
-      ageBand: params.ageBand,
-    }),
     source: params.source,
     domain: params.domain,
     usedForPromotion: params.usedForPromotion,
@@ -528,7 +442,12 @@ export function buildOpportunityEvidence(input: BuildOpportunityEvidenceInput) {
     }
 
     if (nodeType === "GSE_VOCAB") {
-      const lexicalForms = buildVocabLexicalForms(target.node);
+      const baseForms = buildVocabLexicalForms(target.node);
+      const extra = input.targetNodeIdToExtraLexicalForms?.[target.nodeId];
+      const lexicalForms = {
+        lemmas: extra ? [...baseForms.lemmas, ...extra.lemmas] : baseForms.lemmas,
+        phrases: extra ? [...baseForms.phrases, ...extra.phrases] : baseForms.phrases,
+      };
       const wasUsed = lexicalForms.lemmas.some((lemma) => lemmaSet.has(lemma)) ||
         lexicalForms.phrases.some((phrase) => transcriptPhrasePadded.includes(` ${phrase} `));
       const explicitWordTask =
@@ -593,12 +512,12 @@ export function buildOpportunityEvidence(input: BuildOpportunityEvidenceInput) {
             kind: "supporting",
             opportunity: "incidental",
             score: 0.7,
-            confidence: defaultConf * 0.75,
-            impact: Math.min(0.45, impact),
+            confidence: defaultConf,
+            impact,
             source: "rules",
             domain: "vocab",
             usedForPromotion: false,
-            reliability: "medium",
+            reliability,
             ageBand: input.ageBand,
             evidenceText: input.transcript.slice(0, 220),
             metadataJson: {
@@ -718,6 +637,54 @@ export async function persistAttemptGseEvidence(input: BuildAttemptEvidenceInput
     },
   });
 
+  const requiredWordsList = [
+    ...extractRequiredWords(input.taskPrompt),
+    ...(Array.isArray(input.taskMeta?.requiredWords)
+      ? input.taskMeta.requiredWords.map((w) => String(w).toLowerCase())
+      : []),
+  ].map(normalizeWord).filter(Boolean);
+  const requiredWordsSet = new Set(requiredWordsList);
+
+  let targetNodeIdToExtraLexicalForms: Record<string, { lemmas: string[]; phrases: string[] }> | undefined;
+  if (input.taskType === "target_vocab" && requiredWordsList.length > 0) {
+    const vocabTargets = taskTargets.filter((row) => row.node.type === "GSE_VOCAB");
+    const vocabNodeIds = vocabTargets.map((row) => row.nodeId);
+    const aliases = vocabNodeIds.length > 0
+      ? await prisma.gseNodeAlias.findMany({
+          where: { nodeId: { in: vocabNodeIds } },
+          select: { nodeId: true, alias: true },
+        })
+      : [];
+    const aliasByNode = new Map<string, string[]>();
+    for (const a of aliases) {
+      const list = aliasByNode.get(a.nodeId) ?? [];
+      list.push(normalizePhrase(a.alias));
+      aliasByNode.set(a.nodeId, list);
+    }
+    targetNodeIdToExtraLexicalForms = {};
+    for (const row of vocabTargets) {
+      const nodeDescriptor = normalizePhrase(row.node.descriptor ?? "");
+      const nodeAliases = aliasByNode.get(row.nodeId) ?? [];
+      const lemmas = new Set<string>();
+      const phrases = new Set<string>();
+      for (const word of requiredWordsList) {
+        const wordLemma = toLemma(word);
+        const matchesDescriptor = nodeDescriptor.length >= 2 && (word === nodeDescriptor || wordLemma === toLemma(nodeDescriptor));
+        const matchesAlias = nodeAliases.some((al) => al === word || toLemma(al) === wordLemma);
+        if (matchesDescriptor || matchesAlias) {
+          lemmas.add(wordLemma);
+          phrases.add(word);
+        }
+      }
+      if (lemmas.size > 0 || phrases.size > 0) {
+        targetNodeIdToExtraLexicalForms[row.nodeId] = {
+          lemmas: Array.from(lemmas),
+          phrases: Array.from(phrases),
+        };
+      }
+    }
+  }
+
   const { created, metricSignals, consistency } = buildOpportunityEvidence({
     taskType: input.taskType,
     taskPrompt: input.taskPrompt,
@@ -728,22 +695,15 @@ export async function persistAttemptGseEvidence(input: BuildAttemptEvidenceInput
     scoreReliability: input.scoreReliability,
     taskTargets: taskTargets as TargetNode[],
     ageBand: input.ageBand,
+    targetNodeIdToExtraLexicalForms,
   });
 
   const targetNodeIds = new Set(taskTargets.map((row) => row.nodeId));
   const incidentalDefaultConf = confidenceFromReliability(input.scoreReliability);
-  const requiredWords = new Set(
-    [
-      ...extractRequiredWords(input.taskPrompt),
-      ...(Array.isArray(input.taskMeta?.requiredWords)
-        ? input.taskMeta.requiredWords.map((word) => String(word).toLowerCase())
-        : []),
-    ].map(normalizeWord)
-  );
 
   const transcriptWords = mapTranscriptToWordSet(input.transcript)
     .map(normalizeWord)
-    .filter((word) => word.length >= 3 && !requiredWords.has(word) && !STOPWORDS.has(word))
+    .filter((word) => word.length >= 3 && !requiredWordsSet.has(word) && !STOPWORDS.has(word))
     .slice(0, 120);
   const transcriptLemmas = uniqueStrings(transcriptWords.map(toLemma)).filter((word) => word.length >= 3);
   const transcriptCandidates = uniqueStrings([...transcriptWords, ...transcriptLemmas]);
@@ -794,14 +754,14 @@ export async function persistAttemptGseEvidence(input: BuildAttemptEvidenceInput
           kind: "supporting",
           opportunity: "incidental",
           score: 0.68,
-          confidence: incidentalDefaultConf * 0.74,
-          impact: 0.25,
+          confidence: incidentalDefaultConf,
+          impact: 0.8,
           source: "rules",
           domain: "vocab",
           usedForPromotion: false,
           targeted: false,
           activationImpact: "observed",
-          reliability: "medium",
+          reliability: input.scoreReliability,
           ageBand: input.ageBand,
           evidenceText: input.transcript.slice(0, 220),
           metadataJson: {
@@ -847,13 +807,13 @@ export async function persistAttemptGseEvidence(input: BuildAttemptEvidenceInput
           opportunity: "incidental",
           score: pass ? Math.max(0.62, Math.min(0.9, check.confidence * 0.92)) : Math.max(0.1, 1 - check.confidence),
           confidence: check.confidence,
-          impact: 0.3,
+          impact: 0.8,
           source: "rules",
           domain: "grammar",
           usedForPromotion: false,
           targeted: false,
           activationImpact: "observed",
-          reliability: "medium",
+          reliability: input.scoreReliability,
           ageBand: input.ageBand,
           evidenceText: check.evidenceSpan || input.transcript.slice(0, 220),
           metadataJson: {
@@ -911,7 +871,7 @@ export async function persistAttemptGseEvidence(input: BuildAttemptEvidenceInput
   for (const row of created) {
     const key = `${row.nodeId}|${row.signalType}|${row.evidenceKind}`;
     const prev = deduped.get(key);
-    if (!prev || row.weight > prev.weight) deduped.set(key, row);
+    if (!prev || getEvidenceBaseWeight(row) > getEvidenceBaseWeight(prev)) deduped.set(key, row);
   }
   const rows = Array.from(deduped.values());
 
@@ -926,7 +886,7 @@ export async function persistAttemptGseEvidence(input: BuildAttemptEvidenceInput
       score: row.score,
       confidence: row.confidence,
       impact: row.impact,
-      weight: row.weight,
+      weight: getEvidenceBaseWeight(row),
       source: row.source,
       domain: row.domain,
       usedForPromotion: row.usedForPromotion,
@@ -945,7 +905,6 @@ export async function persistAttemptGseEvidence(input: BuildAttemptEvidenceInput
     evidenceKind: row.evidenceKind,
     opportunityType: row.opportunityType,
     score: row.score,
-    weight: row.weight,
     usedForPromotion: row.usedForPromotion,
     taskType: input.taskType,
     targeted: row.targeted,

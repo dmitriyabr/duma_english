@@ -7,7 +7,7 @@ export default function LandingPage() {
         <strong style={{ fontFamily: "var(--font-display)" }}>Duma Trainer</strong>
         <div className="nav-links">
           <Link href="/login">Student login</Link>
-          <Link href="/admin">Teacher admin</Link>
+          <Link href="/teacher">Teacher</Link>
           <Link href="/progress">Progress</Link>
         </div>
       </nav>
@@ -26,8 +26,8 @@ export default function LandingPage() {
             <Link className="btn" href="/login">
               Start practice
             </Link>
-            <Link className="btn ghost" href="/admin">
-              Teacher setup
+            <Link className="btn ghost" href="/teacher">
+              Teacher
             </Link>
           </div>
 

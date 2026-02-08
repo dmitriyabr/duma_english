@@ -85,6 +85,7 @@ type ProgressData = {
     ready: boolean;
     readinessScore: number;
     coverageRatio: number | null;
+    valueProgress?: number;
     blockedByNodes: string[];
     blockedByNodeDescriptors?: string[];
     blockedBundles?: Array<{
@@ -271,6 +272,9 @@ export default function ProgressPage() {
                       {data.promotionReadiness.coverageRatio === null
                         ? "n/a"
                         : `${data.promotionReadiness.coverageRatio}%`}
+                      {typeof data.promotionReadiness.valueProgress === "number"
+                        ? ` | Node progress: ${Math.round(data.promotionReadiness.valueProgress * 100)}%`
+                        : null}
                     </p>
                     <p className="subtitle">
                       Status: {data.promotionReadiness.ready ? "Ready" : "Blocked"}

@@ -47,6 +47,17 @@ export type StageProjection = {
     reason: string;
     blockers: Array<{ nodeId: string; descriptor: string; value: number }>;
   }>;
+  /** Per-bundle achieved count for target stage (X/Y nodes at 70+ verified). */
+  targetStageBundleProgress: Array<{
+    bundleKey: string;
+    title: string;
+    domain: string;
+    coveredCount: number;
+    totalRequired: number;
+    ready: boolean;
+  }>;
+  /** 0..1: value-weighted progress toward 70 for target stage nodes (min(value,70)/70). Used so progress bar moves with every evidence. */
+  targetStageValueProgress: number;
   nodeCoverageByBand: Record<string, { mastered: number; total: number }>;
   derivedSkills: DerivedSkill[];
 };
@@ -279,8 +290,14 @@ export async function projectLearnerStageFromGse(studentId: string): Promise<Sta
   });
 
   const placement = projectPlacementStage(rows);
-  const bundleReadiness = await computeStageBundleReadiness(studentId);
-  const promotionStage = projectPromotionStageFromBundles(bundleReadiness.stageRows);
+  const bundleReadiness = await computeStageBundleReadiness(studentId, placement.stage);
+  const bundlePromotionStage = projectPromotionStageFromBundles(bundleReadiness.stageRows);
+  // If placement is above bundle-based promotion, lift promotion: learner shows skills from higher
+  // nodes → treat as that level so we don't show "A0" while they're working on B1.
+  const placementIdx = toStageIndex(placement.stage);
+  const bundlePromoIdx = toStageIndex(bundlePromotionStage);
+  const promotionStage: CEFRStage =
+    placementIdx > bundlePromoIdx ? placement.stage : bundlePromotionStage;
   const targetStage = nextStage(promotionStage);
   const currentStageRow = bundleReadiness.stageRows.find(
     (row) => row.stage === (promotionStage === "A0" ? "A1" : promotionStage)
@@ -341,6 +358,28 @@ export async function projectLearnerStageFromGse(studentId: string): Promise<Sta
     ).toFixed(1)
   );
 
+  const targetStageBundleProgress = (targetStageRow?.bundleRows ?? []).map((row) => ({
+    bundleKey: row.bundleKey,
+    title: row.title,
+    domain: row.domain,
+    coveredCount: row.coveredCount,
+    totalRequired: row.totalRequired,
+    ready: row.ready,
+  }));
+
+  const targetStageValueProgress =
+    (targetStageRow?.bundleRows ?? []).length > 0
+      ? Number(
+          (
+            (targetStageRow!.bundleRows.reduce(
+              (sum, row) => sum + row.valueProgress * row.totalRequired,
+              0
+            ) as number) /
+            Math.max(1, (targetStageRow!.bundleRows.reduce((s, row) => s + row.totalRequired, 0) as number))
+          ).toFixed(4)
+        )
+      : 0;
+
   return {
     stage: promotionStage,
     confidence,
@@ -357,6 +396,8 @@ export async function projectLearnerStageFromGse(studentId: string): Promise<Sta
     blockedByNodes,
     blockedByNodeDescriptors,
     blockedBundles,
+    targetStageBundleProgress,
+    targetStageValueProgress,
     nodeCoverageByBand: buildNodeCoverageByBand(rows),
     derivedSkills: buildDerivedSkills(rows),
   };

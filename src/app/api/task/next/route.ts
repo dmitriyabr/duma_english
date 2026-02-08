@@ -130,13 +130,30 @@ export async function GET(req: Request) {
     .map((item) => item.task?.prompt || "")
     .filter((value) => value.length > 0);
 
+  // For target_vocab, words in the prompt MUST match planner target nodes — otherwise we penalize for words we never asked for.
+  const targetWordsForPrompt =
+    decision.chosenTaskType === "target_vocab"
+      ? (() => {
+          const fromNodes = decision.targetNodeDescriptors
+            .map((d) => {
+              const w = d.trim().toLowerCase().replace(/[^a-z0-9\s]/g, " ").trim();
+              const first = w.split(/\s+/).filter((t) => t.length >= 2)[0];
+              return first ?? w.slice(0, 20);
+            })
+            .filter((w) => w.length >= 2);
+          const uniq = [...new Set(fromNodes)];
+          return uniq.length >= 2 ? uniq : targetWords;
+        })()
+      : [];
+
   const generated = await generateTaskSpec({
     taskType: decision.chosenTaskType,
     stage: projection.promotionStage,
     ageBand: profile?.ageBand || "9-11",
-    targetWords: decision.chosenTaskType === "target_vocab" ? targetWords : [],
+    targetWords: decision.chosenTaskType === "target_vocab" ? targetWordsForPrompt : [],
     targetNodeIds: decision.targetNodeIds,
     targetNodeLabels: decision.targetNodeDescriptors,
+    targetNodeTypes: decision.targetNodeTypes,
     focusSkills: weakestSkills,
     plannerReason: decision.selectionReason,
     primaryGoal: decision.primaryGoal,
@@ -158,7 +175,7 @@ export async function GET(req: Request) {
   let prompt = generated.prompt;
   let promptTargetWords = selectedTaskType === "target_vocab" ? extractRequiredWords(prompt) : [];
   if (selectedTaskType === "target_vocab" && promptTargetWords.length < 2) {
-    const fallbackWords = targetWords.slice(0, 6);
+    const fallbackWords = targetWordsForPrompt.length >= 2 ? targetWordsForPrompt : targetWords.slice(0, 6);
     if (fallbackWords.length >= 2) {
       prompt = `Use these words in a short talk: ${fallbackWords.join(", ")}.`;
       promptTargetWords = fallbackWords;
@@ -207,13 +224,14 @@ export async function GET(req: Request) {
     },
   });
 
+  // Target nodes always from planner; LLM is not asked for IDs (only for instruction text and words).
   const gseSelection = await assignTaskTargetsFromCatalog({
     taskId: task.id,
     stage: projection.promotionStage,
     taskType: selectedTaskType,
     ageBand: profile?.ageBand || "9-11",
     studentId: student.studentId,
-    preferredNodeIds: generated.targetNodes.length > 0 ? generated.targetNodes : decision.targetNodeIds,
+    preferredNodeIds: decision.targetNodeIds,
   });
   if (gseSelection.targetNodeIds.length === 0) {
     return NextResponse.json(
@@ -239,6 +257,7 @@ export async function GET(req: Request) {
       estimatedDifficulty: generated.estimatedDifficulty,
       targetNodes: gseSelection.targetNodeIds,
       model: generated.model || null,
+      fallbackReason: generated.fallbackReason ?? null,
     } as Prisma.InputJsonValue,
     fallbackUsed: generated.fallbackUsed,
     estimatedDifficulty: generated.estimatedDifficulty,
@@ -273,7 +292,7 @@ export async function GET(req: Request) {
     ageBand: profile?.ageBand || "9-11",
     reason: decision.selectionReason,
     targetSkills: weakestSkills,
-    targetWords,
+    targetWords: selectedTaskType === "target_vocab" ? promptTargetWords : targetWords,
     recommendedTaskTypes: ALL_TASK_TYPES,
     placementFresh: Boolean(profile?.placementFresh),
     coldStartActive,

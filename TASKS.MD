@@ -142,9 +142,15 @@ Build an autonomous speaking trainer where every learning decision is based on G
 - Plan: `docs/TEACHER_STUDENT_UI_PLAN.md`
 - Done: Teacher auth (email + password, signup/login), dashboard, classes, add students, generate codes, student profile (updates, dynamics, GSE nodes). Student login unchanged (code + name). Landing links to `/teacher` instead of `/admin`.
 
-## 9) Docs Index
+## 9) Eval split (LO / Grammar / Vocab) — реализовано
+- Branch: `feature/eval-split-lo-grammar-vocab`
+- Plan: `docs/EVAL_SPLIT_PLAN.md`
+- Включение: `EVAL_SPLIT_BY_DOMAIN=true` в `.env`. При включении: три LLM-запроса (LO, grammar, vocab) параллельно, затем один общий (taskScore, rubricChecks, artifacts, evidence, feedback). Лимиты: LO 16 кандидатов / 8 чеков, Grammar 14/10, Vocab 20/12. Сборка в один taskEvaluation, контракт evidence/mastery без изменений.
+
+## 10) Docs Index
 Authoritative docs are in:
 1. `docs/BRAIN_RUNTIME.md`
 2. `docs/BRAIN_ROADMAP.md`
 3. `docs/DEBUG_PLAYBOOK.md`
 4. `docs/TEACHER_STUDENT_UI_PLAN.md` (teacher/student UI)
+5. `docs/EVAL_SPLIT_PLAN.md` (split evaluation by domain)

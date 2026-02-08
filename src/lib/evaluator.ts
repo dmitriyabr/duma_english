@@ -106,6 +106,13 @@ export type EvaluationInput = {
 
 const MODEL_VERSION = "eval-v2";
 
+const SPLIT_LO_CANDIDATES = 16;
+const SPLIT_GRAMMAR_CANDIDATES = 14;
+const SPLIT_VOCAB_CANDIDATES = 20;
+const SPLIT_LO_CHECKS_MAX = 8;
+const SPLIT_GRAMMAR_CHECKS_MAX = 10;
+const SPLIT_VOCAB_CHECKS_MAX = 12;
+
 const outputSchema = z.object({
   taskEvaluation: z.object({
     taskType: z.string(),
@@ -1037,6 +1044,402 @@ function parseMaybeJson(content: string) {
   }
 }
 
+const loOnlySchema = z.object({
+  loChecks: z.array(
+    z.object({
+      checkId: z.string(),
+      label: z.string(),
+      pass: z.boolean(),
+      confidence: z.number().min(0).max(1),
+      severity: z.enum(["low", "medium", "high"]),
+      evidenceSpan: z.string().optional(),
+    })
+  ),
+});
+
+const grammarOnlySchema = z.object({
+  grammarChecks: z.array(
+    z.object({
+      checkId: z.string().optional(),
+      descriptorId: z.string().optional(),
+      label: z.string(),
+      pass: z.boolean(),
+      confidence: z.number().min(0).max(1),
+      opportunityType: z.enum(["explicit_target", "elicited_incidental", "incidental"]),
+      errorType: z.string().optional(),
+      evidenceSpan: z.string().optional(),
+      correction: z.string().optional(),
+    })
+  ),
+});
+
+const vocabOnlySchema = z.object({
+  vocabChecks: z.array(
+    z.object({
+      nodeId: z.string(),
+      label: z.string(),
+      pass: z.boolean(),
+      confidence: z.number().min(0).max(1),
+      opportunityType: z.enum(["explicit_target", "incidental"]),
+      evidenceSpan: z.string().optional(),
+      matchedPhrase: z.string().optional(),
+    })
+  ),
+});
+
+const generalOnlySchema = z.object({
+  taskEvaluation: z.object({
+    taskType: z.string(),
+    taskScore: z.number().min(0).max(100),
+    languageScore: z.number().min(0).max(100).optional(),
+    artifacts: z.record(z.unknown()),
+    rubricChecks: z.array(
+      z.object({
+        name: z.string(),
+        pass: z.boolean(),
+        reason: z.string(),
+        weight: z.number().min(0).max(1),
+      })
+    ),
+    evidence: z.array(z.string()).max(6),
+  }),
+  feedback: z.object({
+    summary: z.string(),
+    whatWentWell: z.array(z.string()).min(1).max(3),
+    whatToFixNow: z.array(z.string()).min(1).max(3),
+    exampleBetterAnswer: z.string(),
+    nextMicroTask: z.string(),
+  }),
+});
+
+async function evaluateLoOnly(
+  apiKey: string,
+  model: string,
+  input: EvaluationInput,
+  targetOptions: Array<{ nodeId: string; label: string }>,
+  candidateOptions: Array<{ nodeId: string; label: string }>
+): Promise<LoCheck[]> {
+  const compactInput = buildOpenAIInput(input);
+  const prompt = [
+    "You evaluate ONLY Learning Objectives (LO) for this child speaking attempt.",
+    "Return one JSON object: { \"loChecks\": [ ... ] }. No markdown.",
+    "Use only nodeIds from the provided options. Do not invent IDs.",
+    "Evidence gating: set pass=true ONLY if the transcript contains clear evidence for that LO. Include ALL target options (pass true/false).",
+    "Do NOT be minimal. Include up to " +
+      SPLIT_LO_CHECKS_MAX +
+      " loChecks when clearly evidenced.",
+    "Each item: { checkId (nodeId), label, pass, confidence (0..1), severity (low|medium|high), evidenceSpan (optional) }.",
+    `Target LO options: ${JSON.stringify(targetOptions)}`,
+    `Candidate LO options: ${JSON.stringify(candidateOptions)}`,
+    `Input: ${JSON.stringify(compactInput)}`,
+  ].join("\n");
+  const content = await chatJson(
+    "You are a strict speaking evaluator. Output one JSON object only. No markdown.",
+    prompt,
+    { openaiApiKey: apiKey, model, temperature: 0, maxTokens: 700, runName: "gse_eval_lo", tags: ["gse", "eval_split", "lo"] }
+  );
+  const raw = parseMaybeJson(content || "");
+  if (!raw || typeof raw !== "object") return [];
+  const parsed = loOnlySchema.safeParse(raw);
+  if (!parsed.success) return [];
+  return (parsed.data.loChecks || []).slice(0, SPLIT_LO_CHECKS_MAX);
+}
+
+async function evaluateGrammarOnly(
+  apiKey: string,
+  model: string,
+  input: EvaluationInput,
+  targetOptions: Array<{ descriptorId: string; label: string }>,
+  candidateOptions: Array<{ descriptorId: string; label: string }>,
+  targetGrammarDescriptorIds: Set<string>
+): Promise<GrammarCheck[]> {
+  const compactInput = buildOpenAIInput(input);
+  const prompt = [
+    "You evaluate ONLY Grammar for this child speaking attempt.",
+    "Return one JSON object: { \"grammarChecks\": [ ... ] }. No markdown.",
+    "Use only descriptorIds from the provided options. Do not invent IDs.",
+    "Evidence gating: set pass=true ONLY if the transcript contains clear evidence. Include ALL target options (pass true/false).",
+    "opportunityType: explicit_target ONLY for descriptorIds in Target Grammar options; otherwise incidental or elicited_incidental.",
+    "Do NOT be minimal. Include up to " + SPLIT_GRAMMAR_CHECKS_MAX + " grammarChecks when clearly evidenced.",
+    "Each item: { checkId, descriptorId, label, pass, confidence (0..1), opportunityType, evidenceSpan (optional) }.",
+    `Target Grammar options: ${JSON.stringify(targetOptions)}`,
+    `Candidate Grammar options: ${JSON.stringify(candidateOptions)}`,
+    `Input: ${JSON.stringify(compactInput)}`,
+  ].join("\n");
+  const content = await chatJson(
+    "You are a strict speaking evaluator. Output one JSON object only. No markdown.",
+    prompt,
+    {
+      openaiApiKey: apiKey,
+      model,
+      temperature: 0,
+      maxTokens: 800,
+      runName: "gse_eval_grammar",
+      tags: ["gse", "eval_split", "grammar"],
+    }
+  );
+  const raw = parseMaybeJson(content || "");
+  if (!raw || typeof raw !== "object") return [];
+  const parsed = grammarOnlySchema.safeParse(raw);
+  if (!parsed.success) return [];
+  return (parsed.data.grammarChecks || []).slice(0, SPLIT_GRAMMAR_CHECKS_MAX).map((c) => ({
+    ...c,
+    checkId: c.checkId ?? c.descriptorId ?? slugify(c.label),
+    opportunityType:
+      c.descriptorId && targetGrammarDescriptorIds.has(c.descriptorId)
+        ? "explicit_target"
+        : c.opportunityType,
+  }));
+}
+
+async function evaluateVocabOnly(
+  apiKey: string,
+  model: string,
+  input: EvaluationInput,
+  targetOptions: Array<{ nodeId: string; label: string }>,
+  candidateOptions: Array<{ nodeId: string; label: string; topicHints?: string[]; grammaticalCategories?: string[] }>,
+  targetVocabNodeIds: Set<string>
+): Promise<VocabCheck[]> {
+  const compactInput = buildOpenAIInput(input);
+  const prompt = [
+    "You evaluate ONLY Vocabulary for this child speaking attempt.",
+    "Return one JSON object: { \"vocabChecks\": [ ... ] }. No markdown.",
+    "Use only nodeIds from the provided options. Do not invent IDs.",
+    "Evidence gating: set pass=true ONLY if the transcript contains clear evidence. Include ALL target options (pass true/false).",
+    "opportunityType: explicit_target ONLY for nodeIds in Target Vocabulary options; otherwise incidental.",
+    "Do NOT be minimal. Include up to " + SPLIT_VOCAB_CHECKS_MAX + " vocabChecks when clearly evidenced.",
+    "Each item: { nodeId, label, pass, confidence (0..1), opportunityType, evidenceSpan (optional), matchedPhrase (optional) }.",
+    `Target Vocabulary options: ${JSON.stringify(targetOptions)}`,
+    `Candidate Vocabulary options: ${JSON.stringify(candidateOptions.map((c) => ({ nodeId: c.nodeId, label: c.label })))}`,
+    `Input: ${JSON.stringify(compactInput)}`,
+  ].join("\n");
+  const content = await chatJson(
+    "You are a strict speaking evaluator. Output one JSON object only. No markdown.",
+    prompt,
+    {
+      openaiApiKey: apiKey,
+      model,
+      temperature: 0,
+      maxTokens: 800,
+      runName: "gse_eval_vocab",
+      tags: ["gse", "eval_split", "vocab"],
+    }
+  );
+  const raw = parseMaybeJson(content || "");
+  if (!raw || typeof raw !== "object") return [];
+  const parsed = vocabOnlySchema.safeParse(raw);
+  if (!parsed.success) return [];
+  return (parsed.data.vocabChecks || []).slice(0, SPLIT_VOCAB_CHECKS_MAX).map((c) => ({
+    ...c,
+    opportunityType: c.nodeId && targetVocabNodeIds.has(c.nodeId) ? "explicit_target" : c.opportunityType,
+  }));
+}
+
+async function evaluateGeneralOnly(
+  apiKey: string,
+  model: string,
+  input: EvaluationInput,
+  domainSummary: { loPass: number; grammarPass: number; vocabPass: number }
+): Promise<{
+  taskScore: number;
+  languageScore?: number;
+  rubricChecks: RubricCheck[];
+  artifacts: Record<string, unknown>;
+  evidence: string[];
+  feedback: FeedbackResult;
+} | null> {
+  const compactInput = buildOpenAIInput(input);
+  const prompt = [
+    "Evaluate overall task success and give feedback for this child speaking attempt. Do NOT evaluate LO/grammar/vocab — that is done separately.",
+    "Return one JSON object: { taskEvaluation: { taskType, taskScore, languageScore, artifacts, rubricChecks, evidence }, feedback: { summary, whatWentWell, whatToFixNow, exampleBetterAnswer, nextMicroTask } }.",
+    "Scores 0..100. rubricChecks: at least 2 items, each { name, pass, reason, weight }. Total weight close to 1.",
+    buildTaskSpecificPrompt(input.taskType),
+    "Domain checks summary (for consistency): " + JSON.stringify(domainSummary),
+    `Input: ${JSON.stringify(compactInput)}`,
+  ].join("\n");
+  const content = await chatJson(
+    "You are a strict speaking evaluator. Output one JSON object only. No markdown.",
+    prompt,
+    {
+      openaiApiKey: apiKey,
+      model,
+      temperature: 0,
+      maxTokens: 850,
+      runName: "gse_eval_general",
+      tags: ["gse", "eval_split", "general"],
+    }
+  );
+  const raw = parseMaybeJson(content || "");
+  if (!raw || typeof raw !== "object") return null;
+  const parsed = generalOnlySchema.safeParse(raw);
+  if (!parsed.success) return null;
+  const te = parsed.data.taskEvaluation;
+  const fb = parsed.data.feedback;
+  return {
+    taskScore: te.taskScore,
+    languageScore: te.languageScore,
+    rubricChecks: te.rubricChecks?.length ? te.rubricChecks : [{ name: "task", pass: te.taskScore >= 65, reason: "Overall", weight: 1 }],
+    artifacts: te.artifacts ?? {},
+    evidence: te.evidence ?? [],
+    feedback: fb,
+  };
+}
+
+async function evaluateWithOpenAISplit(input: EvaluationInput): Promise<{
+  parsed: { taskEvaluation: TaskEvaluation; feedback: FeedbackResult } | null;
+  debug: Pick<EvaluationDebugInfo, "openai">;
+}> {
+  const apiKey = process.env.OPENAI_API_KEY;
+  const model = process.env.OPENAI_MODEL || "gpt-4.1-mini";
+  if (!apiKey) {
+    return {
+      parsed: null,
+      debug: {
+        openai: {
+          enabled: false,
+          model: model ?? "gpt-4.1-mini",
+          attempts: [],
+          finalSource: "rules" as const,
+          reason: "OPENAI_API_KEY is missing",
+        },
+      },
+    };
+  }
+
+  const stageRaw =
+    typeof input.taskMeta?.stage === "string" && input.taskMeta.stage.trim().length > 0
+      ? input.taskMeta.stage
+      : "A2";
+  const ageBandRaw =
+    typeof input.taskMeta?.ageBand === "string" && input.taskMeta.ageBand.trim().length > 0
+      ? input.taskMeta.ageBand
+      : null;
+
+  const [semanticContext, vocabContext] = await Promise.all([
+    buildSemanticEvaluationContext({
+      transcript: input.transcript,
+      taskPrompt: input.taskPrompt,
+      taskType: input.taskType,
+      stage: stageRaw,
+      ageBand: ageBandRaw,
+    }),
+    buildVocabEvaluationContext({
+      transcript: input.transcript,
+      stage: stageRaw,
+      ageBand: ageBandRaw,
+      taskType: input.taskType,
+      runId: input.taskId,
+    }),
+  ]);
+
+  const taskTargets = Array.isArray(input.taskTargets) ? input.taskTargets : [];
+  const targetLoOptions = taskTargets
+    .filter((t) => t?.node?.type === "GSE_LO" && typeof t.nodeId === "string" && typeof t.node?.descriptor === "string")
+    .slice(0, 8)
+    .map((t) => ({ nodeId: t.nodeId!, label: (t.node!.descriptor ?? "").slice(0, 140) }));
+  const targetGrammarOptions = taskTargets
+    .filter(
+      (t) =>
+        t?.node?.type === "GSE_GRAMMAR" &&
+        typeof t.node?.sourceKey === "string" &&
+        typeof t.node?.descriptor === "string"
+    )
+    .slice(0, 8)
+    .map((t) => ({
+      descriptorId: t.node!.sourceKey,
+      label: (t.node!.descriptor ?? "").slice(0, 140),
+    }));
+  const targetVocabOptions = taskTargets
+    .filter((t) => t?.node?.type === "GSE_VOCAB" && typeof t.nodeId === "string" && typeof t.node?.descriptor === "string")
+    .slice(0, 12)
+    .map((t) => ({ nodeId: t.nodeId!, label: (t.node!.descriptor ?? "").slice(0, 140) }));
+
+  const targetLoNodeIds = new Set(targetLoOptions.map((t) => t.nodeId));
+  const targetGrammarDescriptorIds = new Set(targetGrammarOptions.map((t) => t.descriptorId));
+  const targetVocabNodeIds = new Set(targetVocabOptions.map((t) => t.nodeId));
+
+  const loOptions = semanticContext.loCandidates
+    .filter((item) => !targetLoNodeIds.has(item.nodeId))
+    .slice(0, SPLIT_LO_CANDIDATES)
+    .map((item) => ({ nodeId: item.nodeId, label: item.descriptor.slice(0, 140) }));
+  const grammarOptions = semanticContext.grammarCandidates
+    .filter((item) => !targetGrammarDescriptorIds.has(item.sourceKey))
+    .slice(0, SPLIT_GRAMMAR_CANDIDATES)
+    .map((item) => ({ descriptorId: item.sourceKey, label: item.descriptor.slice(0, 140) }));
+  const vocabOptions = vocabContext.candidates
+    .filter((c) => !targetVocabNodeIds.has(c.nodeId))
+    .slice(0, SPLIT_VOCAB_CANDIDATES)
+    .map((c) => ({
+      nodeId: c.nodeId,
+      label: c.descriptor.slice(0, 140),
+      topicHints: c.topicHints?.slice(0, 2),
+      grammaticalCategories: c.grammaticalCategories?.slice(0, 2),
+    }));
+
+  const [loChecks, grammarChecks, vocabChecks] = await Promise.all([
+    evaluateLoOnly(apiKey, model, input, targetLoOptions, loOptions),
+    evaluateGrammarOnly(
+      apiKey,
+      model,
+      input,
+      targetGrammarOptions,
+      grammarOptions,
+      targetGrammarDescriptorIds
+    ),
+    evaluateVocabOnly(apiKey, model, input, targetVocabOptions, vocabOptions, targetVocabNodeIds),
+  ]);
+
+  const domainSummary = {
+    loPass: loChecks.filter((c) => c.pass).length,
+    grammarPass: grammarChecks.filter((c) => c.pass).length,
+    vocabPass: vocabChecks.filter((c) => c.pass).length,
+  };
+
+  const general = await evaluateGeneralOnly(apiKey, model, input, domainSummary);
+  if (!general) {
+    return {
+      parsed: null,
+      debug: {
+        openai: {
+          enabled: true,
+          model,
+          attempts: [{ try: 1, status: 200, ok: true, parseOk: false }],
+          finalSource: "rules" as const,
+          reason: "general evaluation parse failed",
+        },
+      },
+    };
+  }
+
+  const taskEvaluation: TaskEvaluation = {
+    taskType: input.taskType,
+    taskScore: general.taskScore,
+    languageScore: general.languageScore,
+    artifacts: general.artifacts,
+    rubricChecks: general.rubricChecks,
+    loChecks,
+    grammarChecks,
+    vocabChecks,
+    evidence: general.evidence,
+    modelVersion: `${MODEL_VERSION}+openai-split`,
+  };
+
+  return {
+    parsed: {
+      taskEvaluation,
+      feedback: general.feedback,
+    },
+    debug: {
+      openai: {
+        enabled: true,
+        model,
+        attempts: [{ try: 1, status: 200, ok: true, parseOk: true }],
+        finalSource: "openai" as const,
+      },
+    },
+  };
+}
+
 async function evaluateWithOpenAI(input: EvaluationInput) {
   const apiKey = process.env.OPENAI_API_KEY;
   const model = process.env.OPENAI_MODEL || "gpt-4.1-mini";
@@ -1358,11 +1761,14 @@ async function evaluateWithOpenAI(input: EvaluationInput) {
 
 export async function evaluateTaskQuality(input: EvaluationInput) {
   const promptPreview = `${input.taskType} :: ${input.taskPrompt.slice(0, 160)}`;
-  const fromModel = await evaluateWithOpenAI(input);
+  const useSplit = process.env.EVAL_SPLIT_BY_DOMAIN === "true";
+  const fromModel = useSplit
+    ? await evaluateWithOpenAISplit(input)
+    : await evaluateWithOpenAI(input);
   if (fromModel.parsed) {
     const baseTaskEvaluation: TaskEvaluation = {
       ...fromModel.parsed.taskEvaluation,
-      modelVersion: `${MODEL_VERSION}+openai`,
+      modelVersion: fromModel.parsed.taskEvaluation.modelVersion || `${MODEL_VERSION}+openai`,
       loChecks: fromModel.parsed.taskEvaluation.loChecks || [],
       grammarChecks: fromModel.parsed.taskEvaluation.grammarChecks || [],
       vocabChecks: fromModel.parsed.taskEvaluation.vocabChecks || [],

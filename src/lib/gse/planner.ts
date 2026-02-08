@@ -11,6 +11,11 @@ function nextStage(stage: string): CEFRStage {
   if (i < 0 || i >= STAGE_ORDER.length - 1) return (stage as CEFRStage) || "A1";
   return STAGE_ORDER[i + 1];
 }
+function prevStage(stage: string): CEFRStage | null {
+  const i = STAGE_ORDER.indexOf(stage as CEFRStage);
+  if (i <= 0) return null;
+  return STAGE_ORDER[i - 1];
+}
 
 type DomainKey = "vocab" | "grammar" | "lo";
 
@@ -54,6 +59,30 @@ function round(value: number) {
 
 function dedupe<T>(items: T[]) {
   return Array.from(new Set(items));
+}
+
+/** Weighted random sample without replacement; weightFn must return > 0. */
+function weightedSampleWithoutReplacement<T>(
+  items: T[],
+  k: number,
+  weightFn: (item: T) => number
+): T[] {
+  if (items.length <= k) return [...items];
+  const result: T[] = [];
+  let remaining = items.map((item) => ({ item, weight: Math.max(1e-6, weightFn(item)) }));
+  for (let s = 0; s < k && remaining.length > 0; s++) {
+    const total = remaining.reduce((sum, x) => sum + x.weight, 0);
+    let r = Math.random() * total;
+    for (let i = 0; i < remaining.length; i++) {
+      r -= remaining[i].weight;
+      if (r <= 0) {
+        result.push(remaining[i].item);
+        remaining.splice(i, 1);
+        break;
+      }
+    }
+  }
+  return result;
 }
 
 function buildPrimaryGoal(params: { overdueCount: number; weakCount: number; uncertainCount: number }) {
@@ -118,6 +147,7 @@ type CandidateScore = {
   taskType: string;
   targetNodeIds: string[];
   targetNodeDescriptors: string[];
+  targetNodeTypes: string[];
   domainsTargeted: DomainKey[];
   expectedGain: number;
   successProbability: number;
@@ -137,6 +167,7 @@ export type PlannerDecision = {
   chosenTaskType: string;
   targetNodeIds: string[];
   targetNodeDescriptors: string[];
+  targetNodeTypes: string[];
   domainsTargeted: DomainKey[];
   diagnosticMode: boolean;
   rotationApplied: boolean;
@@ -367,7 +398,12 @@ async function loadNodeState(params: {
     };
   });
 
-  if (states.length >= 8) return states;
+  // Exclude fully mastered so they don't take pool slots; when they decay they re-enter (same row, lower decayedMastery)
+  const statesFiltered = states.filter(
+    (n) => !(n.activationState === "verified" && n.decayedMastery >= 70)
+  );
+
+  if (statesFiltered.length >= 8) return statesFiltered;
 
   const fallbackNodes = await prisma.gseNode.findMany({
     where: {
@@ -386,13 +422,13 @@ async function loadNodeState(params: {
   });
 
   for (const node of fallbackNodes) {
-    if (states.some((row) => row.nodeId === node.nodeId)) continue;
+    if (statesFiltered.some((row) => row.nodeId === node.nodeId)) continue;
     const descriptor = node.descriptor?.trim()
       ? node.descriptor
       : node.type === "GSE_GRAMMAR"
       ? "Grammar pattern"
       : "GSE item";
-    states.push({
+    statesFiltered.push({
       nodeId: node.nodeId,
       descriptor,
       skill: node.skill,
@@ -408,10 +444,118 @@ async function loadNodeState(params: {
       activationState: "observed",
       verificationDueAt: null,
     });
-    if (states.length >= 20) break;
+    if (statesFiltered.length >= 20) break;
   }
 
-  return states;
+  return statesFiltered;
+}
+
+/** Prev-stage not-fully-mastered nodes: bundle only, random sample, fewer than current pool. */
+async function loadPrevStageNotMastered(params: {
+  studentId: string;
+  stage: string;
+  ageBand?: string | null;
+  currentPoolSize: number;
+}): Promise<NodeState[]> {
+  const prev = prevStage(params.stage);
+  if (!prev) return [];
+  const now = new Date();
+  const maxAdd = Math.min(20, Math.max(0, params.currentPoolSize - 1));
+  if (maxAdd <= 0) return [];
+
+  const prevBundleIds = await getBundleNodeIdsForStage(prev);
+  if (prevBundleIds.length === 0) return [];
+
+  const [masteryForPrev, nodesForPrev] = await Promise.all([
+    prisma.studentGseMastery.findMany({
+      where: { studentId: params.studentId, nodeId: { in: prevBundleIds } },
+      include: {
+        node: { select: { nodeId: true, descriptor: true, skill: true, type: true, gseCenter: true } },
+      },
+    }),
+    prisma.gseNode.findMany({
+      where: { nodeId: { in: prevBundleIds } },
+      select: { nodeId: true, descriptor: true, skill: true, type: true, gseCenter: true },
+    }),
+  ]);
+
+  const masteryByNode = new Map(masteryForPrev.map((r) => [r.nodeId, r]));
+  const nodeByNodeId = new Map(nodesForPrev.map((n) => [n.nodeId, n]));
+
+  const candidates: NodeState[] = [];
+  for (const nodeId of prevBundleIds) {
+    const row = masteryByNode.get(nodeId);
+    const node = nodeByNodeId.get(nodeId);
+    if (!node) continue;
+    const descriptor = node.descriptor?.trim()
+      ? node.descriptor
+      : node.type === "GSE_GRAMMAR"
+      ? "Grammar pattern"
+      : "GSE item";
+    const halfLifeDays = node.type === "GSE_VOCAB" ? 14 : node.type === "GSE_GRAMMAR" ? 21 : 10;
+
+    if (row) {
+      const reliability = (row.reliability as "high" | "medium" | "low") || "low";
+      const masteryMean = row.masteryMean ?? row.masteryScore;
+      const decayedMastery =
+        row.decayedMastery ??
+        computeDecayedMastery({
+          masteryMean,
+          lastEvidenceAt: row.lastEvidenceAt,
+          now,
+          halfLifeDays,
+          evidenceCount: row.evidenceCount,
+          reliability,
+        });
+      const activationState =
+        row.activationState === "verified" || row.activationState === "candidate_for_verification"
+          ? row.activationState
+          : "observed";
+      if (activationState === "verified" && decayedMastery >= 70) continue;
+      const daysSinceEvidence = row.lastEvidenceAt
+        ? (now.getTime() - row.lastEvidenceAt.getTime()) / (1000 * 60 * 60 * 24)
+        : 999;
+      candidates.push({
+        nodeId,
+        descriptor,
+        skill: node.skill,
+        type: node.type,
+        domain: nodeDomain(node.type),
+        gseCenter: node.gseCenter,
+        decayedMastery: round(decayedMastery),
+        masteryMean: round(masteryMean),
+        masterySigma: round(row.masterySigma ?? 24),
+        reliability,
+        daysSinceEvidence: round(daysSinceEvidence),
+        halfLifeDays,
+        activationState,
+        verificationDueAt: row.verificationDueAt ?? null,
+      });
+    } else {
+      candidates.push({
+        nodeId,
+        descriptor,
+        skill: node.skill,
+        type: node.type,
+        domain: nodeDomain(node.type),
+        gseCenter: node.gseCenter,
+        decayedMastery: 30,
+        masteryMean: 30,
+        masterySigma: 28,
+        reliability: "low",
+        daysSinceEvidence: 999,
+        halfLifeDays,
+        activationState: "observed",
+        verificationDueAt: null,
+      });
+    }
+  }
+
+  for (let i = candidates.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+  }
+  return candidates.slice(0, maxAdd);
 }
 
 function scoreCandidate(params: {
@@ -445,8 +589,12 @@ function scoreCandidate(params: {
     .map((row) => row.node)
     .sort((a, b) => a.decayedMastery - b.decayedMastery)
     .slice(0, 8);
-  // At most 2 from preferred so other nodes get a chance (more spread)
-  const fromPreferred = preferredNodes.slice(0, 2);
+  // Probabilistic: 2 from preferred by weight (weaker = more likely) so we don't always get the same two (e.g. kettle, formal)
+  const fromPreferred = weightedSampleWithoutReplacement(
+    preferredNodes,
+    2,
+    (node) => (100 - node.decayedMastery) + 1
+  );
   const preferredIds = new Set(fromPreferred.map((n) => n.nodeId));
   const fromRelevant = relevantNodes.filter((n) => !preferredIds.has(n.nodeId));
   const mergedTargets = [...fromPreferred, ...fromRelevant].filter(
@@ -553,6 +701,7 @@ function scoreCandidate(params: {
       }
       return d;
     }),
+    targetNodeTypes: targetNodes.map((node) => node.type),
     domainsTargeted: Array.from(new Set(targetNodes.map((node) => node.domain))),
     expectedGain: round(expectedGain),
     successProbability: round(successProbability),
@@ -609,6 +758,55 @@ export async function planNextTaskDecision(params: {
     }),
     getBundleNodeIdsForStage(targetStage),
   ]);
+
+  const inPool = new Set(nodeStates.map((n) => n.nodeId));
+  const missingBundleIds = targetStageBundleNodeIds.filter((id) => !inPool.has(id));
+  if (missingBundleIds.length > 0) {
+    const maxAdd = 45;
+    const bundleNodes = await prisma.gseNode.findMany({
+      where: { nodeId: { in: missingBundleIds.slice(0, maxAdd) } },
+      select: { nodeId: true, descriptor: true, skill: true, type: true, gseCenter: true },
+    });
+    for (const node of bundleNodes) {
+      const descriptor = node.descriptor?.trim()
+        ? node.descriptor
+        : node.type === "GSE_GRAMMAR"
+        ? "Grammar pattern"
+        : "GSE item";
+      nodeStates.push({
+        nodeId: node.nodeId,
+        descriptor,
+        skill: node.skill,
+        type: node.type,
+        domain: nodeDomain(node.type),
+        gseCenter: node.gseCenter,
+        decayedMastery: 0,
+        masteryMean: 0,
+        masterySigma: 28,
+        reliability: "low",
+        daysSinceEvidence: 999,
+        halfLifeDays: node.type === "GSE_VOCAB" ? 14 : node.type === "GSE_GRAMMAR" ? 21 : 10,
+        activationState: "observed",
+        verificationDueAt: null,
+      });
+      inPool.add(node.nodeId);
+    }
+  }
+
+  // Lower-level refresh: any not-fully-mastered prev-stage bundle nodes; random sample; fewer than current pool
+  const prevStageNodes = await loadPrevStageNotMastered({
+    studentId: params.studentId,
+    stage: params.stage,
+    ageBand: params.ageBand,
+    currentPoolSize: nodeStates.length,
+  });
+  for (const n of prevStageNodes) {
+    if (!inPool.has(n.nodeId)) {
+      nodeStates.push(n);
+      inPool.add(n.nodeId);
+    }
+  }
+
   const verificationTargetNodeIds = nodeStates
     .filter((node) => node.activationState === "candidate_for_verification")
     .sort((a, b) => {
@@ -749,6 +947,7 @@ export async function planNextTaskDecision(params: {
     chosenTaskType: chosen.taskType,
     targetNodeIds: chosen.targetNodeIds,
     targetNodeDescriptors: chosen.targetNodeDescriptors,
+    targetNodeTypes: chosen.targetNodeTypes,
     domainsTargeted: chosen.domainsTargeted,
     diagnosticMode: Boolean(params.diagnosticMode),
     rotationApplied,

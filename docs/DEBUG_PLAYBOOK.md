@@ -26,11 +26,26 @@ Then the planner prioritises that node for a **verification** task (explicit tar
 
 2. **Spread across nodes:** Usually each attempt touches **many** nodes (too, for, play, feel, …). So each node gets 1–2 evidences per attempt → small delta per node. Lots of lines = lots of nodes, each moving a little.
 
-3. **Weight of evidence:** Mastery is updated with `alpha += weight * score`, `beta += weight * (1 - score)`. For **incidental/supporting** evidence, `weight` is ~0.2–0.35, so each evidence moves the mean only a bit. **Direct + explicit_target** has weight up to 1, so one strong hit can add several points.
+3. **Weight of evidence:** Mastery is updated with `alpha += weight * score`, `beta += weight * (1 - score)`. **Supporting+incidental** и **direct+explicit_target** имеют baseWeight 1; effectiveWeight = baseWeight × conf × rel × impact. При одинаковых conf/rel/impact прирост одинаковый (плюс streak для direct при 2+ подряд).
 
 4. **Decay:** The number you see in "Focus (next targets)" and in the skillset table is **decayedMastery**, not raw mean. It **decreases over time** when the node isn't practiced (half-life ~14 days for vocab). So: raw mean can grow (+0.8, +0.5, …), but if the node isn't practiced again for a while, **decayed** mastery goes down. Result: many pluses in the log, but the **displayed** mastery stays low until the same node is practiced again.
 
 **Summary:** The pluses are real increments to the 0–100 mean. They are small per evidence and spread across many nodes; decay then reduces the **shown** value. To see high mastery: same nodes need repeated practice (many +0.5s on the same node) and/or strong direct evidence; otherwise decay will keep the displayed number low.
+
+**Why +10.9 on "think" but +0.5 on "play" if weight is only 2× different?**  
+See "Why old nodes grow so slowly" below.
+
+**Why do old nodes (play, for, too) grow so slowly?**  
+Mastery = 100×α/(α+β). Each evidence: α += weight×score, β += weight×(1−score), so **α+β каждый раз растёт**.  
+1. **Мало доказательств (новая нода):** α+β маленькая → прирост большой (+10).  
+2. **Много доказательств (старая нода):** α+β большая → прирост маленький (+0.5).  
+
+**Fix (bounded memory):** α+β ограничены сверху (cap **12**), чтобы каждый evidence давал видимый прирост: при streak ×1.56 не +0.6, а **~2+** балла. До 70 реально добраться за 15–25 повторений.
+
+**Ориентир при cap 12:** один evidence при cap — supporting и direct при одинаковых conf/rel/impact дают одинаковый прирост (~5–12 баллов в зависимости от streak). Порог «closed» value ≥ 70.
+
+## A3) Evidence mix and streak
+Run **`npx tsx src/scripts/inspect_profile_evidence.ts [studentId]`** to see your evidence mix. Streak applies to both direct and supporting success. Supporting and direct: baseWeight 1, same formula (conf×rel×impact). Most evidence is **supporting + incidental** (word used in speech but task was not target_vocab with that word). Streak applies only when **kind=direct** and score≥0.7, so with almost no direct evidence you rarely see “streak ×1.15”. See MASTERY_METHODOLOGY for spec. See MASTERY_METHODOLOGY.md “Why you see so few streaks”.
 
 ## B) Why skills don't progress (no direct evidence)
 Progress and promotion depend on **direct** evidence (target nodes hit). Check:
@@ -90,7 +105,7 @@ Check:
 
 3. **What exactly gives 17%?**  
    Readiness score formula:  
-   - `coverage * 60` (0 if no nodes at 70+ verified)  
+   - `coverage * 60` (0 if no nodes verified with value≥70)  
    - `+ (reliability >= 0.65 ? 20 : 8)`  
    - `+ (stability >= 0.5 ? 10 : 3)`  
    - `+ min(10, round(confidence * 10))`  
@@ -105,6 +120,47 @@ Check:
 - So you can do exercises, get evidence, raise mastery on “make”, “too”, “good”, etc., but if those nodes are **not** among the 12+16+14 bundle nodes, the “path to next level” counter does **not** move. The exercises are not “pointless” (they grow your skills and can lead to verification on other nodes), but they are **not guaranteed** to be the same nodes that fill the progress bar.
 
 **Done:** (1) When **placement** (weighted evidence from all nodes) is **above** bundle-based promotion, we now **lift promotion** to placement so the UI doesn’t show “A0” while the learner is already working on B1 nodes. (2) Planner **prefers** target-stage bundle nodes (after verification queue) so tasks align with “path to next level”. See TASKS “What was just fixed”.
+
+
+## E4) Откуда берутся ноды заданий (пул, выбор, пример по твоему профилю)
+
+**Проверять по базе, не «судя».** Скрипт: `npx tsx src/scripts/inspect_planner_flow.ts [studentId]` — выводит stage из БД, пул нод, ноды бандла B1, последние 5 решений планировщика.
+
+**Как устроено (простыми словами):**
+
+1. **Stage берётся из базы:** `projectLearnerStageFromGse(studentId)` → `promotionStage` (текущий уровень, напр. A2) и `targetStage` (следующий, напр. B1). Никаких «судя» — только эти поля.
+
+2. **Пул нод (loadNodeState):** планировщик грузит только те ноды, по которым у ученика уже есть строка в **StudentGseMastery** и у которых **gseCenter** в диапазоне текущего стейджа ± 5 (для A2 это 25–47). То есть в пул попадают только ноды, по которым уже был хотя бы один evidence. Остальных нод в пуле **нет**.
+
+3. **Ноды бандла B1:** это фиксированный список nodeId из бандлов целевого стейджа (Grammar Core, Can-Do Core, Vocab Core для B1). Они нужны для «path to next level»: прогресс по ним даёт node progress и readiness. Планировщик **предпочитает** их (preferredNodeIds), но выбирать может **только из пула**. Если в пуле нет ни одной ноды из бандла B1, то ни одна такая нода не будет выдана — предпочтение бесполезно.
+
+4. **Выбор задания:** из пула (nodeStates) считается utility по типам заданий и нодам; preferred (верификация, потом target-stage bundle) повышает оценку. Выбирается пара (тип задания, до 3 нод). **targetNodeIds** всегда только из пула.
+
+**Конкретно по твоему профилю (данные из скрипта):**
+
+- **Stage из БД:** promotionStage = A2, targetStage = B1. GSE для A2: 30–42.
+- **Пул:** 50 записей StudentGseMastery в диапазоне 25–47. **Ни одна из этих 50 нод не входит в бандлы B1** (это в основном vocab: learner, learn, girl, say, girlfriend, example и т.д. с gseCenter 28–46).
+- **Бандл B1:** 62 ноды (грамматика/can-do типа "Can use 'all of'...", gseCenter 43–44). По ним у тебя **нет** записей в StudentGseMastery, поэтому они **не в пуле**.
+- **Последние 5 заданий:** все target ноды — из пула (learner, learn, girl, say, girlfriend, example); **0 из бандла B1**.
+- **Итог:** тебе не дают ноды из бандлов B1, потому что их нет в пуле. Node progress к B1 = 0%, потому что по обязательным B1-нодам нет evidence.
+
+**Как должно быть:** в пул планировщика должны попадать и ноды целевого стейджа (B1) из бандлов, даже если по ним ещё нет mastery — с «нулевым» состоянием (decayedMastery 0, observed). Тогда их можно выбирать, давать задания, накапливать evidence и поднимать node progress. После фикса планировщика скрипт `inspect_planner_flow.ts` покажет ноды B1 в пуле и в последних решениях.
+
+## E5) Рассинхроны (два источника правды)
+
+Места, где раньше или до сих пор два разных источника данных могли расходиться. Правило: **один источник правды на контекст** (на задание — ноды и слова из планировщика; на прогресс — бандлы и mastery).
+
+**Исправлено:**
+
+1. **target_vocab: слова в задании vs ноды** — раньше prompt/requiredWords из StudentVocabulary, target nodes из планировщика → штраф за слова, которые не просили. Теперь слова в промпте и requiredWords выводятся из **targetNodeDescriptors** планировщика; fallback на vocab queue только если &lt; 2 дескрипторов.
+2. **assignTaskTargetsFromCatalog** — preferredNodeIds всегда **decision.targetNodeIds**. LLM не знает про ID: в промпт ему передаём только слова/цели (target words, learning objectives), в схеме ответа нет target_nodes. Ноды к заданию привязываем только из планировщика.
+3. **GET /api/task/next ответ targetWords** — раньше в ответе отдавался список из vocabDue, а в задании — слова из нод. Теперь для target_vocab в ответе отдаются **promptTargetWords** (те же, что в промпте).
+
+**Проверить / оставить в уме:**
+
+4. **Learning path API** (`/api/learning-path`) — возвращает targetWords из StudentVocabulary (леммы к повторению). Это список «слов в очереди», а не «слова следующего задания». Если в UI показывать его как «слова следующего задания» — будет рассинхрон; лучше подписывать как «слова к повторению» или брать слова из следующего task/next.
+5. **Stage** — везде должен браться из `projectLearnerStageFromGse` (promotionStage / placementStage). Если где-то подставляют stage из профиля или хардкод — возможен рассинхрон с прогрессом и пулом нод.
+6. **Генератор заданий** — LLM не видит и не возвращает node ID. Ему передаём только слова/цели (target words, learning objectives); в JSON запрашиваем instruction, constraints и т.д., без target_nodes. Целевые ноды всегда из планировщика (decision.targetNodeIds). Так модель не может перепутать ID и промпт не усложняем.
 
 ## F) Task generator: why prompt sent “garbage” (raw node IDs)
 The task generator LLM used to receive only raw GSE node IDs (e.g. `gse:gse_grammar_glgr:...`), which are meaningless to the model. Now:

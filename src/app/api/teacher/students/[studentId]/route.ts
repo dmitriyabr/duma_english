@@ -164,6 +164,7 @@ export async function GET(
 
   const STAGES = ["A1", "A2", "B1", "B2", "C1", "C2"] as const;
   const placementStage = (progress as { placementStage?: string }).placementStage;
+
   const [catalogNodesByBand, bundleReadiness] = await Promise.all([
     Promise.all(
       STAGES.map(async (stage) => {
@@ -178,8 +179,10 @@ export async function GET(
   ]);
 
   const perStageCredited: Record<string, number> = {};
+  const perStageBundleTotal: Record<string, number> = {};
   for (const row of bundleReadiness.stageRows) {
     perStageCredited[row.stage] = row.bundleRows.reduce((sum, b) => sum + b.coveredCount, 0);
+    perStageBundleTotal[row.stage] = row.bundleRows.reduce((sum, b) => sum + b.totalRequired, 0);
   }
 
   return NextResponse.json({
@@ -193,6 +196,7 @@ export async function GET(
     progress,
     catalogNodesByBand,
     perStageCredited,
+    perStageBundleTotal,
     recentAttempts: recentAttempts.map((a) => ({
       id: a.id,
       createdAt: a.createdAt,

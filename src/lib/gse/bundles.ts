@@ -58,12 +58,16 @@ export type BundleReadinessRow = {
   requiredCoverage: number;
   coveredCount: number;
   coverage: number;
+  /** 0..1: average progress toward 70 per required node (min(value,70)/70). Makes progress bar move with every evidence. */
+  valueProgress: number;
   directEvidenceCovered: number;
   reliabilityRatio: number;
   stabilityRatio: number;
   uncertaintyAvg: number;
   ready: boolean;
   blockers: Array<{ nodeId: string; descriptor: string; value: number }>;
+  /** Nodes that count as credited (70+ and verified, or placement above + value≥50 + direct). */
+  achieved: Array<{ nodeId: string; descriptor: string; value: number }>;
 };
 
 export type StageBundleReadiness = {
@@ -162,7 +166,8 @@ export async function ensureDefaultGseBundles() {
 }
 
 const STAGE_ORDER_FULL: CEFRStage[] = ["A0", "A1", "A2", "B1", "B2", "C1", "C2"];
-function isPlacementAboveStage(placementStage: CEFRStage | undefined, bundleStage: CEFRStage): boolean {
+/** True when placement has passed the given stage (used for bundle credited: value≥50+direct counts only when placement above stage). */
+export function isPlacementAboveStage(placementStage: CEFRStage | undefined, bundleStage: CEFRStage): boolean {
   if (!placementStage) return false;
   const pIdx = STAGE_ORDER_FULL.indexOf(placementStage);
   const bIdx = STAGE_ORDER_FULL.indexOf(bundleStage);
@@ -240,11 +245,15 @@ export async function computeStageBundleReadiness(studentId: string, placementSt
 
     // Fast credit: when placement is above this bundle's stage, count node as covered if value≥50 and ≥1 direct (no need to grind to verified+70)
     const placementAbove = isPlacementAboveStage(placementStage, bundle.stage as CEFRStage);
-    const coveredCount = scored.filter(
-      (row) =>
-        (row.verified && row.value >= 70) || (placementAbove && row.value >= 50 && row.direct >= 1)
-    ).length;
+    const isCredited = (row: (typeof scored)[0]) =>
+      (row.verified && row.value >= 70) || (placementAbove && row.value >= 50 && row.direct >= 1);
+    const achievedRows = scored.filter(isCredited).sort((a, b) => b.value - a.value);
+    const coveredCount = achievedRows.length;
     const coverage = totalRequired > 0 ? coveredCount / totalRequired : 0;
+    const valueProgress =
+      totalRequired > 0
+        ? scored.reduce((sum, row) => sum + Math.min(1, Math.max(0, row.value / 70)), 0) / totalRequired
+        : 0;
     const directEvidenceCovered = scored.filter((row) => row.verified && row.direct > 0 && row.value >= 65).length;
     const reliabilityRatio =
       totalRequired > 0 ? scored.filter((row) => row.verified && row.reliability !== "low").length / totalRequired : 0;
@@ -271,20 +280,26 @@ export async function computeStageBundleReadiness(studentId: string, placementSt
       requiredCoverage: bundle.requiredCoverage,
       coveredCount,
       coverage: Number(clamp01(coverage).toFixed(4)),
+      valueProgress: Number(clamp01(valueProgress).toFixed(4)),
       directEvidenceCovered,
       reliabilityRatio: Number(clamp01(reliabilityRatio).toFixed(4)),
       stabilityRatio: Number(clamp01(stabilityRatio).toFixed(4)),
       uncertaintyAvg: Number(clamp01(uncertaintyAvg).toFixed(4)),
       ready,
       blockers: scored
-        .filter((row) => !row.verified || row.value < 60)
+        .filter((row) => !isCredited(row))
         .sort((a, b) => a.value - b.value)
-        .slice(0, 5)
+        .slice(0, 20)
         .map((row) => ({
           nodeId: row.nodeId,
           descriptor: row.descriptor,
           value: Number(row.value.toFixed(2)),
         })),
+      achieved: achievedRows.map((row) => ({
+        nodeId: row.nodeId,
+        descriptor: row.descriptor,
+        value: Number(row.value.toFixed(2)),
+      })),
     };
   });
 

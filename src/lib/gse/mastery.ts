@@ -75,14 +75,32 @@ function effectiveHalfLifeDays(base: number, evidenceCount: number, reliability:
 }
 
 function baseWeight(kind: GseEvidenceKind, opportunity: GseOpportunityType) {
+  // Позитив: сила в conf/rel/impact
   if (kind === "direct" && opportunity === "explicit_target") return 1;
-  if (kind === "direct" && opportunity === "elicited_incidental") return 0.65;
-  if (kind === "supporting" && opportunity === "incidental") return 0.35;
+  if (kind === "direct" && opportunity === "elicited_incidental") return 1;
+  if (kind === "supporting" && opportunity === "incidental") return 1;
+  if (kind === "supporting") return 1;
+  // Негатив: ошибки слабее успехов (один косяк не откатывает так же сильно)
   if (kind === "negative" && opportunity === "explicit_target") return 0.9;
   if (kind === "negative" && opportunity === "incidental") return 0.4;
-  if (kind === "supporting") return 0.3;
   if (kind === "negative") return 0.55;
-  return 0.5;
+  return 1;
+}
+
+/** Для персиста/аудита: базовый вес без PFA/streak. Реальный вес считает applyEvidenceToStudentMastery. */
+export function getEvidenceBaseWeight(evidence: {
+  evidenceKind?: string;
+  opportunityType?: string;
+  confidence: number;
+  reliability: string;
+  impact: number;
+}): number {
+  const kind = (evidence.evidenceKind || "direct") as GseEvidenceKind;
+  const opportunity = (evidence.opportunityType || "explicit_target") as GseOpportunityType;
+  const conf = clamp01(evidence.confidence);
+  const rel = reliabilityFactor(evidence.reliability as GseReliability);
+  const imp = Math.max(0.2, clamp01(evidence.impact));
+  return Math.max(0.05, Math.min(2, baseWeight(kind, opportunity) * conf * rel * imp));
 }
 
 function deriveReliability(params: {
@@ -138,10 +156,11 @@ export function computeNextMasteryScore(current: number, evidence: MasteryEviden
       ? evidence.score
       : clamp01(0.5 + evidence.confidence * evidence.impact * 0.5)
   );
+  const imp = Math.max(0.2, clamp01(evidence.impact ?? 0.5));
   const weight =
     typeof evidence.weight === "number"
       ? clamp01(evidence.weight)
-      : clamp01(baseWeight(kind, opportunity) * evidence.confidence * reliabilityFactor(evidence.reliability));
+      : clamp01(baseWeight(kind, opportunity) * evidence.confidence * reliabilityFactor(evidence.reliability) * imp);
   const alpha = Math.max(1, (current / 100) * 8) + weight * score;
   const beta = Math.max(1, (1 - current / 100) * 8) + weight * (1 - score);
   return Number(clamp((alpha / (alpha + beta)) * 100).toFixed(2));
@@ -209,8 +228,16 @@ export async function applyEvidenceToStudentMastery(params: {
 
     const previousScore01 = clamp01(previousMean / 100);
     const priorStrength = Math.max(4, (existing?.evidenceCount ?? 0) + 4);
-    const alphaBefore = alphaFromStore ?? Math.max(1, previousScore01 * priorStrength);
-    const betaBefore = betaFromStore ?? Math.max(1, (1 - previousScore01) * priorStrength);
+    let alphaBefore = alphaFromStore ?? Math.max(1, previousScore01 * priorStrength);
+    let betaBefore = betaFromStore ?? Math.max(1, (1 - previousScore01) * priorStrength);
+
+    const POSTERIOR_STRENGTH_CAP = 12;
+    const sumBefore = alphaBefore + betaBefore;
+    if (sumBefore > POSTERIOR_STRENGTH_CAP) {
+      const scale = POSTERIOR_STRENGTH_CAP / sumBefore;
+      alphaBefore = alphaBefore * scale;
+      betaBefore = betaBefore * scale;
+    }
 
     const kind: GseEvidenceKind = evidence.evidenceKind || "direct";
     const opportunity: GseOpportunityType = evidence.opportunityType || "explicit_target";
@@ -221,36 +248,42 @@ export async function applyEvidenceToStudentMastery(params: {
         ? evidence.confidence * evidence.impact * 0.8
         : evidence.confidence * evidence.impact
     );
-    const maxWeight = 1.5; // allow streak bonus to speed progression to mastery
-    let effectiveWeight =
-      typeof evidence.weight === "number"
-        ? Math.max(0.05, Math.min(maxWeight, evidence.weight))
-        : Math.max(
-            0.05,
-            Math.min(
-              maxWeight,
-              baseWeight(kind, opportunity) *
-                clamp01(evidence.confidence) *
-                reliabilityFactor(evidence.reliability) *
-                Math.max(0.2, clamp01(evidence.impact))
-            )
-          );
+    const maxWeight = 2; // allow higher streak bonus to speed progression
+    const conf = clamp01(evidence.confidence);
+    const rel = reliabilityFactor(evidence.reliability);
+    const imp = Math.max(0.2, clamp01(evidence.impact));
+    let effectiveWeight: number;
+    if (typeof evidence.weight === "number") {
+      effectiveWeight = Math.max(0.05, Math.min(maxWeight, evidence.weight));
+    } else {
+      effectiveWeight = baseWeight(kind, opportunity) * conf * rel * imp;
+    }
+    effectiveWeight = Math.max(0.05, Math.min(maxWeight, effectiveWeight));
 
+    // Success = direct (score≥0.7) OR supporting (score≥0.6). Уместное использование слова засчитывается и даёт стрик.
     const directSuccess = kind === "direct" && score >= 0.7;
-    const nextStreak = directSuccess ? directSuccessStreak + 1 : 0;
+    const supportingSuccess = kind === "supporting" && score >= 0.6;
+    const success = directSuccess || supportingSuccess;
+    const nextStreak = success ? directSuccessStreak + 1 : 0;
 
     if (score >= 0.6) effectiveWeight *= 1.1;
     else if (score < 0.4) effectiveWeight *= 0.9;
-    // Streak bonus: exponent with cap (2nd ×1.15, 3rd ×1.32, 4th+ ×1.5)
+    // Streak bonus: 2nd in a row ×1.25, 3rd ×1.56, 4th+ ×1.8 (base 1.25, cap 1.8)
     let streakMultiplierApplied: number | undefined;
-    if (directSuccess && directSuccessStreak >= 1) {
-      streakMultiplierApplied = Math.min(1.5, 1.15 ** Math.min(directSuccessStreak, 3));
+    if (success && directSuccessStreak >= 1) {
+      streakMultiplierApplied = Math.min(1.8, 1.25 ** Math.min(directSuccessStreak, 3));
       effectiveWeight *= streakMultiplierApplied;
     }
     effectiveWeight = Math.max(0.05, Math.min(maxWeight, effectiveWeight));
 
-    const alphaAfter = alphaBefore + effectiveWeight * score;
-    const betaAfter = betaBefore + effectiveWeight * (1 - score);
+    let alphaAfter = alphaBefore + effectiveWeight * score;
+    let betaAfter = betaBefore + effectiveWeight * (1 - score);
+    const total = alphaAfter + betaAfter;
+    if (total > POSTERIOR_STRENGTH_CAP) {
+      const scale = POSTERIOR_STRENGTH_CAP / total;
+      alphaAfter = alphaAfter * scale;
+      betaAfter = betaAfter * scale;
+    }
     const nextMean = Number(clamp((alphaAfter / (alphaAfter + betaAfter)) * 100).toFixed(2));
     const nextUncertainty = Number((1 / Math.sqrt(Math.max(2, alphaAfter + betaAfter))).toFixed(4));
 

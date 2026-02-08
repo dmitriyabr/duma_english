@@ -26,7 +26,7 @@ export function previewText(value: unknown, max = 600) {
   return safePreview(value, max);
 }
 
-export async function appendPipelineDebugEvent(event: Omit<DebugEvent, "ts">) {
+export async function appendPipelineDebugEvent(event: { event: string; [key: string]: unknown }) {
   if (!isEnabled()) return;
   const filePath = resolveLogPath();
   const dir = path.dirname(filePath);
@@ -43,4 +43,3 @@ export async function appendPipelineDebugEvent(event: Omit<DebugEvent, "ts">) {
     // ignore (debug logging must not break runtime)
   }
 }
-

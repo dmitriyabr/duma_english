@@ -128,6 +128,28 @@ All OpenAI calls (evaluator + task generator) go through LangChain. To trace pro
 
 Without these env vars, the app works as before; tracing is off.
 
+## G2) Debugging vocab matching (lemma + candidates)
+Vocabulary matching has non-LLM steps (lemmatization + lexical retrieval), so you will not see them in LangSmith.
+
+To inspect inputs/outputs for each step, enable the pipeline debug log:
+1. In `.env`: `PIPELINE_DEBUG_LOG_ENABLED=true`
+2. Optionally: `PIPELINE_DEBUG_LOG_PATH=tmp/pipeline-debug.ndjson`
+3. Re-run an attempt and inspect `tmp/pipeline-debug.ndjson` (NDJSON events).
+
+Key events:
+- `lemma_service_request` / `lemma_service_response` / `lemma_service_error`
+- `vocab_retrieval_phrase_candidates`
+- `vocab_retrieval_candidates`
+- `evaluation_prompt_inputs` (includes `vocabRetrieval` + the exact prompt inputs)
+
+Notes:
+- `evaluation_prompt_inputs` separates `Target ... options` vs `Candidate ... options`. Candidate options should not duplicate target options for LO/grammar/vocab.
+- `GSE_VOCAB_CATALOGS` affects incidental vocab retrieval only. Explicit task targets come from `TaskGseTarget` and can include nodes from other catalogs unless the planner is restricted.
+
+To use spaCy (higher-quality lemmas), start the optional lemma service and set:
+- `LEMMA_SERVICE_URL=http://localhost:8099`
+- `docker compose --profile nlp up -d lemma_service`
+
 ## H) Mandatory checks before saying “fixed”
 1. `npm test`
 2. `npm run lint`

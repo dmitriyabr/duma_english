@@ -1,6 +1,6 @@
 # TASKS (Single Source Of Truth)
 
-Last updated: 2026-02-07
+Last updated: 2026-02-08
 Owner: product brain track (GSE-only)
 
 ## 1) Product Goal
@@ -29,6 +29,12 @@ Build an autonomous speaking trainer where every learning decision is based on G
 8. Explicit task targets are passed into evaluation:
 - worker loads `TaskGseTarget` rows for the task and supplies them to the evaluator.
 - evaluation is expected to include checks for these targets; target grammar checks use `opportunityType=explicit_target`.
+9. Vocabulary incidental selection is now “lemma + index + LLM checks”:
+- transcript is lemmatized (spaCy service if configured, otherwise fallback).
+- a stage/audience-windowed in-memory index matches lemma/surface n-grams to `GSE_VOCAB` aliases/descriptors.
+- evaluation LLM receives only the shortlisted vocab options and returns `vocabChecks`.
+- `vocabChecks` are persisted as incidental vocab evidence (`targeted=false`) when `pass=true`.
+- `GSE_VOCAB_CATALOGS` currently restricts *incidental* vocab indexing only (not planner-selected explicit targets).
 
 ## 3) What was just fixed
 1. **Mastery improvements (streak + N-CCR + PFA):** In `applyEvidenceToStudentMastery`: (a) **Streak:** `directSuccessStreak` in `spacingStateJson`; 2nd+ direct success in a row gets weight ×1.15. (b) **N-CCR:** 2 direct successes in a row → set **verified** even if mean &lt; 70. (c) **PFA-style:** score ≥ 0.6 → weight ×1.1; score &lt; 0.4 → weight ×0.9. Plan: `docs/MASTERY_IMPROVEMENTS_PLAN.md`.
@@ -58,12 +64,20 @@ Build an autonomous speaking trainer where every learning decision is based on G
 - embedding queries made topic-robust for grammar (query = pattern label only).
 - retrieval list is reordered by query coverage so top-8 options cover all extracted patterns.
 - evaluator now includes explicit task targets (not only incidental retrieval).
+7. Vocab disambiguation first pass:
+- stage-windowed vocab index + lemma/surface n-gram matching produces a small candidate list.
+- evaluator receives vocab options and emits `vocabChecks` (LLM context validation).
+- legacy alias-scan incidental discovery remains only as fallback when no `vocabChecks` exist.
+8. Evaluation prompt hygiene:
+- target options are capped to fit the evaluator limits (LO<=4, Grammar<=6, Vocab<=8).
+- prompt sections are normalized as `Target ... options` and `Candidate ... options` to avoid ambiguity.
 
 ## 4) Critical Open Gaps (brain-level only)
 1. **Planner vs promotion bundle alignment:** Exercises are chosen from “any nodes in stage band”; progress is counted only on **bundle** nodes (A1 Grammar/Vocab/Can-Do). So tasks often don’t target the same nodes that move the “path to next level” bar. Done: we lift promotion to placement when placement > bundle promotion and prefer target-stage bundle nodes in planner. Fast credit implemented: when placement is above a bundle stage, nodes with value≥50 and ≥1 direct count as covered.
-2. Incidental vocab disambiguation is still too broad:
-- one word can match many nodes.
-- need top-k resolution by stage range + context.
+2. Incidental vocab disambiguation still needs calibration:
+- candidate generation is lexical-first and stage-windowed, but still needs better ambiguity handling.
+- need stricter caps per lexical unit (avoid many nodes per same word), and better sense checks for polysemy.
+- need precision QA to avoid false positives on high-frequency words.
 3. Semantic LO/Grammar evaluation needs calibration and precision QA:
 - tune parser/evaluator prompts and thresholds from real traces.
 - add gold-set precision checks for false-positive suppression.
@@ -78,10 +92,10 @@ Build an autonomous speaking trainer where every learning decision is based on G
 ## 5) Active Execution Plan (no legacy work)
 
 ### Sprint A: Vocab Disambiguation Hardening
-1. Add candidate ranking for incidental vocab matches.
-2. Keep only top-k node matches per lexical unit.
-3. Add confidence penalty for ambiguous matches.
-4. Add tests for false-positive suppression.
+1. Done: stage-windowed candidate ranking (lemma + n-gram match against in-memory alias/descriptor index).
+2. Next: per-lexeme caps (top-k per lemma/ngram) and diversity (prefer distinct n-grams).
+3. Next: ambiguity penalty + polysemy prompts (e.g., `bank` river vs money).
+4. Next: tests for false-positive suppression and phrase matching.
 
 ### Sprint B: Verification-First Policy
 1. Add hard SLA: candidate node must get verification task in <=2 tasks.
@@ -108,9 +122,10 @@ Build an autonomous speaking trainer where every learning decision is based on G
 
 ## 6) Immediate Next Steps (in order)
 1. Run `gse:embeddings:backfill -- --all` in production-like data.
-2. Execute 50 real-attempt traces and review semantic incidental precision.
-3. Implement Sprint E calibration using trace outcomes.
-4. Continue Sprint A (vocab top-k) and Sprint B (verification SLA).
+2. Start lemma service locally (`docker compose --profile nlp up -d lemma_service`) and set `LEMMA_SERVICE_URL`.
+3. Execute 50 real-attempt traces and review semantic incidental precision (LO/grammar + vocabChecks).
+4. Implement Sprint E calibration using trace outcomes.
+5. Continue Sprint A (vocab caps/ambiguity) and Sprint B (verification SLA).
 
 ## 7) Guardrails
 1. No return to legacy skill model.

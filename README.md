@@ -19,6 +19,20 @@ Web MVP for an AI speaking trainer: student login via personal code (from teache
 `docker run --rm --entrypoint sh minio/mc -c "mc alias set local http://host.docker.internal:9000 minioadmin minioadmin && mc mb -p local/duma-audio || true"`
 3. Stop services when done: `docker compose down`
 
+## Lemma service (spaCy)
+
+For higher-quality vocabulary matching, the app can call a small Python spaCy lemmatization service.
+
+The service is included in `docker compose up -d` by default.
+
+1. Start local infra (includes lemma service): `docker compose up -d`
+2. In `.env` set: `LEMMA_SERVICE_URL=http://localhost:8099`
+3. Restart `npm run dev` / `npm run worker`
+
+Note: On Apple Silicon (Docker `linux/arm64`) spaCy may compile from source during the image build, which can take a few minutes.
+
+If `LEMMA_SERVICE_URL` is not set (or the service is down), the app falls back to a lightweight JS lemmatizer.
+
 ## Teacher flow
 
 1. Open `/teacher` (or `/teacher/login`) and sign up (email, password, name) or sign in.
@@ -56,11 +70,23 @@ The worker can detect and score incidental `GSE_LO` and `GSE_GRAMMAR` nodes from
 
 This is optional and is disabled if `OPENAI_API_KEY` is not set.
 
+## Vocabulary (Incidental Evidence)
+
+Vocabulary incidental selection is lexical-first:
+
+1. Lemmatization: transcript is lemmatized (spaCy if available, otherwise fallback JS).
+2. Stage index: we build an in-memory index of `GSE_VOCAB` aliases/descriptors in a stage/audience window.
+3. Candidate generation: lemma/surface n-grams are matched to the index to produce a small candidate list.
+4. Evaluation LLM: receives only the shortlisted vocab options (and any explicit vocab targets) and returns `vocabChecks`.
+5. Evidence pipeline: `vocabChecks` produce incidental vocab evidence rows (`targeted=false`).
+
 ### Target nodes (explicit tasks)
 
 Each task has `TaskGseTarget` rows (node targets selected by the planner). The worker passes these targets into evaluation so the model:
 - always evaluates the explicit target nodes for the task (not only incidental nodes),
 - marks target grammar checks as `opportunityType=explicit_target`.
+
+Note: `GSE_VOCAB_CATALOGS` affects *incidental vocab retrieval* (the in-memory index). It does not currently restrict which `GSE_VOCAB` nodes the planner can select as explicit task targets, so you may see targets from other catalogs (e.g. `gse_vocab_ssgl`) depending on what is in the database.
 
 ### Embeddings backfill
 
@@ -78,6 +104,11 @@ Embeddings are cached in Postgres (`GseNodeEmbedding`). For production-like usag
   - `GSE_SEMANTIC_MAX_CANDIDATES` (default: `24`)
   - `GSE_EMBEDDING_MODEL` (default: `text-embedding-3-small`)
   - `GSE_PARSER_MODEL` (default: `OPENAI_MODEL` or `gpt-4.1-mini`)
+  - `LEMMA_SERVICE_URL` (optional, enables spaCy lemmatization)
+  - `LEMMA_SERVICE_TIMEOUT_MS` (default: `1200`)
+  - `GSE_VOCAB_CATALOGS` (optional, comma-separated; e.g. `gse_vocab_yl` to avoid duplicate catalogs)
+  - `GSE_VOCAB_INDEX_TTL_MS` (default: `600000`)
+  - `GSE_VOCAB_MAX_CANDIDATES` (default: `24`)
 
 ## Brain docs (current truth)
 

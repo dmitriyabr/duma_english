@@ -3,6 +3,7 @@ import { SpeechMetrics } from "./scoring";
 import { extractReferenceText, extractRequiredWords } from "./taskText";
 import { chatJson } from "./llm";
 import { buildSemanticEvaluationContext } from "./gse/semanticAssessor";
+import { buildVocabEvaluationContext } from "./gse/vocabRetrieval";
 import { appendPipelineDebugEvent, previewText } from "./pipelineDebugLog";
 
 export type RubricCheck = {
@@ -33,6 +34,16 @@ export type GrammarCheck = {
   correction?: string;
 };
 
+export type VocabCheck = {
+  nodeId: string;
+  label: string;
+  pass: boolean;
+  confidence: number;
+  opportunityType: "explicit_target" | "incidental";
+  evidenceSpan?: string;
+  matchedPhrase?: string;
+};
+
 export type TaskEvaluation = {
   taskType: string;
   taskScore: number;
@@ -41,6 +52,7 @@ export type TaskEvaluation = {
   rubricChecks: RubricCheck[];
   loChecks: LoCheck[];
   grammarChecks: GrammarCheck[];
+  vocabChecks: VocabCheck[];
   evidence: string[];
   modelVersion: string;
 };
@@ -151,6 +163,19 @@ const outputSchema = z.object({
         })
       )
       .optional(),
+    vocabChecks: z
+      .array(
+        z.object({
+          nodeId: z.string(),
+          label: z.string(),
+          pass: z.boolean(),
+          confidence: z.number().min(0).max(1),
+          opportunityType: z.enum(["explicit_target", "incidental"]),
+          evidenceSpan: z.string().optional(),
+          matchedPhrase: z.string().optional(),
+        })
+      )
+      .optional(),
     evidence: z.array(z.string()).max(6),
     modelVersion: z.string(),
   }),
@@ -216,6 +241,18 @@ function normalizeModelPayload(payload: unknown, input: EvaluationInput) {
   const row = payload as Record<string, unknown>;
   const taskEvaluationRaw = (row.taskEvaluation || {}) as Record<string, unknown>;
   const feedbackRaw = (row.feedback || {}) as Record<string, unknown>;
+  const taskTargets = Array.isArray(input.taskTargets) ? input.taskTargets : [];
+  const targetVocabNodeIds = new Set(
+    taskTargets
+      .filter((t) => t?.node?.type === "GSE_VOCAB" && typeof t.nodeId === "string")
+      .map((t) => String(t.nodeId))
+  );
+  const targetGrammarDescriptorIds = new Set(
+    taskTargets
+      .filter((t) => t?.node?.type === "GSE_GRAMMAR" && typeof t.node?.sourceKey === "string")
+      .map((t) => String((t as { node?: { sourceKey?: unknown } }).node?.sourceKey || ""))
+      .filter(Boolean)
+  );
   const normalized = {
     taskEvaluation: {
       taskType: String(taskEvaluationRaw.taskType || input.taskType),
@@ -258,21 +295,44 @@ function normalizeModelPayload(payload: unknown, input: EvaluationInput) {
       grammarChecks: Array.isArray(taskEvaluationRaw.grammarChecks)
         ? taskEvaluationRaw.grammarChecks.map((item) => {
             const rowItem = (item || {}) as Record<string, unknown>;
+            const descriptorId = rowItem.descriptorId ? String(rowItem.descriptorId) : undefined;
             return {
               checkId: String(rowItem.checkId || slugify(String(rowItem.label || "grammar_check"))),
-              descriptorId: rowItem.descriptorId ? String(rowItem.descriptorId) : undefined,
+              descriptorId,
               label: String(rowItem.label || "Grammar check"),
               pass: toBoolean(rowItem.pass),
               confidence: toConfidence(rowItem.confidence, 0.72),
               opportunityType:
-                rowItem.opportunityType === "explicit_target" ||
-                rowItem.opportunityType === "elicited_incidental" ||
-                rowItem.opportunityType === "incidental"
-                  ? rowItem.opportunityType
-                  : "incidental",
+                descriptorId && targetGrammarDescriptorIds.has(descriptorId)
+                  ? "explicit_target"
+                  : rowItem.opportunityType === "explicit_target" ||
+                      rowItem.opportunityType === "elicited_incidental" ||
+                      rowItem.opportunityType === "incidental"
+                    ? rowItem.opportunityType
+                    : "incidental",
               errorType: rowItem.errorType ? String(rowItem.errorType) : undefined,
               evidenceSpan: rowItem.evidenceSpan ? String(rowItem.evidenceSpan) : undefined,
               correction: rowItem.correction ? String(rowItem.correction) : undefined,
+            };
+          })
+        : [],
+      vocabChecks: Array.isArray(taskEvaluationRaw.vocabChecks)
+        ? taskEvaluationRaw.vocabChecks.map((item) => {
+            const rowItem = (item || {}) as Record<string, unknown>;
+            const nodeId = String(rowItem.nodeId || rowItem.checkId || "");
+            return {
+              nodeId,
+              label: String(rowItem.label || rowItem.name || "Vocabulary check"),
+              pass: toBoolean(rowItem.pass),
+              confidence: toConfidence(rowItem.confidence, 0.72),
+              opportunityType:
+                nodeId && targetVocabNodeIds.has(nodeId)
+                  ? "explicit_target"
+                  : rowItem.opportunityType === "explicit_target"
+                    ? "explicit_target"
+                    : "incidental",
+              evidenceSpan: rowItem.evidenceSpan ? String(rowItem.evidenceSpan) : undefined,
+              matchedPhrase: rowItem.matchedPhrase ? String(rowItem.matchedPhrase) : undefined,
             };
           })
         : [],
@@ -335,11 +395,18 @@ function deriveGrammarChecks(taskEvaluation: TaskEvaluation): GrammarCheck[] {
   return [];
 }
 
+function deriveVocabChecks(taskEvaluation: TaskEvaluation): VocabCheck[] {
+  const fromModel = Array.isArray(taskEvaluation.vocabChecks) ? taskEvaluation.vocabChecks : [];
+  if (fromModel.length > 0) return fromModel.slice(0, 14);
+  return [];
+}
+
 function attachStructuredChecks(taskEvaluation: TaskEvaluation, transcript: string): TaskEvaluation {
   return {
     ...taskEvaluation,
     loChecks: deriveLoChecks(taskEvaluation, transcript),
     grammarChecks: deriveGrammarChecks(taskEvaluation),
+    vocabChecks: deriveVocabChecks(taskEvaluation),
   };
 }
 
@@ -494,6 +561,7 @@ function evaluateReadAloud(input: EvaluationInput): { taskEvaluation: TaskEvalua
     rubricChecks: checks,
     loChecks: [],
     grammarChecks: [],
+    vocabChecks: [],
     evidence: [input.transcript.slice(0, 200)],
     modelVersion: MODEL_VERSION,
   };
@@ -549,6 +617,7 @@ function evaluateTargetVocab(input: EvaluationInput): { taskEvaluation: TaskEval
     rubricChecks: checks,
     loChecks: [],
     grammarChecks: [],
+    vocabChecks: [],
     evidence: [input.transcript.slice(0, 220)],
     modelVersion: MODEL_VERSION,
   };
@@ -609,6 +678,7 @@ function evaluateRolePlay(input: EvaluationInput): { taskEvaluation: TaskEvaluat
     rubricChecks: checks,
     loChecks: [],
     grammarChecks: [],
+    vocabChecks: [],
     evidence: [input.transcript.slice(0, 220)],
     modelVersion: MODEL_VERSION,
   };
@@ -663,6 +733,7 @@ function evaluateQAPrompt(input: EvaluationInput): { taskEvaluation: TaskEvaluat
     rubricChecks: checks,
     loChecks: [],
     grammarChecks: [],
+    vocabChecks: [],
     evidence: [firstSentence, sentences[1] || ""].filter(Boolean),
     modelVersion: MODEL_VERSION,
   };
@@ -716,6 +787,7 @@ function evaluateTopicTalk(input: EvaluationInput): { taskEvaluation: TaskEvalua
     rubricChecks: checks,
     loChecks: [],
     grammarChecks: [],
+    vocabChecks: [],
     evidence: [input.transcript.slice(0, 220)],
     modelVersion: MODEL_VERSION,
   };
@@ -777,6 +849,7 @@ function evaluateFillerControl(input: EvaluationInput): { taskEvaluation: TaskEv
     rubricChecks: checks,
     loChecks: [],
     grammarChecks: [],
+    vocabChecks: [],
     evidence: [input.transcript.slice(0, 220)],
     modelVersion: MODEL_VERSION,
   };
@@ -840,6 +913,7 @@ function evaluateSpeechBuilder(input: EvaluationInput): { taskEvaluation: TaskEv
     rubricChecks: checks,
     loChecks: [],
     grammarChecks: [],
+    vocabChecks: [],
     evidence: sentences.slice(0, 4),
     modelVersion: MODEL_VERSION,
   };
@@ -997,11 +1071,18 @@ async function evaluateWithOpenAI(input: EvaluationInput) {
     stage: stageRaw,
     ageBand: ageBandRaw,
   });
+  const vocabContext = await buildVocabEvaluationContext({
+    transcript: input.transcript,
+    stage: stageRaw,
+    ageBand: ageBandRaw,
+    taskType: input.taskType,
+    runId: input.taskId,
+  });
 
   const taskTargets = Array.isArray(input.taskTargets) ? input.taskTargets : [];
   const targetLoOptions = taskTargets
     .filter((t) => t?.node?.type === "GSE_LO" && typeof t.nodeId === "string" && typeof t.node?.descriptor === "string")
-    .slice(0, 6)
+    .slice(0, 4)
     .map((t) => ({ nodeId: t.nodeId, label: t.node.descriptor.slice(0, 140), required: Boolean(t.required) }));
   const targetGrammarOptions = taskTargets
     .filter(
@@ -1016,8 +1097,19 @@ async function evaluateWithOpenAI(input: EvaluationInput) {
       label: t.node.descriptor.slice(0, 140),
       required: Boolean(t.required),
     }));
+  const targetVocabOptions = taskTargets
+    .filter((t) => t?.node?.type === "GSE_VOCAB" && typeof t.nodeId === "string" && typeof t.node?.descriptor === "string")
+    .slice(0, 8)
+    .map((t) => ({ nodeId: t.nodeId, label: t.node.descriptor.slice(0, 140), required: Boolean(t.required) }));
   const targetOtherNodes = taskTargets
-    .filter((t) => t?.node?.type !== "GSE_LO" && t?.node?.type !== "GSE_GRAMMAR")
+    // Keep truly "other" targets out of the evaluation ID-option lists.
+    // Vocab/LO/Grammar targets are provided in dedicated option sections.
+    .filter(
+      (t) =>
+        t?.node?.type !== "GSE_LO" &&
+        t?.node?.type !== "GSE_GRAMMAR" &&
+        t?.node?.type !== "GSE_VOCAB"
+    )
     .slice(0, 6)
     .map((t) => ({
       nodeId: String(t.nodeId || t.node?.nodeId || ""),
@@ -1026,14 +1118,33 @@ async function evaluateWithOpenAI(input: EvaluationInput) {
       required: Boolean((t as { required?: unknown }).required),
     }))
     .filter((t) => t.nodeId && t.type && t.label);
-  const loOptions = semanticContext.loCandidates.slice(0, 6).map((item) => ({
-    nodeId: item.nodeId,
-    label: item.descriptor.slice(0, 140),
-  }));
-  const grammarOptions = semanticContext.grammarCandidates.slice(0, 8).map((item) => ({
-    descriptorId: item.sourceKey,
-    label: item.descriptor.slice(0, 140),
-  }));
+  const targetLoNodeIds = new Set(targetLoOptions.map((t) => t.nodeId));
+  const targetGrammarDescriptorIds = new Set(targetGrammarOptions.map((t) => t.descriptorId));
+  const loOptions = semanticContext.loCandidates
+    .filter((item) => !targetLoNodeIds.has(item.nodeId))
+    .slice(0, 6)
+    .map((item) => ({
+      nodeId: item.nodeId,
+      label: item.descriptor.slice(0, 140),
+    }));
+  const grammarOptions = semanticContext.grammarCandidates
+    .filter((item) => !targetGrammarDescriptorIds.has(item.sourceKey))
+    .slice(0, 8)
+    .map((item) => ({
+      descriptorId: item.sourceKey,
+      label: item.descriptor.slice(0, 140),
+    }));
+  const vocabOptions = vocabContext.candidates
+    .filter((c) => !targetVocabOptions.some((t) => t.nodeId === c.nodeId))
+    .slice(0, 10)
+    .map((c) => ({
+      nodeId: c.nodeId,
+      label: c.descriptor.slice(0, 140),
+      topicHints: c.topicHints.slice(0, 2),
+      grammaticalCategories: c.grammaticalCategories.slice(0, 2),
+      retrievalScore: c.retrievalScore,
+      matchedPhrases: c.matchedPhrases.slice(0, 4),
+    }));
   const retrievalTracePayload = {
     stage: stageRaw,
     ageBand: ageBandRaw,
@@ -1042,6 +1153,9 @@ async function evaluateWithOpenAI(input: EvaluationInput) {
     grammarCandidateCount: grammarOptions.length,
     loCandidates: loOptions,
     grammarCandidates: grammarOptions,
+    vocabDisabledReason: vocabContext.disabledReason || null,
+    vocabCandidateCount: vocabOptions.length,
+    vocabCandidates: vocabOptions,
   };
   console.log(
     JSON.stringify({
@@ -1053,6 +1167,9 @@ async function evaluateWithOpenAI(input: EvaluationInput) {
       grammarCandidateCount: grammarOptions.length,
       loTop: loOptions.slice(0, 3),
       grammarTop: grammarOptions.slice(0, 3),
+      vocabDisabledReason: vocabContext.disabledReason || null,
+      vocabCandidateCount: vocabOptions.length,
+      vocabTop: vocabOptions.slice(0, 3),
     })
   );
   await appendPipelineDebugEvent({
@@ -1066,7 +1183,15 @@ async function evaluateWithOpenAI(input: EvaluationInput) {
     taskTargets: {
       lo: targetLoOptions,
       grammar: targetGrammarOptions,
+      vocab: targetVocabOptions,
       other: targetOtherNodes,
+    },
+    vocabRetrieval: {
+      disabledReason: vocabContext.disabledReason || null,
+      model: vocabContext.model || null,
+      candidateCount: vocabOptions.length,
+      candidates: vocabOptions,
+      debug: vocabContext.debug,
     },
     compactInput,
   });
@@ -1077,26 +1202,46 @@ async function evaluateWithOpenAI(input: EvaluationInput) {
     "Use boolean for pass fields and numbers for score/weight/confidence.",
     "Scores must be 0..100 (not 0..10). Prefer integers.",
     "Do not invent IDs: loChecks.checkId must be nodeId from loDescriptorOptions; grammarChecks.descriptorId must be from grammarDescriptorOptions.",
-    "If target descriptor options are provided, you MUST include checks for them (pass true/false).",
-    "For target grammar checks, set opportunityType=explicit_target.",
-    "Keep at most 4 loChecks and 6 grammarChecks total.",
-    "rubricChecks must have at least 2 items; each weight is 0..1 and total weight should be close to 1.",
-    "Output shape: {taskEvaluation:{taskType,taskScore,languageScore,artifacts,rubricChecks,loChecks,grammarChecks,evidence,modelVersion},feedback:{summary,whatWentWell,whatToFixNow,exampleBetterAnswer,nextMicroTask}}",
+    "Vocabulary: vocabChecks.nodeId must be a nodeId from vocabDescriptorOptions.",
+    "Evidence gating: set pass=true ONLY if the transcript contains clear evidence. If a target option is not used, you MUST still include it with pass=false.",
+    "Target checks: include ALL target LO/grammar/vocab options (pass true/false).",
+    "opportunityType rules: grammarChecks.opportunityType=explicit_target ONLY if descriptorId is listed in Target Grammar descriptor options; vocabChecks.opportunityType=explicit_target ONLY if nodeId is listed in Target Vocabulary descriptor options. Otherwise use incidental (or elicited_incidental if you believe the task prompt elicited it).",
+    "Recall: do NOT be minimal. Use the available budget and include additional non-target checks that are clearly evidenced, up to the limits below.",
+    "Coverage: if Candidate Grammar options is non-empty, include at least 2 grammarChecks when the transcript contains any full clause (subject + verb). If you cannot justify any grammar check, explain why by omitting grammarChecks entirely.",
+    "Coverage: if Candidate Vocabulary options is non-empty, include at least 2 incidental vocabChecks for content words or phrases (prefer noun/verb/adjective/phrase options over pronoun/conjunction/adverb).",
+    "Limits: at most 4 loChecks, 6 grammarChecks, and 8 vocabChecks total (including target checks).",
+    "rubricChecks: must have at least 2 items; each item MUST include {name, pass, reason, weight}. Each weight is 0..1 and total weight should be close to 1.",
+    "Checks schema: loChecks items MUST include {checkId, label, pass, confidence (0..1), severity (low|medium|high), evidenceSpan(optional)}; grammarChecks items MUST include {checkId, descriptorId, label, pass, confidence (0..1), opportunityType, evidenceSpan(optional)}; vocabChecks items MUST include {nodeId, label, pass, confidence (0..1), opportunityType, evidenceSpan(optional), matchedPhrase(optional)}.",
+    "Evidence field: taskEvaluation.evidence must be an array of up to 6 short exact quotes from the transcript that support your PASS=true decisions (prefer 1 quote per category).",
+    "Output shape: {taskEvaluation:{taskType,taskScore,languageScore,artifacts,rubricChecks,loChecks,grammarChecks,vocabChecks,evidence,modelVersion},feedback:{summary,whatWentWell,whatToFixNow,exampleBetterAnswer,nextMicroTask}}",
     buildTaskSpecificPrompt(input.taskType),
     `Semantic retrieval status: ${JSON.stringify({
       disabledReason: semanticContext.disabledReason || null,
       loCandidateCount: loOptions.length,
       grammarCandidateCount: grammarOptions.length,
+      vocabDisabledReason: vocabContext.disabledReason || null,
+      vocabCandidateCount: vocabOptions.length,
     })}`,
-    `Target LO descriptor options (nodeId + label): ${JSON.stringify(
+    `Target LO options (nodeId + label): ${JSON.stringify(
       targetLoOptions.map(({ nodeId, label }) => ({ nodeId, label }))
     )}`,
-    `Target Grammar descriptor options (descriptorId + label): ${JSON.stringify(
+    `Target Grammar options (descriptorId + label): ${JSON.stringify(
       targetGrammarOptions.map(({ descriptorId, label }) => ({ descriptorId, label }))
     )}`,
+    `Target Vocabulary options (nodeId + label): ${JSON.stringify(
+      targetVocabOptions.map(({ nodeId, label }) => ({ nodeId, label }))
+    )}`,
     `Other target nodes (not LO/grammar): ${JSON.stringify(targetOtherNodes)}`,
-    `LO descriptor options (nodeId + label): ${JSON.stringify(loOptions)}`,
-    `Grammar descriptor options (descriptorId + descriptor): ${JSON.stringify(grammarOptions)}`,
+    `Candidate LO options (nodeId + label): ${JSON.stringify(loOptions)}`,
+    `Candidate Grammar options (descriptorId + label): ${JSON.stringify(grammarOptions)}`,
+    `Candidate Vocabulary options (nodeId + label + topicHints + grammaticalCategories): ${JSON.stringify(
+      vocabOptions.map(({ nodeId, label, topicHints, grammaticalCategories }) => ({
+        nodeId,
+        label,
+        topicHints,
+        grammaticalCategories,
+      }))
+    )}`,
     `Input JSON: ${JSON.stringify(compactInput)}`,
   ].join("\n");
   const attempts: EvaluationDebugInfo["openai"]["attempts"] = [];
@@ -1111,7 +1256,7 @@ async function evaluateWithOpenAI(input: EvaluationInput) {
         openaiApiKey: apiKey,
         model,
         temperature: 0,
-        maxTokens: 700,
+        maxTokens: 1100,
         runName: "gse_evaluation",
         tags: ["gse", "evaluation"],
         metadata: {
@@ -1121,6 +1266,7 @@ async function evaluateWithOpenAI(input: EvaluationInput) {
           taskTargets: {
             lo: targetLoOptions.map(({ nodeId }) => nodeId),
             grammar: targetGrammarOptions.map(({ descriptorId }) => descriptorId),
+            vocab: targetVocabOptions.map(({ nodeId }) => nodeId),
             other: targetOtherNodes.map(({ nodeId }) => nodeId),
           },
         },
@@ -1219,6 +1365,7 @@ export async function evaluateTaskQuality(input: EvaluationInput) {
       modelVersion: `${MODEL_VERSION}+openai`,
       loChecks: fromModel.parsed.taskEvaluation.loChecks || [],
       grammarChecks: fromModel.parsed.taskEvaluation.grammarChecks || [],
+      vocabChecks: fromModel.parsed.taskEvaluation.vocabChecks || [],
     };
     const modelTaskEvaluation = attachStructuredChecks(baseTaskEvaluation, input.transcript);
     const normalizedFeedback = {

@@ -164,7 +164,8 @@ export async function ensureDefaultGseBundles() {
 }
 
 const STAGE_ORDER_FULL: CEFRStage[] = ["A0", "A1", "A2", "B1", "B2", "C1", "C2"];
-function isPlacementAboveStage(placementStage: CEFRStage | undefined, bundleStage: CEFRStage): boolean {
+/** True when placement has passed the given stage (used for bundle credited: value≥50+direct counts only when placement above stage). */
+export function isPlacementAboveStage(placementStage: CEFRStage | undefined, bundleStage: CEFRStage): boolean {
   if (!placementStage) return false;
   const pIdx = STAGE_ORDER_FULL.indexOf(placementStage);
   const bIdx = STAGE_ORDER_FULL.indexOf(bundleStage);

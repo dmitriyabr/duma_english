@@ -106,11 +106,13 @@ type LevelNodeRow = {
   directEvidenceCount: number;
   activationState: string | null;
   status: "mastered" | "credited" | "in_progress" | "no_evidence";
+  inBundle?: boolean;
 };
 
 type StudentProfile = {
   catalogNodesByBand?: Record<string, number>;
   perStageCredited?: Record<string, number>;
+  perStageBundleTotal?: Record<string, number>;
   student: {
     id: string;
     displayName: string;
@@ -196,7 +198,7 @@ export default function TeacherStudentProfilePage() {
     );
   }
 
-  const { student, progress, recentAttempts, catalogNodesByBand, perStageCredited } = data;
+  const { student, progress, recentAttempts, catalogNodesByBand, perStageCredited, perStageBundleTotal } = data;
   const np = progress.nodeProgress;
   const pr = progress.promotionReadiness;
 
@@ -240,7 +242,7 @@ export default function TeacherStudentProfilePage() {
                 By level (temporary)
               </h2>
               <p className="subtitle" style={{ marginBottom: 10, fontSize: "0.8rem" }}>
-                Total = nodes in catalog. Credited = verified+70 or (value≥50 and ≥1 direct). Click a level to see all nodes and their status.
+                Total = nodes in catalog. Credited and % = bundle nodes (count toward next level): verified+70 or (value≥50 and ≥1 direct). Click a level to see all catalog nodes and their status.
               </p>
               <div style={{ overflowX: "auto" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem" }}>
@@ -266,7 +268,8 @@ export default function TeacherStudentProfilePage() {
                       const mastered = stat.mastered;
                       const inProgress = withEvidence - mastered;
                       const noEvidence = Math.max(0, catalogTotal - withEvidence);
-                      const pctCatalog = catalogTotal > 0 ? Math.round((mastered / catalogTotal) * 100) : 0;
+                      const bundleTotal = perStageBundleTotal?.[stage] ?? 0;
+                      const pctCatalog = bundleTotal > 0 ? Math.round((credited / bundleTotal) * 100) : 0;
                       return (
                         <tr key={stage} style={{ borderBottom: "1px solid rgba(16,22,47,0.06)" }}>
                           <td
@@ -304,7 +307,7 @@ export default function TeacherStudentProfilePage() {
                                 style={{
                                   height: "100%",
                                   width: `${Math.min(100, pctCatalog)}%`,
-                                  minWidth: mastered > 0 ? 4 : 0,
+                                  minWidth: credited > 0 ? 4 : 0,
                                   background: pctCatalog >= 80 ? "var(--accent-2)" : "var(--accent-3)",
                                   borderRadius: 999,
                                 }}
@@ -377,6 +380,7 @@ export default function TeacherStudentProfilePage() {
                       <thead>
                         <tr style={{ borderBottom: "1px solid rgba(16,22,47,0.12)", color: "var(--ink-2)" }}>
                           <th style={{ textAlign: "left", padding: "8px", fontWeight: 600 }}>Descriptor</th>
+                          <th style={{ textAlign: "center", padding: "8px", width: 70 }}>Path</th>
                           <th style={{ textAlign: "left", padding: "8px", width: 100 }}>Status</th>
                           <th style={{ textAlign: "right", padding: "8px", width: 56 }}>Value</th>
                           <th style={{ textAlign: "right", padding: "8px", width: 56 }}>Direct</th>
@@ -384,12 +388,23 @@ export default function TeacherStudentProfilePage() {
                       </thead>
                       <tbody>
                         {[...levelModalNodes]
-                          .sort((a, b) => b.value - a.value)
+                          .sort((a, b) => {
+                            const byValue = b.value - a.value;
+                            if (byValue !== 0) return byValue;
+                            return (b.inBundle ? 1 : 0) - (a.inBundle ? 1 : 0);
+                          })
                           .map((n) => (
                           <tr key={n.nodeId} style={{ borderBottom: "1px solid rgba(16,22,47,0.06)" }}>
                             <td style={{ padding: "8px", color: "var(--ink-1)" }} title={n.descriptor}>
                               {(n.descriptor || n.nodeId).slice(0, 60)}
                               {(n.descriptor?.length ?? 0) > 60 ? "…" : ""}
+                            </td>
+                            <td style={{ padding: "8px", textAlign: "center" }}>
+                              {n.inBundle ? (
+                                <span style={{ fontSize: "0.75rem", color: "var(--accent-1)", fontWeight: 600 }} title="Counts toward next level">✓</span>
+                              ) : (
+                                <span style={{ fontSize: "0.75rem", color: "var(--ink-3)" }}>—</span>
+                              )}
                             </td>
                             <td style={{ padding: "8px" }}>
                               <span

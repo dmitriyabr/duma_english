@@ -80,10 +80,10 @@ async function main() {
 
   console.log("=== 2) Why nodes in UI differ from words in tasks? ===\n");
   console.log("Two different sources:");
-  console.log("  • Blocking nodes (Path to next level) = A1 bundle nodes from GSE catalog (e.g. 'Can say their age using I'm [number]').");
+  console.log("  • Blocking nodes (Path to next level) = target-stage bundle nodes from GSE catalog (e.g. 'Can say their age using I'm [number]').");
   console.log("  • Words in tasks (target_vocab) = from StudentVocabulary (spaced repetition: new/learning lemmas), e.g. 'play', 'feel'.");
-  console.log("  • Planner picks GSE target nodes; task generator gets targetNodeLabels (descriptors). For target_vocab, requiredWords in the prompt come from vocabDue (StudentVocabulary), not from the bundle node list.");
-  console.log("So you see A1 Grammar/Can-Do descriptors in the block, but tasks may use different vocab words from your vocabulary queue.\n");
+  console.log("  • For target_vocab, requiredWords and prompt words come from the planner's target node descriptors (so we only penalize for words we asked for). See DEBUG_PLAYBOOK § E5.");
+  console.log("So you see target-stage Grammar/Can-Do descriptors in the block, but tasks may use different vocab words from your vocabulary queue.\n");
 
   const lastTasks = await prisma.taskInstance.findMany({
     where: { studentId: sid },

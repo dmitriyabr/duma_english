@@ -110,6 +110,47 @@ Check:
 
 **Done:** (1) When **placement** (weighted evidence from all nodes) is **above** bundle-based promotion, we now **lift promotion** to placement so the UI doesn’t show “A0” while the learner is already working on B1 nodes. (2) Planner **prefers** target-stage bundle nodes (after verification queue) so tasks align with “path to next level”. See TASKS “What was just fixed”.
 
+
+## E4) Откуда берутся ноды заданий (пул, выбор, пример по твоему профилю)
+
+**Проверять по базе, не «судя».** Скрипт: `npx tsx src/scripts/inspect_planner_flow.ts [studentId]` — выводит stage из БД, пул нод, ноды бандла B1, последние 5 решений планировщика.
+
+**Как устроено (простыми словами):**
+
+1. **Stage берётся из базы:** `projectLearnerStageFromGse(studentId)` → `promotionStage` (текущий уровень, напр. A2) и `targetStage` (следующий, напр. B1). Никаких «судя» — только эти поля.
+
+2. **Пул нод (loadNodeState):** планировщик грузит только те ноды, по которым у ученика уже есть строка в **StudentGseMastery** и у которых **gseCenter** в диапазоне текущего стейджа ± 5 (для A2 это 25–47). То есть в пул попадают только ноды, по которым уже был хотя бы один evidence. Остальных нод в пуле **нет**.
+
+3. **Ноды бандла B1:** это фиксированный список nodeId из бандлов целевого стейджа (Grammar Core, Can-Do Core, Vocab Core для B1). Они нужны для «path to next level»: прогресс по ним даёт node progress и readiness. Планировщик **предпочитает** их (preferredNodeIds), но выбирать может **только из пула**. Если в пуле нет ни одной ноды из бандла B1, то ни одна такая нода не будет выдана — предпочтение бесполезно.
+
+4. **Выбор задания:** из пула (nodeStates) считается utility по типам заданий и нодам; preferred (верификация, потом target-stage bundle) повышает оценку. Выбирается пара (тип задания, до 3 нод). **targetNodeIds** всегда только из пула.
+
+**Конкретно по твоему профилю (данные из скрипта):**
+
+- **Stage из БД:** promotionStage = A2, targetStage = B1. GSE для A2: 30–42.
+- **Пул:** 50 записей StudentGseMastery в диапазоне 25–47. **Ни одна из этих 50 нод не входит в бандлы B1** (это в основном vocab: learner, learn, girl, say, girlfriend, example и т.д. с gseCenter 28–46).
+- **Бандл B1:** 62 ноды (грамматика/can-do типа "Can use 'all of'...", gseCenter 43–44). По ним у тебя **нет** записей в StudentGseMastery, поэтому они **не в пуле**.
+- **Последние 5 заданий:** все target ноды — из пула (learner, learn, girl, say, girlfriend, example); **0 из бандла B1**.
+- **Итог:** тебе не дают ноды из бандлов B1, потому что их нет в пуле. Node progress к B1 = 0%, потому что по обязательным B1-нодам нет evidence.
+
+**Как должно быть:** в пул планировщика должны попадать и ноды целевого стейджа (B1) из бандлов, даже если по ним ещё нет mastery — с «нулевым» состоянием (decayedMastery 0, observed). Тогда их можно выбирать, давать задания, накапливать evidence и поднимать node progress. После фикса планировщика скрипт `inspect_planner_flow.ts` покажет ноды B1 в пуле и в последних решениях.
+
+## E5) Рассинхроны (два источника правды)
+
+Места, где раньше или до сих пор два разных источника данных могли расходиться. Правило: **один источник правды на контекст** (на задание — ноды и слова из планировщика; на прогресс — бандлы и mastery).
+
+**Исправлено:**
+
+1. **target_vocab: слова в задании vs ноды** — раньше prompt/requiredWords из StudentVocabulary, target nodes из планировщика → штраф за слова, которые не просили. Теперь слова в промпте и requiredWords выводятся из **targetNodeDescriptors** планировщика; fallback на vocab queue только если &lt; 2 дескрипторов.
+2. **assignTaskTargetsFromCatalog** — preferredNodeIds всегда **decision.targetNodeIds**. LLM не знает про ID: в промпт ему передаём только слова/цели (target words, learning objectives), в схеме ответа нет target_nodes. Ноды к заданию привязываем только из планировщика.
+3. **GET /api/task/next ответ targetWords** — раньше в ответе отдавался список из vocabDue, а в задании — слова из нод. Теперь для target_vocab в ответе отдаются **promptTargetWords** (те же, что в промпте).
+
+**Проверить / оставить в уме:**
+
+4. **Learning path API** (`/api/learning-path`) — возвращает targetWords из StudentVocabulary (леммы к повторению). Это список «слов в очереди», а не «слова следующего задания». Если в UI показывать его как «слова следующего задания» — будет рассинхрон; лучше подписывать как «слова к повторению» или брать слова из следующего task/next.
+5. **Stage** — везде должен браться из `projectLearnerStageFromGse` (promotionStage / placementStage). Если где-то подставляют stage из профиля или хардкод — возможен рассинхрон с прогрессом и пулом нод.
+6. **Генератор заданий** — LLM не видит и не возвращает node ID. Ему передаём только слова/цели (target words, learning objectives); в JSON запрашиваем instruction, constraints и т.д., без target_nodes. Целевые ноды всегда из планировщика (decision.targetNodeIds). Так модель не может перепутать ID и промпт не усложняем.
+
 ## F) Task generator: why prompt sent “garbage” (raw node IDs)
 The task generator LLM used to receive only raw GSE node IDs (e.g. `gse:gse_grammar_glgr:...`), which are meaningless to the model. Now:
 - Planner returns **targetNodeDescriptors** (human-readable learning objectives) together with targetNodeIds.

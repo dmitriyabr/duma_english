@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getTeacherFromRequest } from "@/lib/auth";
+import { getBundleNodeIdsForStage, isPlacementAboveStage } from "@/lib/gse/bundles";
 import { mapStageToGseRange } from "@/lib/gse/utils";
+import { getStudentProgress } from "@/lib/progress";
 
 async function ensureTeacherCanAccessStudent(
   teacherId: string,
@@ -42,11 +44,19 @@ export async function GET(
   }
 
   const range = mapStageToGseRange(stage);
-  const nodes = await prisma.gseNode.findMany({
-    where: { gseCenter: { gte: range.min, lte: range.max } },
-    select: { nodeId: true, descriptor: true, gseCenter: true },
-    orderBy: [{ gseCenter: "asc" }, { nodeId: "asc" }],
-  });
+  const stageCEFR = stage as "A1" | "A2" | "B1" | "B2" | "C1" | "C2";
+  const [nodes, bundleNodeIds, progress] = await Promise.all([
+    prisma.gseNode.findMany({
+      where: { gseCenter: { gte: range.min, lte: range.max } },
+      select: { nodeId: true, descriptor: true, gseCenter: true },
+      orderBy: [{ gseCenter: "asc" }, { nodeId: "asc" }],
+    }),
+    getBundleNodeIdsForStage(stageCEFR),
+    getStudentProgress(studentId),
+  ]);
+  const bundleSet = new Set(bundleNodeIds);
+  const placementStage = (progress as { placementStage?: string }).placementStage as "A0" | "A1" | "A2" | "B1" | "B2" | "C1" | "C2" | undefined;
+  const placementAbove = isPlacementAboveStage(placementStage, stageCEFR);
 
   const nodeIds = nodes.map((n) => n.nodeId);
   const masteryRows =
@@ -74,7 +84,7 @@ export async function GET(
     const direct = m?.directEvidenceCount ?? 0;
     const verified = m?.activationState === "verified";
     const credited =
-      (verified && value >= 70) || (value >= 50 && direct >= 1);
+      (verified && value >= 70) || (placementAbove && value >= 50 && direct >= 1);
     const mastered = value >= 75;
     let status: "mastered" | "credited" | "in_progress" | "no_evidence" =
       "no_evidence";
@@ -90,6 +100,7 @@ export async function GET(
       directEvidenceCount: direct,
       activationState: m?.activationState ?? null,
       status,
+      inBundle: bundleSet.has(node.nodeId),
     };
   });
 

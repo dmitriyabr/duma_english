@@ -15,7 +15,6 @@ const generatedTaskSchema = z.object({
   expected_artifacts: z.array(z.string()).max(12),
   scoring_hooks: z.array(z.string()).max(12),
   estimated_difficulty: z.number().min(0).max(100),
-  target_nodes: z.array(z.string()).max(8),
 });
 
 type GenerateTaskSpecInput = {
@@ -26,6 +25,8 @@ type GenerateTaskSpecInput = {
   targetNodeIds: string[];
   /** Human-readable learning objectives (same order as targetNodeIds). Shown to LLM instead of raw IDs. */
   targetNodeLabels?: string[];
+  /** Node types in same order as targetNodeIds: GSE_VOCAB, GSE_GRAMMAR, GSE_LO. Used to split words vs objectives. */
+  targetNodeTypes?: string[];
   focusSkills: string[];
   plannerReason: string;
   primaryGoal: string;
@@ -274,7 +275,6 @@ function normalizeGeneratedPayload(
       : Math.max(maxSeconds, fallback.maxDurationSec);
   const expectedArtifacts = coerceStringArray(row.expected_artifacts);
   const scoringHooks = coerceStringArray(row.scoring_hooks);
-  const targetNodes = coerceStringArray(row.target_nodes);
 
   return {
     taskType,
@@ -288,7 +288,7 @@ function normalizeGeneratedPayload(
     expectedArtifacts: expectedArtifacts.length ? expectedArtifacts.slice(0, 12) : fallback.expectedArtifacts,
     scoringHooks: scoringHooks.length ? scoringHooks.slice(0, 12) : fallback.scoringHooks,
     estimatedDifficulty: Math.round(coerceDifficulty(row.estimated_difficulty, input.stage)),
-    targetNodes: targetNodes.length ? targetNodes.slice(0, 8) : fallback.targetNodes,
+    targetNodes: input.targetNodeIds.slice(0, 8),
     fallbackUsed: false,
   };
 }
@@ -297,29 +297,48 @@ export async function generateTaskSpec(input: GenerateTaskSpecInput): Promise<Ge
   const apiKey = process.env.OPENAI_API_KEY;
   const model = process.env.OPENAI_MODEL || "gpt-4.1-mini";
   const fallback = fallbackTaskSpec(input);
-  if (!apiKey) return fallback;
+  if (!apiKey) {
+    console.warn(JSON.stringify({ event: "task_gen_fallback", reason: "no_openai_api_key", taskType: input.taskType }));
+    return fallback;
+  }
 
   const labels = input.targetNodeLabels?.filter(Boolean) ?? [];
+  const types = input.targetNodeTypes ?? [];
   const hasLabels = labels.length > 0 && labels.length === input.targetNodeIds.length;
-  const targetObjectivesBlock = hasLabels
-    ? [
-        "Target learning objectives (design the task so the learner can demonstrate these):",
-        ...labels.map((desc, i) => `${i + 1}) ${desc}`),
-        `In your JSON, set target_nodes to exactly these IDs in this order: ${input.targetNodeIds.join(", ")}`,
-      ].join("\n")
-    : `Target node IDs (copy into target_nodes): ${input.targetNodeIds.join(", ") || "none"}`;
+  const hasTypes = types.length === input.targetNodeIds.length;
+  const vocabIndices = hasTypes ? types.map((t, i) => (t === "GSE_VOCAB" ? i : -1)).filter((i) => i >= 0) : [];
+  const nonVocabIndices = hasTypes ? types.map((t, i) => (t !== "GSE_VOCAB" ? i : -1)).filter((i) => i >= 0) : [];
+  const wordsForLearner =
+    input.targetWords.length > 0
+      ? input.targetWords
+      : hasLabels && vocabIndices.length > 0
+        ? vocabIndices.map((i) => labels[i]!).filter(Boolean)
+        : [];
+  const objectiveLabels =
+    hasLabels && nonVocabIndices.length > 0 ? nonVocabIndices.map((i) => labels[i]!).filter(Boolean) : [];
+  const wordsLine =
+    wordsForLearner.length > 0
+      ? `Words the learner must use in their answer: ${wordsForLearner.join(", ")}.`
+      : null;
+  const objectivesBlock =
+    objectiveLabels.length > 0
+      ? [
+          "Learning objectives the learner should demonstrate (design the task so the learner can show this in their answer):",
+          ...objectiveLabels.map((desc, i) => `${i + 1}) ${desc}`),
+        ].join("\n")
+      : null;
 
   const prompt = [
     "Generate one speaking task for a child learner.",
-    "Output JSON only with keys: task_type,instruction,constraints,maxDurationSec,assessmentMode,expected_artifacts,scoring_hooks,estimated_difficulty,target_nodes.",
+    "Output JSON only with keys: task_type,instruction,constraints,maxDurationSec,assessmentMode,expected_artifacts,scoring_hooks,estimated_difficulty.",
     "Use simple child-friendly language and no method jargon.",
     "Keep instruction under 45 words.",
     `Stage: ${input.stage}`,
     `Age band: ${input.ageBand}`,
     `Task type required: ${input.taskType}`,
     `Primary goal: ${input.primaryGoal}`,
-    `Target words: ${input.targetWords.join(", ") || "none"}`,
-    targetObjectivesBlock,
+    ...(wordsLine ? [wordsLine] : []),
+    ...(objectivesBlock ? [objectivesBlock] : []),
     `Focus skills: ${input.focusSkills.join(", ") || "speaking"}`,
     `Planner reason: ${input.plannerReason}`,
     `Avoid repeating recent prompts: ${(input.recentPrompts || []).slice(0, 5).join(" || ") || "none"}`,
@@ -340,37 +359,28 @@ export async function generateTaskSpec(input: GenerateTaskSpecInput): Promise<Ge
       maxTokens: 420,
     });
     if (!content || !content.trim()) {
-      return {
-        ...fallback,
-        fallbackReason: "openai_empty_content",
-      };
+      console.warn(JSON.stringify({ event: "task_gen_fallback", reason: "openai_empty_content", taskType: input.taskType }));
+      return { ...fallback, fallbackReason: "openai_empty_content" };
     }
     const json = JSON.parse(content);
     const normalized = normalizeGeneratedPayload(json, input, fallback);
     if (!normalized) {
-      return {
-        ...fallback,
-        fallbackReason: "openai_invalid_payload",
-      };
+      console.warn(JSON.stringify({ event: "task_gen_fallback", reason: "openai_invalid_payload", taskType: input.taskType }));
+      return { ...fallback, fallbackReason: "openai_invalid_payload" };
     }
     if (normalized.taskType === "read_aloud" && !extractReferenceText(normalized.prompt)) {
-      return {
-        ...fallback,
-        fallbackReason: "openai_missing_read_aloud_reference",
-      };
+      console.warn(JSON.stringify({ event: "task_gen_fallback", reason: "openai_missing_read_aloud_reference", taskType: input.taskType }));
+      return { ...fallback, fallbackReason: "openai_missing_read_aloud_reference" };
     }
     if (isTooSimilarPrompt(normalized.prompt, input.recentPrompts || [])) {
-      return {
-        ...fallback,
-        fallbackReason: "openai_repeated_prompt",
-      };
+      console.warn(JSON.stringify({ event: "task_gen_fallback", reason: "openai_repeated_prompt", taskType: input.taskType }));
+      return { ...fallback, fallbackReason: "openai_repeated_prompt" };
     }
     const quality = validatePromptQuality(normalized, input);
     if (!quality.ok) {
-      return {
-        ...fallback,
-        fallbackReason: `openai_low_quality_${quality.reason || "prompt"}`,
-      };
+      const reason = `openai_low_quality_${quality.reason || "prompt"}`;
+      console.warn(JSON.stringify({ event: "task_gen_fallback", reason, taskType: input.taskType }));
+      return { ...fallback, fallbackReason: reason };
     }
     const parsed = generatedTaskSchema.parse({
       task_type: normalized.taskType,
@@ -381,7 +391,6 @@ export async function generateTaskSpec(input: GenerateTaskSpecInput): Promise<Ge
       expected_artifacts: normalized.expectedArtifacts,
       scoring_hooks: normalized.scoringHooks,
       estimated_difficulty: normalized.estimatedDifficulty,
-      target_nodes: normalized.targetNodes,
     });
     return {
       taskType: parsed.task_type,
@@ -392,14 +401,17 @@ export async function generateTaskSpec(input: GenerateTaskSpecInput): Promise<Ge
       expectedArtifacts: parsed.expected_artifacts,
       scoringHooks: parsed.scoring_hooks,
       estimatedDifficulty: parsed.estimated_difficulty,
-      targetNodes: parsed.target_nodes,
+      targetNodes: input.targetNodeIds.slice(0, 8),
       fallbackUsed: false,
       model,
     };
-  } catch {
-    return {
-      ...fallback,
-      fallbackReason: "openai_exception",
-    };
+  } catch (err) {
+    console.warn(JSON.stringify({
+      event: "task_gen_fallback",
+      reason: "openai_exception",
+      taskType: input.taskType,
+      error: err instanceof Error ? err.message : String(err),
+    }));
+    return { ...fallback, fallbackReason: "openai_exception" };
   }
 }

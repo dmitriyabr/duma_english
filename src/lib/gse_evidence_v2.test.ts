@@ -163,7 +163,7 @@ test("age-band calibration lowers incidental grammar weight for 6-8 vs 12-14", (
   const olderGrammar = older.created.find((row) => row.domain === "grammar");
   assert.ok(youngGrammar);
   assert.ok(olderGrammar);
-  // Weight is computed in mastery from conf/rel/impact; draft no longer has weight
+  // Weight is computed in mastery from conf/rel (baseWeight); draft no longer has weight
 });
 
 test("low task score enforces explicit negative LO evidence", () => {

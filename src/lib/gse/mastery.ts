@@ -9,7 +9,6 @@ export type EvidenceActivationImpact = "none" | "observed" | "candidate" | "veri
 export type MasteryEvidence = {
   nodeId: string;
   confidence: number; // 0..1
-  impact: number; // 0..1
   reliability: GseReliability;
   evidenceKind?: GseEvidenceKind;
   opportunityType?: GseOpportunityType;

@@ -67,7 +67,6 @@ type EvidenceDraft = {
   opportunityType: GseOpportunityType;
   score: number;
   confidence: number;
-  impact: number;
   weight?: number;
   source: string;
   domain: "vocab" | "grammar" | "lo";
@@ -380,7 +379,6 @@ function makeEvidence(params: {
   opportunity: GseOpportunityType;
   score: number;
   confidence: number;
-  impact: number;
   source: string;
   domain: "vocab" | "grammar" | "lo";
   usedForPromotion: boolean;
@@ -398,7 +396,6 @@ function makeEvidence(params: {
     opportunityType: params.opportunity,
     score: Number(clamp01(params.score).toFixed(4)),
     confidence: Number(clamp01(params.confidence).toFixed(4)),
-    impact: Number(Math.max(0.1, Math.min(1, params.impact)).toFixed(4)),
     source: params.source,
     domain: params.domain,
     usedForPromotion: params.usedForPromotion,
@@ -456,7 +453,6 @@ export function buildOpportunityEvidence(input: BuildOpportunityEvidenceInput) {
           opportunity: "explicit_target",
           score,
           confidence: selectedCheck ? selectedCheck.confidence : defaultConf,
-          impact: 1,
           source: "rules",
           domain: "lo",
           usedForPromotion: true,
@@ -501,7 +497,6 @@ export function buildOpportunityEvidence(input: BuildOpportunityEvidenceInput) {
             opportunity: "incidental",
             score: wasUsed ? 0.55 : 0.35,
             confidence: defaultConf * 0.6,
-            impact: 1,
             source: "rules",
             domain: "vocab",
             usedForPromotion: false,
@@ -526,7 +521,6 @@ export function buildOpportunityEvidence(input: BuildOpportunityEvidenceInput) {
             opportunity: "explicit_target",
             score: wasUsed ? 1 : scoreForNegativeEvidence(1),
             confidence: selectedCheck ? selectedCheck.confidence : defaultConf,
-            impact: 1,
             source: "rules",
             domain: "vocab",
             usedForPromotion: true,
@@ -549,7 +543,6 @@ export function buildOpportunityEvidence(input: BuildOpportunityEvidenceInput) {
             opportunity: "incidental",
             score: 0.7,
             confidence: defaultConf,
-            impact: 1,
             source: "rules",
             domain: "vocab",
             usedForPromotion: false,
@@ -588,7 +581,6 @@ export function buildOpportunityEvidence(input: BuildOpportunityEvidenceInput) {
             : "elicited_incidental",
           score,
           confidence: selectedCheck ? selectedCheck.confidence : defaultConf,
-          impact: 1,
           source: "rules",
           domain: "grammar",
           usedForPromotion: true,
@@ -622,7 +614,6 @@ export function buildOpportunityEvidence(input: BuildOpportunityEvidenceInput) {
           ? Math.max(0.6, Math.min(0.92, check.confidence * 0.92))
           : scoreForNegativeEvidence(check.confidence),
         confidence: check.confidence,
-        impact: 1,
         source: "rules",
         domain: "vocab",
         usedForPromotion: false,
@@ -656,7 +647,6 @@ export function buildOpportunityEvidence(input: BuildOpportunityEvidenceInput) {
           opportunity: "explicit_target",
           score: scoreForNegativeEvidence(0.8),
           confidence: 0.92,
-          impact: 1,
           source: "rules",
           domain: "lo",
           usedForPromotion: true,
@@ -833,16 +823,15 @@ export async function persistAttemptGseEvidence(input: BuildAttemptEvidenceInput
           opportunity: "incidental",
           score: 0.68,
           confidence: incidentalDefaultConf,
-          impact: 1,
-          source: "rules",
-          domain: "vocab",
-          usedForPromotion: false,
-          targeted: false,
-          activationImpact: "observed",
-          reliability: input.scoreReliability,
-          ageBand: input.ageBand,
-          evidenceText: input.transcript.slice(0, 220),
-          metadataJson: {
+        source: "rules",
+        domain: "vocab",
+        usedForPromotion: false,
+        targeted: false,
+        activationImpact: "observed",
+        reliability: input.scoreReliability,
+        ageBand: input.ageBand,
+        evidenceText: input.transcript.slice(0, 220),
+        metadataJson: {
             checkId: "vocab_incidental_discovery",
             matchedWord: match.matchedWord,
             ruleVersion: EVIDENCE_RULE_VERSION,
@@ -885,7 +874,6 @@ export async function persistAttemptGseEvidence(input: BuildAttemptEvidenceInput
           opportunity: "incidental",
           score: pass ? Math.max(0.62, Math.min(0.9, check.confidence * 0.92)) : scoreForNegativeEvidence(check.confidence),
           confidence: check.confidence,
-          impact: 1,
           source: "rules",
           domain: "grammar",
           usedForPromotion: false,
@@ -936,7 +924,6 @@ export async function persistAttemptGseEvidence(input: BuildAttemptEvidenceInput
             ? Math.max(0.6, Math.min(0.92, check.confidence * 0.92))
             : scoreForNegativeEvidence(check.confidence),
           confidence: check.confidence,
-          impact: 1,
           source: "openai",
           domain: "lo",
           usedForPromotion: false,
@@ -975,7 +962,6 @@ export async function persistAttemptGseEvidence(input: BuildAttemptEvidenceInput
         opportunity: "elicited_incidental",
         score: clamp01(signal.score / 100),
         confidence: conf,
-        impact: 1,
         source: "azure",
         domain: node.type === "GSE_GRAMMAR" ? "grammar" : "lo",
         usedForPromotion: true,
@@ -1035,7 +1021,6 @@ export async function persistAttemptGseEvidence(input: BuildAttemptEvidenceInput
       opportunityType: row.opportunityType,
       score: row.score,
       confidence: row.confidence,
-      impact: row.impact,
       weight: getEvidenceBaseWeight(row),
       source: row.source,
       domain: row.domain,
@@ -1050,7 +1035,6 @@ export async function persistAttemptGseEvidence(input: BuildAttemptEvidenceInput
   const masteryEvidences: MasteryEvidence[] = rows.map((row) => ({
     nodeId: row.nodeId,
     confidence: row.confidence,
-    impact: row.impact,
     reliability: row.reliability,
     evidenceKind: row.evidenceKind,
     opportunityType: row.opportunityType,

@@ -8,13 +8,11 @@ test("mastery update is monotonic for positive evidence", () => {
   const medium = computeNextMasteryScore(current, {
     nodeId: "n1",
     confidence: 0.7,
-    impact: 0.5,
     reliability: "medium",
   });
   const high = computeNextMasteryScore(current, {
     nodeId: "n1",
     confidence: 0.9,
-    impact: 0.8,
     reliability: "high",
   });
   assert.ok(medium > current);

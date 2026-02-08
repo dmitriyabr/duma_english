@@ -365,7 +365,6 @@ model AttemptGseEvidence {
   nodeId           String
   signalType       String
   confidence       Float
-  impact           Float
   evidenceText     String?
   metadataJson     Json?
   createdAt        DateTime @default(now())

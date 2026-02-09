@@ -64,9 +64,14 @@ export default function HomePage() {
             </div>
           </div>
           <div className="spacer" />
-          <Link className="btn" href="/task">
-            Start a task
-          </Link>
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+            <Link className="btn" href="/task">
+              Start a task
+            </Link>
+            <Link className="btn ghost" href="/placement-extended">
+              Take placement test
+            </Link>
+          </div>
         </div>
       </section>
     </div>

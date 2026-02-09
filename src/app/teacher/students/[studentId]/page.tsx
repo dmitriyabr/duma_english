@@ -552,7 +552,7 @@ export default function TeacherStudentProfilePage() {
                           {"reasonLabel" in (blocked ?? {}) &&
                             typeof (blocked as { reasonLabel?: string }).reasonLabel === "string" && (
                               <span style={{ fontSize: "0.8rem", color: "var(--accent-1)" }}>
-                                ({(blocked as { reasonLabel: string }).reasonLabel})
+                                ({(blocked as unknown as { reasonLabel: string }).reasonLabel})
                               </span>
                             )}
                         </div>

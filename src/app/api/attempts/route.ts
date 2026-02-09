@@ -7,7 +7,7 @@ import { v4 as uuidv4 } from "uuid";
 const schema = z.object({
   taskId: z.string().min(1),
   contentType: z.string().min(3),
-  durationSec: z.number().positive().max(120),
+  durationSec: z.number().positive().max(600),
 });
 
 export async function POST(req: NextRequest) {

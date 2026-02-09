@@ -178,6 +178,10 @@ model PlacementSession {
   currentItemId      String?
   stageEstimate      String?
   confidenceEstimate Float?
+  placementMode      String?             @default("irt")
+  conversationTheme  String?
+  transcriptHistory  String[]            @default([])
+  stageHistory       String[]            @default([])
   responses          PlacementResponse[]
   currentItem        PlacementItem?      @relation("PlacementCurrentItem", fields: [currentItemId], references: [id])
   student            Student             @relation(fields: [studentId], references: [id], onDelete: Cascade)

@@ -229,6 +229,8 @@ async function updatePlacementFromAttempt(params: {
   };
   taskScore: number;
 }) {
+  if (params.taskMeta.placementMode === "placement_extended") return;
+
   const placementSessionId =
     typeof params.taskMeta.placementSessionId === "string"
       ? params.taskMeta.placementSessionId

@@ -1,0 +1,539 @@
+=== LAST ATTEMPT ===
+attemptId: cmle03vki000r5xodl7l8mygh
+taskId: cmle02idc000k5xod8rsf9hd9
+taskType: qa_prompt
+completedAt: 2026-02-08T17:13:06.261Z
+transcript (full):
+"Yesterday was my birthday. So usually I don't really like it, but yesterday was a special 1 for me. First of all, I have a big birthday cake from my family. But that's not only thing I had yesterday, we also met with my friends and play in a swimming pool and then we go to Bouncing Castle and then finally. I get a lot of beautiful gifts from them so. Let me be clear here. This birthday was the best birthday ever in my life."
+
+=== TARGETS (TaskGseTarget) — КАЖДАЯ ===
+1. nodeId: gse:gse_grammar_glgr:gse_grammar:55af7503d6c1560c41c6a3bf
+   type: GSE_GRAMMAR sourceKey: 55af7503d6c1560c41c6a3bf
+   descriptor: Can tell when to use the past simple and when to use the present perfect (BrE).
+2. nodeId: gse:gse_grammar_glgr:gse_grammar:56f3d7b24d2694ed0dc5e024
+   type: GSE_GRAMMAR sourceKey: 56f3d7b24d2694ed0dc5e024
+   descriptor: Can form compound nouns from nouns plus other nouns and adjectives.
+3. nodeId: gse:gse_lo_gl:gse_lo:569391190efdad6a49dcbc3b
+   type: GSE_LO sourceKey: 569391190efdad6a49dcbc3b
+   descriptor: Can write about personal experiences in a diary or online posting, given a model.
+
+=== ПАРСЕР: loQueries — КАЖДЫЙ ===
+1. "LO intent: Describe a past event"
+2. "LO intent: Express likes and dislikes about familiar topics"
+3. "LO intent: Describe activities with friends"
+4. "LO intent: Describe receiving gifts"
+5. "LO intent: Express opinions about experiences"
+
+=== ПАРСЕР: grammarQueries — КАЖДЫЙ ===
+1. "Past simple affirmative"
+2. "Present perfect"
+3. "Past simple affirmative"
+4. "Past simple affirmative"
+5. "Past simple affirmative"
+6. "Past simple affirmative"
+7. "Past simple affirmative"
+
+=== RETRIEVAL: loCandidates — КАЖДАЯ НОДА ===
+1. nodeId: gse:gse_lo_gl:gse_lo:555df9281781222779dc6d76
+   score: 0.46607 descriptor: Can make simple references to the past using 'was/were'.
+2. nodeId: gse:gse_lo_gl:gse_lo:5afc23c1a3b3b75f1373e6f2
+   score: 0.65764 descriptor: Can express their likes and dislikes in relation to familiar topics using simple language.
+3. nodeId: gse:gse_lo_gl:gse_lo:555df901744d90d415774dd5
+   score: 0.45577 descriptor: Can describe a person's hobbies and activities using simple language.
+4. nodeId: gse:gse_lo_gl:gse_lo:555df8ab744d90d415773f88
+   score: 0.43094 descriptor: Can ask people for things and give people things.
+5. nodeId: gse:gse_lo_gl:gse_lo:5d40371199d8de49e556e722
+   score: 0.47403 descriptor: Can express their reactions to a work, reporting their feelings and ideas in simple language.
+6. nodeId: gse:gse_lo_gl:gse_lo:555df8fd744d90d415774d03
+   score: 0.5833 descriptor: Can describe a person's likes and dislikes using simple language.
+7. nodeId: gse:gse_lo_gl:gse_lo:555df901744d90d415774dc0
+   score: 0.56999 descriptor: Can express preferences about food and drink using basic fixed expressions.
+8. nodeId: gse:gse_lo_gl:gse_lo:57a3170687baaec739c2e46a
+   score: 0.54979 descriptor: Can express general preferences using basic fixed expressions.
+9. nodeId: gse:gse_lo_gl:gse_lo:555df8b7744d90d415774164
+   score: 0.54262 descriptor: Can say what they like and dislike.
+10. nodeId: gse:gse_lo_gl:gse_lo:555df98a1781222779dc7c80
+   score: 0.53842 descriptor: Can understand basic questions about people's likes and dislikes.
+11. nodeId: gse:gse_lo_gl:gse_lo:5624bd437f25287b557e91c7
+   score: 0.47068 descriptor: Can give simple opinions using basic fixed expressions.
+12. nodeId: gse:gse_lo_gl:gse_lo:5d403721dd5dfe50e7d2523a
+   score: 0.46734 descriptor: Can express an idea and ask what others think, using very simple expressions, provided they can prepare in advance.
+
+=== RETRIEVAL: grammarCandidates — КАЖДАЯ НОДА ===
+1. sourceKey: 57c6ffd287baaec739c2ea6d nodeId: gse:gse_grammar_glgr:gse_grammar:57c6ffd287baaec739c2ea6d
+   score: 0.55355 descriptor: Can make affirmative statements using common irregular past simple forms.
+2. sourceKey: 57c6ffd187baaec739c2ea6b nodeId: gse:gse_grammar_glgr:gse_grammar:57c6ffd187baaec739c2ea6b
+   score: 0.55035 descriptor: Can make affirmative statements using common regular past simple forms.
+3. sourceKey: 55af7500d6c1560c41c6a34f nodeId: gse:gse_grammar_glgr:gse_grammar:55af7500d6c1560c41c6a34f
+   score: 0.51518 descriptor: Can use the present perfect with 'just' (BrE).
+4. sourceKey: 56f3d7b04d2694ed0dc5e020 nodeId: gse:gse_grammar_glgr:gse_grammar:56f3d7b04d2694ed0dc5e020
+   score: 0.51021 descriptor: Can use the present perfect with present reference.
+5. sourceKey: 57c6ffda87baaec739c2ea7b nodeId: gse:gse_grammar_glgr:gse_grammar:57c6ffda87baaec739c2ea7b
+   score: 0.51316 descriptor: Can make affirmative statements using the present simple without time reference.
+6. sourceKey: 57c6ffb787baaec739c2ea3d nodeId: gse:gse_grammar_glgr:gse_grammar:57c6ffb787baaec739c2ea3d
+   score: 0.47097 descriptor: Can ask yes/no questions using the present simple.
+7. sourceKey: 56f3d7e70c535fb44261ff6b nodeId: gse:gse_grammar_glgr:gse_grammar:56f3d7e70c535fb44261ff6b
+   score: 0.4649 descriptor: Can ask yes/no questions using the past tense of verbs.
+8. sourceKey: 55af7503d6c1560c41c6a3cd nodeId: gse:gse_grammar_glgr:gse_grammar:55af7503d6c1560c41c6a3cd
+   score: 0.44762 descriptor: Can use the past simple passive.
+9. sourceKey: 55af7500d6c1560c41c6a35d nodeId: gse:gse_grammar_glgr:gse_grammar:55af7500d6c1560c41c6a35d
+   score: 0.50851 descriptor: Can use the present perfect to refer to personal experiences in the past.
+10. sourceKey: 55af7501d6c1560c41c6a380 nodeId: gse:gse_grammar_glgr:gse_grammar:55af7501d6c1560c41c6a380
+   score: 0.50513 descriptor: Can use the present perfect continuous with 'for/since' and time expressions.
+11. sourceKey: 55af7503d6c1560c41c6a3e2 nodeId: gse:gse_grammar_glgr:gse_grammar:55af7503d6c1560c41c6a3e2
+   score: 0.49843 descriptor: Can use the present perfect passive with 'just/already'.
+12. sourceKey: 56f3d7aa4d2694ed0dc5e012 nodeId: gse:gse_grammar_glgr:gse_grammar:56f3d7aa4d2694ed0dc5e012
+   score: 0.48969 descriptor: Can distinguish between present perfect simple and continuous.
+
+=== RETRIEVAL: vocab_retrieval_phrase_candidates.top — КАЖДАЯ ФРАЗА ===
+1. "yesterday"
+2. "yesterday be"
+3. "yesterday be my"
+4. "yesterday be my birthday"
+5. "be"
+6. "be my"
+7. "be my birthday"
+8. "be my birthday so"
+9. "my"
+10. "my birthday"
+11. "my birthday so"
+12. "my birthday so usually"
+13. "birthday"
+14. "birthday so"
+15. "birthday so usually"
+16. "birthday so usually do"
+17. "so"
+18. "so usually"
+19. "so usually do"
+20. "so usually do not"
+21. "usually"
+22. "usually do"
+23. "usually do not"
+24. "usually do not really"
+25. "do"
+26. "do not"
+27. "do not really"
+28. "do not really like"
+29. "not"
+30. "not really"
+31. "not really like"
+32. "not really like it"
+33. "really"
+34. "really like"
+35. "really like it"
+36. "really like it but"
+37. "like"
+38. "like it"
+39. "like it but"
+40. "like it but yesterday"
+candidateCount: 391
+
+=== RETRIEVAL: vocab_retrieval_candidates.top — КАЖДАЯ НОДА ===
+1. nodeId: gse:gse_vocab_yl:gse_vocab:ue5509a518e6b3efa_72421137_15859603f90_176a
+   retrievalScore: 1 descriptor: "birthday cake"
+   matchedPhrases: ["birthday cake","birthday","cake"]
+2. nodeId: gse:gse_vocab_yl:gse_vocab:ue5509a518e6b3efa_72421137_1585960e44b_c80
+   retrievalScore: 1 descriptor: "swimming pool"
+   matchedPhrases: ["swimming pool","swimming","pool"]
+3. nodeId: gse:gse_vocab_yl:gse_vocab:ue5509a518e6b3efa_72421137_1585960e44b_5b70
+   retrievalScore: 1 descriptor: "yesterday was"
+   matchedPhrases: ["yesterday was","yesterday","was"]
+4. nodeId: gse:gse_vocab_yl:gse_vocab:ue5509a518e6b3efa_72421137_1585960e44b_7552
+   retrievalScore: 0.94737 descriptor: "not really"
+   matchedPhrases: ["not really","really","not"]
+5. nodeId: gse:gse_vocab_yl:gse_vocab:ue5509a518e6b3efa_72421137_1585960e44b_3cd5
+   retrievalScore: 0.73684 descriptor: "best friend"
+   matchedPhrases: ["friend","friends","best"]
+6. nodeId: gse:gse_vocab_yl:gse_vocab:ue5509a518e6b3efa_72421137_1585960e44b_5d09
+   retrievalScore: 0.68421 descriptor: "do not"
+   matchedPhrases: ["do not","not"]
+7. nodeId: gse:gse_vocab_yl:gse_vocab:ue5509a518e6b3efa_72421137_15859603f90_195d
+   retrievalScore: 0.68421 descriptor: "the best"
+   matchedPhrases: ["the best","best"]
+8. nodeId: gse:gse_vocab_yl:gse_vocab:ue5509a518e6b3efa_72421137_15859603f90_4a84
+   retrievalScore: 0.52632 descriptor: "friend"
+   matchedPhrases: ["friend","friends"]
+9. nodeId: gse:gse_vocab_yl:gse_vocab:u102f632bcdcb8768_6a28781b_15a5fcc7d43_7e22
+   retrievalScore: 0.52632 descriptor: "a friend of someone's"
+   matchedPhrases: ["friend","friends"]
+10. nodeId: gse:gse_vocab_yl:gse_vocab:ue5509a518e6b3efa_72421137_15859603f90_34a8
+   retrievalScore: 0.42105 descriptor: "not ever"
+   matchedPhrases: ["not","ever"]
+candidateCount: 24
+
+=== taskEvaluationJson (полностью) ===
+{
+  "evidence": [],
+  "loChecks": [
+    {
+      "pass": true,
+      "label": "Can write about personal experiences in a diary or online posting, given a model.",
+      "checkId": "gse:gse_lo_gl:gse_lo:569391190efdad6a49dcbc3b",
+      "severity": "medium",
+      "confidence": 0.8,
+      "evidenceSpan": "Yesterday was my birthday. So usually I don't really like it, but yesterday was a special 1 for me."
+    },
+    {
+      "pass": true,
+      "label": "Can make simple references to the past using 'was/were'.",
+      "checkId": "gse:gse_lo_gl:gse_lo:555df9281781222779dc6d76",
+      "severity": "high",
+      "confidence": 0.9,
+      "evidenceSpan": "Yesterday was my birthday."
+    },
+    {
+      "pass": true,
+      "label": "Can express their likes and dislikes in relation to familiar topics using simple language.",
+      "checkId": "gse:gse_lo_gl:gse_lo:5afc23c1a3b3b75f1373e6f2",
+      "severity": "medium",
+      "confidence": 0.85,
+      "evidenceSpan": "I don't really like it, but yesterday was a special 1 for me."
+    },
+    {
+      "pass": true,
+      "label": "Can describe a person's hobbies and activities using simple language.",
+      "checkId": "gse:gse_lo_gl:gse_lo:555df901744d90d415774dd5",
+      "severity": "medium",
+      "confidence": 0.8,
+      "evidenceSpan": "we also met with my friends and play in a swimming pool."
+    },
+    {
+      "pass": false,
+      "label": "Can ask people for things and give people things.",
+      "checkId": "gse:gse_lo_gl:gse_lo:555df8ab744d90d415773f88",
+      "severity": "low",
+      "confidence": 0.5
+    },
+    {
+      "pass": true,
+      "label": "Can express their reactions to a work, reporting their feelings and ideas in simple language.",
+      "checkId": "gse:gse_lo_gl:gse_lo:5d40371199d8de49e556e722",
+      "severity": "high",
+      "confidence": 0.9,
+      "evidenceSpan": "this birthday was the best birthday ever in my life."
+    },
+    {
+      "pass": false,
+      "label": "Can describe a person's likes and dislikes using simple language.",
+      "checkId": "gse:gse_lo_gl:gse_lo:555df8fd744d90d415774d03",
+      "severity": "low",
+      "confidence": 0.4
+    },
+    {
+      "pass": true,
+      "label": "Can express how they are feeling using very basic fixed expressions.",
+      "checkId": "gse:gse_lo_gl:gse_lo:555df8b3744d90d4157740d8",
+      "severity": "medium",
+      "confidence": 0.85,
+      "evidenceSpan": "this birthday was the best birthday ever in my life."
+    }
+  ],
+  "taskType": "qa_prompt",
+  "artifacts": {
+    "questionAnswered": true,
+    "directAnswerFirst": true,
+    "supportingReasons": true,
+    "irrelevantSegments": false
+  },
+  "taskScore": 75,
+  "vocabChecks": [
+    {
+      "pass": true,
+      "label": "yesterday",
+      "nodeId": "gse:gse_vocab_yl:gse_vocab:ue5509a518e6b3efa_72421137_1585960e44b_3a8f",
+      "confidence": 0.9,
+      "matchedPhrase": "Yesterday was my birthday.",
+      "opportunityType": "incidental"
+    },
+    {
+      "pass": true,
+      "label": "birthday",
+      "nodeId": "gse:gse_vocab_yl:gse_vocab:ue5509a518e6b3efa_72421137_15859603f90_1774",
+      "confidence": 0.9,
+      "matchedPhrase": "Yesterday was my birthday.",
+      "opportunityType": "incidental"
+    },
+    {
+      "pass": false,
+      "label": "birthday card",
+      "nodeId": "gse:gse_vocab_yl:gse_vocab:ue5509a518e6b3efa_72421137_15859603f90_1763",
+      "confidence": 0,
+      "opportunityType": "incidental"
+    },
+    {
+      "pass": true,
+      "label": "gift",
+      "nodeId": "gse:gse_vocab_yl:gse_vocab:ue5509a518e6b3efa_72421137_15859603f90_502d",
+      "confidence": 0.85,
+      "matchedPhrase": "I get a lot of beautiful gifts from them.",
+      "opportunityType": "incidental"
+    },
+    {
+      "pass": true,
+      "label": "friend",
+      "nodeId": "gse:gse_vocab_yl:gse_vocab:ue5509a518e6b3efa_72421137_15859603f90_4a84",
+      "confidence": 0.8,
+      "matchedPhrase": "we also met with my friends",
+      "opportunityType": "incidental"
+    },
+    {
+      "pass": true,
+      "label": "swimming pool",
+      "nodeId": "gse:gse_vocab_yl:gse_vocab:ue5509a518e6b3efa_72421137_1585960e44b_c80",
+      "confidence": 0.9,
+      "matchedPhrase": "play in a swimming pool",
+      "opportunityType": "incidental"
+    },
+    {
+      "pass": true,
+      "label": "the best",
+      "nodeId": "gse:gse_vocab_yl:gse_vocab:ue5509a518e6b3efa_72421137_15859603f90_195d",
+      "confidence": 0.9,
+      "matchedPhrase": "this birthday was the best birthday ever",
+      "opportunityType": "incidental"
+    },
+    {
+      "pass": false,
+      "label": "do not",
+      "nodeId": "gse:gse_vocab_yl:gse_vocab:ue5509a518e6b3efa_72421137_1585960e44b_5d09",
+      "confidence": 0,
+      "opportunityType": "incidental"
+    },
+    {
+      "pass": false,
+      "label": "not really",
+      "nodeId": "gse:gse_vocab_yl:gse_vocab:ue5509a518e6b3efa_72421137_1585960e44b_7552",
+      "confidence": 0,
+      "opportunityType": "incidental"
+    },
+    {
+      "pass": true,
+      "label": "usually",
+      "nodeId": "gse:gse_vocab_yl:gse_vocab:ue5509a518e6b3efa_72421137_1585960e44b_26b8",
+      "confidence": 0.8,
+      "matchedPhrase": "So usually I don't really like it",
+      "opportunityType": "incidental"
+    },
+    {
+      "pass": false,
+      "label": "best friend",
+      "nodeId": "gse:gse_vocab_yl:gse_vocab:ue5509a518e6b3efa_72421137_1585960e44b_3cd5",
+      "confidence": 0,
+      "opportunityType": "incidental"
+    },
+    {
+      "pass": false,
+      "label": "good for you",
+      "nodeId": "gse:gse_vocab_yl:gse_vocab:ue5509a518e6b3efa_72421137_1585960e44b_5318",
+      "confidence": 0,
+      "opportunityType": "incidental"
+    }
+  ],
+  "modelVersion": "eval-v2+openai-split",
+  "rubricChecks": [
+    {
+      "name": "Answered the prompt",
+      "pass": true,
+      "reason": "The child answered the question about a fun day and provided details.",
+      "weight": 0.5
+    },
+    {
+      "name": "Used past simple and present perfect",
+      "pass": false,
+      "reason": "The child did not consistently use the required tenses correctly.",
+      "weight": 0.3
+    },
+    {
+      "name": "Included compound nouns",
+      "pass": true,
+      "reason": "The child successfully included 'birthday cake' and 'swimming pool'.",
+      "weight": 0.2
+    }
+  ],
+  "grammarChecks": [
+    {
+      "pass": false,
+      "label": "Can tell when to use the past simple and when to use the present perfect (BrE).",
+      "checkId": "1",
+      "confidence": 0.7,
+      "descriptorId": "55af7503d6c1560c41c6a3bf",
+      "opportunityType": "explicit_target"
+    },
+    {
+      "pass": true,
+      "label": "Can form compound nouns from nouns plus other nouns and adjectives.",
+      "checkId": "2",
+      "confidence": 0.9,
+      "descriptorId": "56f3d7b24d2694ed0dc5e024",
+      "evidenceSpan": "birthday cake, swimming pool",
+      "opportunityType": "explicit_target"
+    },
+    {
+      "pass": true,
+      "label": "Can make affirmative statements using common irregular past simple forms.",
+      "checkId": "3",
+      "confidence": 0.85,
+      "descriptorId": "57c6ffd287baaec739c2ea6d",
+      "evidenceSpan": "Yesterday was my birthday, I got a lot of beautiful gifts",
+      "opportunityType": "elicited_incidental"
+    },
+    {
+      "pass": true,
+      "label": "Can make affirmative statements using common regular past simple forms.",
+      "checkId": "4",
+      "confidence": 0.8,
+      "descriptorId": "57c6ffd187baaec739c2ea6b",
+      "evidenceSpan": "we met with my friends, we played in a swimming pool",
+      "opportunityType": "elicited_incidental"
+    },
+    {
+      "pass": false,
+      "label": "Can use the present perfect with 'just' (BrE).",
+      "checkId": "5",
+      "confidence": 0.6,
+      "descriptorId": "55af7500d6c1560c41c6a34f",
+      "opportunityType": "elicited_incidental"
+    },
+    {
+      "pass": false,
+      "label": "Can use the present perfect with present reference.",
+      "checkId": "6",
+      "confidence": 0.5,
+      "descriptorId": "56f3d7b04d2694ed0dc5e020",
+      "opportunityType": "elicited_incidental"
+    },
+    {
+      "pass": false,
+      "label": "Can make affirmative statements using the present simple without time reference.",
+      "checkId": "7",
+      "confidence": 0.4,
+      "descriptorId": "57c6ffda87baaec739c2ea7b",
+      "opportunityType": "elicited_incidental"
+    },
+    {
+      "pass": false,
+      "label": "Can ask yes/no questions using the present simple.",
+      "checkId": "8",
+      "confidence": 0.3,
+      "descriptorId": "57c6ffb787baaec739c2ea3d",
+      "opportunityType": "elicited_incidental"
+    },
+    {
+      "pass": false,
+      "label": "Can ask yes/no questions using the past tense of verbs.",
+      "checkId": "9",
+      "confidence": 0.2,
+      "descriptorId": "56f3d7e70c535fb44261ff6b",
+      "opportunityType": "elicited_incidental"
+    },
+    {
+      "pass": false,
+      "label": "Can use the past simple passive.",
+      "checkId": "10",
+      "confidence": 0.1,
+      "descriptorId": "55af7503d6c1560c41c6a3cd",
+      "opportunityType": "elicited_incidental"
+    }
+  ],
+  "languageScore": 0
+}
+
+=== feedbackJson (полностью) ===
+{
+  "summary": "The child provided a good response to the prompt, sharing a personal experience about their birthday. However, there were some issues with verb tenses.",
+  "whatToFixNow": [
+    "Focus on using the past simple and present perfect tenses correctly throughout the response."
+  ],
+  "whatWentWell": [
+    "The child answered the question directly and included relevant details about their birthday celebration, such as the birthday cake and swimming pool."
+  ],
+  "nextMicroTask": "Practice using past simple and present perfect in sentences about past events.",
+  "exampleBetterAnswer": "Yesterday was my birthday, and I had a great time. I received a big birthday cake from my family, and I have never felt so happy. I played in the swimming pool with my friends, and we went to a Bouncing Castle afterward. I got many beautiful gifts from them, making it the best birthday ever."
+}
+
+=== AttemptGseEvidence — КАЖДАЯ ЗАПИСЬ ===
+1. nodeId: gse:gse_grammar_glgr:gse_grammar:55af7503d6c1560c41c6a3bf
+   domain: grammar signalType: grammar_construct_error evidenceKind: negative opportunityType: explicit_target
+   targeted: true usedForPromotion: true source: rules
+   confidence: 0.7 score: 0.7 impact: 0.7
+   evidenceText: "Yesterday was my birthday. So usually I don't really like it, but yesterday was a special 1 for me. First of all, I have a big birthday cake from my family. But that's not only thing I had yesterday, we also met with my "
+2. nodeId: gse:gse_grammar_glgr:gse_grammar:56f3d7b24d2694ed0dc5e024
+   domain: grammar signalType: grammar_construct_ok evidenceKind: direct opportunityType: explicit_target
+   targeted: true usedForPromotion: true source: rules
+   confidence: 0.9 score: 0.9 impact: 0.7
+   evidenceText: "Yesterday was my birthday. So usually I don't really like it, but yesterday was a special 1 for me. First of all, I have a big birthday cake from my family. But that's not only thing I had yesterday, we also met with my "
+3. nodeId: gse:gse_lo_gl:gse_lo:569391190efdad6a49dcbc3b
+   domain: lo signalType: lo_check_pass evidenceKind: direct opportunityType: explicit_target
+   targeted: true usedForPromotion: true source: rules
+   confidence: 0.8 score: 0.8 impact: 1
+   evidenceText: "Yesterday was my birthday. So usually I don't really like it, but yesterday was a special 1 for me. First of all, I have a big birthday cake from my family. But that's not only thing I had yesterday, we also met with my "
+4. nodeId: gse:gse_vocab_yl:gse_vocab:ue5509a518e6b3efa_72421137_1585960e44b_3a8f
+   domain: vocab signalType: vocab_incidental_usage evidenceKind: supporting opportunityType: incidental
+   targeted: false usedForPromotion: false source: rules
+   confidence: 0.9 score: 0.828 impact: 0.25
+   evidenceText: "Yesterday was my birthday. So usually I don't really like it, but yesterday was a special 1 for me. First of all, I have a big birthday cake from my family. But"
+5. nodeId: gse:gse_vocab_yl:gse_vocab:ue5509a518e6b3efa_72421137_15859603f90_1774
+   domain: vocab signalType: vocab_incidental_usage evidenceKind: supporting opportunityType: incidental
+   targeted: false usedForPromotion: false source: rules
+   confidence: 0.9 score: 0.828 impact: 0.25
+   evidenceText: "Yesterday was my birthday. So usually I don't really like it, but yesterday was a special 1 for me. First of all, I have a big birthday cake from my family. But"
+6. nodeId: gse:gse_vocab_yl:gse_vocab:ue5509a518e6b3efa_72421137_15859603f90_502d
+   domain: vocab signalType: vocab_incidental_usage evidenceKind: supporting opportunityType: incidental
+   targeted: false usedForPromotion: false source: rules
+   confidence: 0.85 score: 0.782 impact: 0.25
+   evidenceText: "Yesterday was my birthday. So usually I don't really like it, but yesterday was a special 1 for me. First of all, I have a big birthday cake from my family. But"
+7. nodeId: gse:gse_vocab_yl:gse_vocab:ue5509a518e6b3efa_72421137_15859603f90_4a84
+   domain: vocab signalType: vocab_incidental_usage evidenceKind: supporting opportunityType: incidental
+   targeted: false usedForPromotion: false source: rules
+   confidence: 0.8 score: 0.736 impact: 0.25
+   evidenceText: "Yesterday was my birthday. So usually I don't really like it, but yesterday was a special 1 for me. First of all, I have a big birthday cake from my family. But"
+8. nodeId: gse:gse_vocab_yl:gse_vocab:ue5509a518e6b3efa_72421137_1585960e44b_c80
+   domain: vocab signalType: vocab_incidental_usage evidenceKind: supporting opportunityType: incidental
+   targeted: false usedForPromotion: false source: rules
+   confidence: 0.9 score: 0.828 impact: 0.25
+   evidenceText: "Yesterday was my birthday. So usually I don't really like it, but yesterday was a special 1 for me. First of all, I have a big birthday cake from my family. But"
+9. nodeId: gse:gse_vocab_yl:gse_vocab:ue5509a518e6b3efa_72421137_15859603f90_195d
+   domain: vocab signalType: vocab_incidental_usage evidenceKind: supporting opportunityType: incidental
+   targeted: false usedForPromotion: false source: rules
+   confidence: 0.9 score: 0.828 impact: 0.25
+   evidenceText: "Yesterday was my birthday. So usually I don't really like it, but yesterday was a special 1 for me. First of all, I have a big birthday cake from my family. But"
+10. nodeId: gse:gse_vocab_yl:gse_vocab:ue5509a518e6b3efa_72421137_1585960e44b_26b8
+   domain: vocab signalType: vocab_incidental_usage evidenceKind: supporting opportunityType: incidental
+   targeted: false usedForPromotion: false source: rules
+   confidence: 0.8 score: 0.736 impact: 0.25
+   evidenceText: "Yesterday was my birthday. So usually I don't really like it, but yesterday was a special 1 for me. First of all, I have a big birthday cake from my family. But"
+11. nodeId: gse:gse_grammar_glgr:gse_grammar:57c6ffd287baaec739c2ea6d
+   domain: grammar signalType: grammar_incidental_discovery evidenceKind: supporting opportunityType: incidental
+   targeted: false usedForPromotion: false source: rules
+   confidence: 0.85 score: 0.782 impact: 0.8
+   evidenceText: "Yesterday was my birthday, I got a lot of beautiful gifts"
+12. nodeId: gse:gse_grammar_glgr:gse_grammar:57c6ffd187baaec739c2ea6b
+   domain: grammar signalType: grammar_incidental_discovery evidenceKind: supporting opportunityType: incidental
+   targeted: false usedForPromotion: false source: rules
+   confidence: 0.8 score: 0.736 impact: 0.8
+   evidenceText: "we met with my friends, we played in a swimming pool"
+13. nodeId: gse:gse_lo_gl:gse_lo:555df9281781222779dc6d76
+   domain: lo signalType: lo_eval_incidental_pass evidenceKind: supporting opportunityType: incidental
+   targeted: false usedForPromotion: false source: openai
+   confidence: 0.9 score: 0.828 impact: 0.34
+   evidenceText: "Yesterday was my birthday."
+14. nodeId: gse:gse_lo_gl:gse_lo:5afc23c1a3b3b75f1373e6f2
+   domain: lo signalType: lo_eval_incidental_pass evidenceKind: supporting opportunityType: incidental
+   targeted: false usedForPromotion: false source: openai
+   confidence: 0.85 score: 0.782 impact: 0.34
+   evidenceText: "I don't really like it, but yesterday was a special 1 for me."
+15. nodeId: gse:gse_lo_gl:gse_lo:555df901744d90d415774dd5
+   domain: lo signalType: lo_eval_incidental_pass evidenceKind: supporting opportunityType: incidental
+   targeted: false usedForPromotion: false source: openai
+   confidence: 0.8 score: 0.736 impact: 0.34
+   evidenceText: "we also met with my friends and play in a swimming pool."
+16. nodeId: gse:gse_lo_gl:gse_lo:5d40371199d8de49e556e722
+   domain: lo signalType: lo_eval_incidental_pass evidenceKind: supporting opportunityType: incidental
+   targeted: false usedForPromotion: false source: openai
+   confidence: 0.9 score: 0.828 impact: 0.34
+   evidenceText: "this birthday was the best birthday ever in my life."
+17. nodeId: gse:gse_lo_gl:gse_lo:555df8b3744d90d4157740d8
+   domain: lo signalType: lo_eval_incidental_pass evidenceKind: supporting opportunityType: incidental
+   targeted: false usedForPromotion: false source: openai
+   confidence: 0.85 score: 0.782 impact: 0.34
+   evidenceText: "this birthday was the best birthday ever in my life."

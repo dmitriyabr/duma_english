@@ -113,6 +113,38 @@ const SPLIT_LO_CHECKS_MAX = 8;
 const SPLIT_GRAMMAR_CHECKS_MAX = 10;
 const SPLIT_VOCAB_CHECKS_MAX = 12;
 
+function getEvaluationLimits(taskMeta?: Record<string, unknown> | null) {
+  const isPlacementExtended = taskMeta?.placementMode === "placement_extended";
+
+  if (isPlacementExtended) {
+    return {
+      TRANSCRIPT_MAX_CHARS: 3000,
+      SPLIT_LO_CANDIDATES: 30,
+      SPLIT_GRAMMAR_CANDIDATES: 25,
+      SPLIT_VOCAB_CANDIDATES: 35,
+      SPLIT_LO_CHECKS_MAX: 15,
+      SPLIT_GRAMMAR_CHECKS_MAX: 18,
+      SPLIT_VOCAB_CHECKS_MAX: 20,
+      TOKEN_BUDGET_LO: 2500,
+      TOKEN_BUDGET_GRAMMAR: 2800,
+      TOKEN_BUDGET_VOCAB: 2800,
+    };
+  }
+
+  return {
+    TRANSCRIPT_MAX_CHARS: 900,
+    SPLIT_LO_CANDIDATES: SPLIT_LO_CANDIDATES,
+    SPLIT_GRAMMAR_CANDIDATES: SPLIT_GRAMMAR_CANDIDATES,
+    SPLIT_VOCAB_CANDIDATES: SPLIT_VOCAB_CANDIDATES,
+    SPLIT_LO_CHECKS_MAX: SPLIT_LO_CHECKS_MAX,
+    SPLIT_GRAMMAR_CHECKS_MAX: SPLIT_GRAMMAR_CHECKS_MAX,
+    SPLIT_VOCAB_CHECKS_MAX: SPLIT_VOCAB_CHECKS_MAX,
+    TOKEN_BUDGET_LO: 1200,
+    TOKEN_BUDGET_GRAMMAR: 1400,
+    TOKEN_BUDGET_VOCAB: 1400,
+  };
+}
+
 function slugify(value: string) {
   return value
     .toLowerCase()
@@ -740,7 +772,8 @@ function buildTaskSpecificPrompt(taskType: string) {
 }
 
 function buildOpenAIInput(input: EvaluationInput) {
-  const transcript = (input.transcript || "").slice(0, 900);
+  const limits = getEvaluationLimits(input.taskMeta);
+  const transcript = (input.transcript || "").slice(0, limits.TRANSCRIPT_MAX_CHARS);
   const taskPrompt = (input.taskPrompt || "").slice(0, 260);
   const taskMeta = input.taskMeta || {};
   const referenceText = typeof taskMeta.referenceText === "string" ? taskMeta.referenceText.slice(0, 260) : undefined;
@@ -884,6 +917,7 @@ async function evaluateLoOnly(
   targetOptions: Array<{ nodeId: string; label: string }>,
   candidateOptions: Array<{ nodeId: string; label: string }>
 ): Promise<LoCheck[]> {
+  const limits = getEvaluationLimits(input.taskMeta);
   const compactInput = buildOpenAIInput(input);
   const prompt = [
     "You evaluate ONLY Learning Objectives (LO) for this child speaking attempt.",
@@ -891,7 +925,7 @@ async function evaluateLoOnly(
     "Use only nodeIds from the provided options. Do not invent IDs.",
     "Evidence gating: set pass=true ONLY if the transcript contains clear evidence for that LO. Include ALL target options (pass true/false).",
     "For candidate (incidental) options: include a check ONLY when the transcript shows this LO was used or attempted. Omit if the LO did not appear in the speech.",
-    "Include up to " + SPLIT_LO_CHECKS_MAX + " loChecks when evidenced.",
+    "Include up to " + limits.SPLIT_LO_CHECKS_MAX + " loChecks when evidenced.",
     "Each item: { checkId (nodeId), label, pass, confidence (0..1), severity (low|medium|high), evidenceSpan (optional) }.",
     `Target LO options: ${JSON.stringify(targetOptions)}`,
     `Candidate LO options: ${JSON.stringify(candidateOptions)}`,
@@ -900,7 +934,7 @@ async function evaluateLoOnly(
   const content = await chatJson(
     "You are a strict speaking evaluator. Output one JSON object only. No markdown.",
     prompt,
-    { openaiApiKey: apiKey, model, temperature: 0, maxTokens: 1200, runName: "gse_eval_lo", tags: ["gse", "eval_split", "lo"] }
+    { openaiApiKey: apiKey, model, temperature: 0, maxTokens: limits.TOKEN_BUDGET_LO, runName: "gse_eval_lo", tags: ["gse", "eval_split", "lo"] }
   );
   const raw = parseMaybeJson(content || "");
   if (!raw || typeof raw !== "object") return [];
@@ -915,7 +949,7 @@ async function evaluateLoOnly(
     );
     return [];
   }
-  return (parsed.data.loChecks || []).slice(0, SPLIT_LO_CHECKS_MAX);
+  return (parsed.data.loChecks || []).slice(0, limits.SPLIT_LO_CHECKS_MAX);
 }
 
 async function evaluateGrammarOnly(
@@ -926,6 +960,7 @@ async function evaluateGrammarOnly(
   candidateOptions: Array<{ descriptorId: string; label: string }>,
   targetGrammarDescriptorIds: Set<string>
 ): Promise<GrammarCheck[]> {
+  const limits = getEvaluationLimits(input.taskMeta);
   const compactInput = buildOpenAIInput(input);
   const prompt = [
     "You evaluate ONLY Grammar for this child speaking attempt.",
@@ -934,7 +969,7 @@ async function evaluateGrammarOnly(
     "Evidence gating: set pass=true ONLY if the transcript contains clear evidence. Include ALL target options (pass true/false).",
     "For candidate options: include a check ONLY when the construct appears in the transcript (correct or incorrect use). Omit if not used.",
     "opportunityType: explicit_target ONLY for descriptorIds in Target Grammar options; otherwise incidental or elicited_incidental.",
-    "Include up to " + SPLIT_GRAMMAR_CHECKS_MAX + " grammarChecks when evidenced.",
+    "Include up to " + limits.SPLIT_GRAMMAR_CHECKS_MAX + " grammarChecks when evidenced.",
     "Each item: { checkId, descriptorId, label, pass, confidence (0..1), opportunityType, evidenceSpan (optional) }.",
     `Target Grammar options: ${JSON.stringify(targetOptions)}`,
     `Candidate Grammar options: ${JSON.stringify(candidateOptions)}`,
@@ -947,7 +982,7 @@ async function evaluateGrammarOnly(
       openaiApiKey: apiKey,
       model,
       temperature: 0,
-      maxTokens: 1400,
+      maxTokens: limits.TOKEN_BUDGET_GRAMMAR,
       runName: "gse_eval_grammar",
       tags: ["gse", "eval_split", "grammar"],
     }
@@ -965,7 +1000,7 @@ async function evaluateGrammarOnly(
     );
     return [];
   }
-  return (parsed.data.grammarChecks || []).slice(0, SPLIT_GRAMMAR_CHECKS_MAX).map((c) => ({
+  return (parsed.data.grammarChecks || []).slice(0, limits.SPLIT_GRAMMAR_CHECKS_MAX).map((c) => ({
     ...c,
     checkId: c.checkId ?? c.descriptorId ?? slugify(c.label),
     opportunityType:
@@ -983,6 +1018,7 @@ async function evaluateVocabOnly(
   candidateOptions: Array<{ nodeId: string; label: string; topicHints?: string[]; grammaticalCategories?: string[] }>,
   targetVocabNodeIds: Set<string>
 ): Promise<VocabCheck[]> {
+  const limits = getEvaluationLimits(input.taskMeta);
   const compactInput = buildOpenAIInput(input);
   const prompt = [
     "You evaluate ONLY Vocabulary for this child speaking attempt.",
@@ -991,7 +1027,7 @@ async function evaluateVocabOnly(
     "Evidence gating: set pass=true ONLY if the transcript contains clear evidence. Include ALL target options (pass true/false).",
     "For candidate options: include a check ONLY when the word or phrase appears in the transcript (correct or incorrect use). Omit if not used.",
     "opportunityType: explicit_target ONLY for nodeIds in Target Vocabulary options; otherwise incidental.",
-    "Include up to " + SPLIT_VOCAB_CHECKS_MAX + " vocabChecks when evidenced.",
+    "Include up to " + limits.SPLIT_VOCAB_CHECKS_MAX + " vocabChecks when evidenced.",
     "Each item: { nodeId, label, pass, confidence (0..1), opportunityType, evidenceSpan (optional), matchedPhrase (optional) }.",
     `Target Vocabulary options: ${JSON.stringify(targetOptions)}`,
     `Candidate Vocabulary options: ${JSON.stringify(candidateOptions.map((c) => ({ nodeId: c.nodeId, label: c.label })))}`,
@@ -1004,7 +1040,7 @@ async function evaluateVocabOnly(
       openaiApiKey: apiKey,
       model,
       temperature: 0,
-      maxTokens: 1400,
+      maxTokens: limits.TOKEN_BUDGET_VOCAB,
       runName: "gse_eval_vocab",
       tags: ["gse", "eval_split", "vocab"],
     }
@@ -1022,7 +1058,7 @@ async function evaluateVocabOnly(
     );
     return [];
   }
-  return (parsed.data.vocabChecks || []).slice(0, SPLIT_VOCAB_CHECKS_MAX).map((c) => ({
+  return (parsed.data.vocabChecks || []).slice(0, limits.SPLIT_VOCAB_CHECKS_MAX).map((c) => ({
     ...c,
     opportunityType: c.nodeId && targetVocabNodeIds.has(c.nodeId) ? "explicit_target" : c.opportunityType,
   }));
@@ -1147,21 +1183,22 @@ async function evaluateWithOpenAISplit(input: EvaluationInput): Promise<{
     .slice(0, 12)
     .map((t) => ({ nodeId: t.nodeId!, label: (t.node!.descriptor ?? "").slice(0, 140) }));
 
+  const limits = getEvaluationLimits(input.taskMeta);
   const targetLoNodeIds = new Set(targetLoOptions.map((t) => t.nodeId));
   const targetGrammarDescriptorIds = new Set(targetGrammarOptions.map((t) => t.descriptorId));
   const targetVocabNodeIds = new Set(targetVocabOptions.map((t) => t.nodeId));
 
   const loOptions = semanticContext.loCandidates
     .filter((item) => !targetLoNodeIds.has(item.nodeId))
-    .slice(0, SPLIT_LO_CANDIDATES)
+    .slice(0, limits.SPLIT_LO_CANDIDATES)
     .map((item) => ({ nodeId: item.nodeId, label: item.descriptor.slice(0, 140) }));
   const grammarOptions = semanticContext.grammarCandidates
     .filter((item) => !targetGrammarDescriptorIds.has(item.sourceKey))
-    .slice(0, SPLIT_GRAMMAR_CANDIDATES)
+    .slice(0, limits.SPLIT_GRAMMAR_CANDIDATES)
     .map((item) => ({ descriptorId: item.sourceKey, label: item.descriptor.slice(0, 140) }));
   const vocabOptions = vocabContext.candidates
     .filter((c) => !targetVocabNodeIds.has(c.nodeId))
-    .slice(0, SPLIT_VOCAB_CANDIDATES)
+    .slice(0, limits.SPLIT_VOCAB_CANDIDATES)
     .map((c) => ({
       nodeId: c.nodeId,
       label: c.descriptor.slice(0, 140),

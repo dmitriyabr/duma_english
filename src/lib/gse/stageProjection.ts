@@ -116,7 +116,7 @@ function rowUncertainty(row: MasteryRow) {
   return clamp01(sigma / 100);
 }
 
-function gseBandFromCenter(value: number | null | undefined): CEFRStage {
+export function gseBandFromCenter(value: number | null | undefined): CEFRStage {
   if (typeof value !== "number") return "A0";
   if (value <= 29) return "A1";
   if (value <= 42) return "A2";

@@ -410,7 +410,9 @@ function makeEvidence(params: {
 export function buildOpportunityEvidence(input: BuildOpportunityEvidenceInput) {
   const created: EvidenceDraft[] = [];
   const reliability = input.scoreReliability;
+  const isPlacementExtended = input.taskMeta?.placementMode === "placement_extended";
   const defaultConf = confidenceFromReliability(reliability);
+  const confidenceBoost = isPlacementExtended ? 0.95 : 1.0;
   const wordsRaw = mapTranscriptToWordSet(input.transcript).map(normalizeWord);
   const lemmaSet = new Set(wordsRaw.map(toLemma));
   const transcriptPhrase = normalizePhrase(input.transcript);
@@ -445,6 +447,8 @@ export function buildOpportunityEvidence(input: BuildOpportunityEvidenceInput) {
         : positive
         ? passRatio
         : scoreForNegativeEvidence(passRatio);
+      const baseConfidence = selectedCheck ? selectedCheck.confidence : defaultConf;
+      const effectiveConfidence = isPlacementExtended ? Math.max(baseConfidence, confidenceBoost) : baseConfidence;
       created.push(
         makeEvidence({
           nodeId: target.nodeId,
@@ -452,7 +456,7 @@ export function buildOpportunityEvidence(input: BuildOpportunityEvidenceInput) {
           kind: positive ? "direct" : "negative",
           opportunity: "explicit_target",
           score,
-          confidence: selectedCheck ? selectedCheck.confidence : defaultConf,
+          confidence: effectiveConfidence,
           source: "rules",
           domain: "lo",
           usedForPromotion: true,
@@ -463,6 +467,7 @@ export function buildOpportunityEvidence(input: BuildOpportunityEvidenceInput) {
             checkId: selectedCheck?.checkId || null,
             ruleVersion: EVIDENCE_RULE_VERSION,
             severity: selectedCheck?.severity || null,
+            placementMode: isPlacementExtended ? "placement_extended" : null,
           },
         })
       );
@@ -513,6 +518,8 @@ export function buildOpportunityEvidence(input: BuildOpportunityEvidenceInput) {
       }
 
       if (explicitWordTask) {
+        const baseConfidence = selectedCheck ? selectedCheck.confidence : defaultConf;
+        const effectiveConfidence = isPlacementExtended ? Math.max(baseConfidence, confidenceBoost) : baseConfidence;
         created.push(
           makeEvidence({
             nodeId: target.nodeId,
@@ -520,7 +527,7 @@ export function buildOpportunityEvidence(input: BuildOpportunityEvidenceInput) {
             kind: wasUsed ? "direct" : "negative",
             opportunity: "explicit_target",
             score: wasUsed ? 1 : scoreForNegativeEvidence(1),
-            confidence: selectedCheck ? selectedCheck.confidence : defaultConf,
+            confidence: effectiveConfidence,
             source: "rules",
             domain: "vocab",
             usedForPromotion: true,
@@ -531,10 +538,12 @@ export function buildOpportunityEvidence(input: BuildOpportunityEvidenceInput) {
               checkId: wasUsed ? "vocab_target_used" : "vocab_target_missing",
               matchedPhrase: selectedCheck?.matchedPhrase || null,
               ruleVersion: EVIDENCE_RULE_VERSION,
+              placementMode: isPlacementExtended ? "placement_extended" : null,
             },
           })
         );
       } else if (wasUsed) {
+        const effectiveConfidence = isPlacementExtended ? Math.max(defaultConf, confidenceBoost) : defaultConf;
         created.push(
           makeEvidence({
             nodeId: target.nodeId,
@@ -542,7 +551,7 @@ export function buildOpportunityEvidence(input: BuildOpportunityEvidenceInput) {
             kind: "supporting",
             opportunity: "incidental",
             score: 0.7,
-            confidence: defaultConf,
+            confidence: effectiveConfidence,
             source: "rules",
             domain: "vocab",
             usedForPromotion: false,
@@ -553,6 +562,7 @@ export function buildOpportunityEvidence(input: BuildOpportunityEvidenceInput) {
               checkId: "vocab_incidental_used",
               matchedPhrase: selectedCheck?.matchedPhrase || null,
               ruleVersion: EVIDENCE_RULE_VERSION,
+              placementMode: isPlacementExtended ? "placement_extended" : null,
             },
           })
         );
@@ -569,6 +579,8 @@ export function buildOpportunityEvidence(input: BuildOpportunityEvidenceInput) {
       const grammarScore = selectedCheck.confidence;
       const correctEnough = selectedCheck.pass;
       const score = correctEnough ? grammarScore : scoreForNegativeEvidence(grammarScore);
+      const baseConfidence = selectedCheck ? selectedCheck.confidence : defaultConf;
+      const effectiveConfidence = isPlacementExtended ? Math.max(baseConfidence, confidenceBoost) : baseConfidence;
       created.push(
         makeEvidence({
           nodeId: target.nodeId,
@@ -580,7 +592,7 @@ export function buildOpportunityEvidence(input: BuildOpportunityEvidenceInput) {
             ? "incidental"
             : "elicited_incidental",
           score,
-          confidence: selectedCheck ? selectedCheck.confidence : defaultConf,
+          confidence: effectiveConfidence,
           source: "rules",
           domain: "grammar",
           usedForPromotion: true,
@@ -592,6 +604,7 @@ export function buildOpportunityEvidence(input: BuildOpportunityEvidenceInput) {
             ruleVersion: EVIDENCE_RULE_VERSION,
             errorType: selectedCheck?.errorType || null,
             correction: selectedCheck?.correction || null,
+            placementMode: isPlacementExtended ? "placement_extended" : null,
           },
         })
       );
@@ -604,6 +617,7 @@ export function buildOpportunityEvidence(input: BuildOpportunityEvidenceInput) {
     .slice(0, 12);
   for (const check of incidentalVocab) {
     const pass = check.pass;
+    const effectiveConfidence = isPlacementExtended ? Math.max(check.confidence, confidenceBoost) : check.confidence;
     created.push(
       makeEvidence({
         nodeId: check.nodeId,
@@ -611,9 +625,9 @@ export function buildOpportunityEvidence(input: BuildOpportunityEvidenceInput) {
         kind: pass ? "supporting" : "negative",
         opportunity: "incidental",
         score: pass
-          ? Math.max(0.6, Math.min(0.92, check.confidence * 0.92))
-          : scoreForNegativeEvidence(check.confidence),
-        confidence: check.confidence,
+          ? Math.max(0.6, Math.min(0.92, effectiveConfidence * 0.92))
+          : scoreForNegativeEvidence(effectiveConfidence),
+        confidence: effectiveConfidence,
         source: "rules",
         domain: "vocab",
         usedForPromotion: false,
@@ -627,6 +641,7 @@ export function buildOpportunityEvidence(input: BuildOpportunityEvidenceInput) {
           matchedPhrase: check.matchedPhrase || null,
           label: check.label,
           ruleVersion: EVIDENCE_RULE_VERSION,
+          placementMode: isPlacementExtended ? "placement_extended" : null,
         },
       })
     );
@@ -1042,6 +1057,7 @@ export async function persistAttemptGseEvidence(input: BuildAttemptEvidenceInput
     usedForPromotion: row.usedForPromotion,
     taskType: input.taskType,
     targeted: row.targeted,
+    placementMode: (row.metadataJson as any)?.placementMode || null,
   }));
 
   const nodeOutcomes = await applyEvidenceToStudentMastery({

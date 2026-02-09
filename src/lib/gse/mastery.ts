@@ -17,6 +17,7 @@ export type MasteryEvidence = {
   usedForPromotion?: boolean;
   taskType?: string;
   targeted?: boolean;
+  placementMode?: string | null;
 };
 
 export type NodeMasteryOutcome = {
@@ -356,13 +357,16 @@ export async function applyEvidenceToStudentMastery(params: {
       evidence.confidence >= 0.75 &&
       evidence.usedForPromotion !== false;
 
+    const isPlacementExtended = evidence.placementMode === "placement_extended";
+    const verificationThreshold = isPlacementExtended ? 1 : 2;
+
     if (activationStateBefore !== "verified" && verificationPass) {
       activationStateAfter = "verified";
       verificationDueAt = null;
       activationImpact = "verified";
     } else if (
       activationStateBefore !== "verified" &&
-      nextStreak >= 2 &&
+      nextStreak >= verificationThreshold &&
       directSuccess
     ) {
       activationStateAfter = "verified";

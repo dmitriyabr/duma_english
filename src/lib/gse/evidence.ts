@@ -26,6 +26,7 @@ type TaskEvaluation = {
   rubricChecks?: Array<{ name?: string; pass?: boolean; weight?: number; reason?: string }>;
   loChecks?: Array<{
     checkId?: string;
+    nodeId?: string;
     label?: string;
     pass?: boolean;
     confidence?: number;
@@ -66,7 +67,6 @@ type EvidenceDraft = {
   opportunityType: GseOpportunityType;
   score: number;
   confidence: number;
-  impact: number;
   weight?: number;
   source: string;
   domain: "vocab" | "grammar" | "lo";
@@ -275,6 +275,7 @@ function normalizedLoChecks(taskEvaluation: TaskEvaluation) {
   if (fromModel.length > 0) {
     return fromModel.map((check, index) => ({
       checkId: String(check.checkId || `lo_${index + 1}`),
+      nodeId: check.nodeId ? String(check.nodeId) : (check.checkId ? String(check.checkId) : undefined),
       label: String(check.label || `LO check ${index + 1}`),
       pass: Boolean(check.pass),
       confidence: clamp01(typeof check.confidence === "number" ? check.confidence : 0.72),
@@ -285,6 +286,7 @@ function normalizedLoChecks(taskEvaluation: TaskEvaluation) {
   const fallbackRubric = Array.isArray(taskEvaluation.rubricChecks) ? taskEvaluation.rubricChecks : [];
   return fallbackRubric.map((check, index) => ({
     checkId: `rubric_${index + 1}`,
+    nodeId: undefined,
     label: String(check.name || `rubric_${index + 1}`),
     pass: Boolean(check.pass),
     confidence: clamp01(0.6 + (typeof check.weight === "number" ? check.weight : 0.2) * 0.35),
@@ -343,6 +345,33 @@ function normalizedGrammarChecks(taskEvaluation: TaskEvaluation, transcript: str
   ];
 }
 
+function normalizedVocabChecks(taskEvaluation: TaskEvaluation, transcript: string) {
+  const fromModel = Array.isArray((taskEvaluation as unknown as { vocabChecks?: unknown }).vocabChecks)
+    ? ((taskEvaluation as unknown as { vocabChecks: unknown[] }).vocabChecks as unknown[])
+    : [];
+  if (fromModel.length === 0) return [];
+  return fromModel.map((item, index) => {
+    const row = (item || {}) as Record<string, unknown>;
+    const nodeId = String(row.nodeId || row.checkId || "").trim();
+    const opportunityType = row.opportunityType === "explicit_target" ? "explicit_target" : "incidental";
+    return {
+      nodeId,
+      label: String(row.label || row.name || `Vocabulary check ${index + 1}`),
+      pass: Boolean(row.pass),
+      confidence: clamp01(typeof row.confidence === "number" ? row.confidence : Number(row.confidence) || 0.72),
+      opportunityType: opportunityType as "explicit_target" | "incidental",
+      evidenceSpan: row.evidenceSpan ? String(row.evidenceSpan).slice(0, 220) : transcript.slice(0, 160),
+      matchedPhrase: row.matchedPhrase ? String(row.matchedPhrase).slice(0, 80) : undefined,
+    };
+  }).filter((row) => Boolean(row.nodeId));
+}
+
+/** Single rule for negative evidence: mastery uses score as "success signal"; for negative we need low score so beta grows. */
+function scoreForNegativeEvidence(confidenceThatFailed: number | undefined): number {
+  const c = typeof confidenceThatFailed === "number" ? confidenceThatFailed : 1;
+  return clamp01(1 - c);
+}
+
 function makeEvidence(params: {
   nodeId: string;
   signalType: string;
@@ -350,7 +379,6 @@ function makeEvidence(params: {
   opportunity: GseOpportunityType;
   score: number;
   confidence: number;
-  impact: number;
   source: string;
   domain: "vocab" | "grammar" | "lo";
   usedForPromotion: boolean;
@@ -368,7 +396,6 @@ function makeEvidence(params: {
     opportunityType: params.opportunity,
     score: Number(clamp01(params.score).toFixed(4)),
     confidence: Number(clamp01(params.confidence).toFixed(4)),
-    impact: Number(Math.max(0.1, Math.min(1, params.impact)).toFixed(4)),
     source: params.source,
     domain: params.domain,
     usedForPromotion: params.usedForPromotion,
@@ -391,6 +418,7 @@ export function buildOpportunityEvidence(input: BuildOpportunityEvidenceInput) {
   const passRatio = checkPassRatio(input.taskEvaluation);
   const loChecks = normalizedLoChecks(input.taskEvaluation);
   const grammarChecks = normalizedGrammarChecks(input.taskEvaluation, input.transcript);
+  const vocabChecks = normalizedVocabChecks(input.taskEvaluation, input.transcript);
   const requiredWords = new Set(
     [
       ...extractRequiredWords(input.taskPrompt),
@@ -401,9 +429,10 @@ export function buildOpportunityEvidence(input: BuildOpportunityEvidenceInput) {
   );
   const requiredWordLemmas = new Set(Array.from(requiredWords).map(toLemma));
 
+  const targetNodeIds = new Set(input.taskTargets.map((t) => t.nodeId));
+
   for (const target of input.taskTargets) {
     const nodeType = target.node.type;
-    const impact = Math.max(0.2, Math.min(1, target.weight || 1));
 
     if (nodeType === "GSE_LO") {
       const targetHint = `${target.node.descriptor} ${input.taskPrompt}`;
@@ -412,10 +441,10 @@ export function buildOpportunityEvidence(input: BuildOpportunityEvidenceInput) {
           .sort((a, b) => overlapScore(b.label, targetHint) - overlapScore(a.label, targetHint))[0] || null;
       const positive = selectedCheck ? selectedCheck.pass : passRatio >= 0.55;
       const score = selectedCheck
-        ? (selectedCheck.pass ? selectedCheck.confidence : 1 - selectedCheck.confidence)
+        ? (selectedCheck.pass ? selectedCheck.confidence : scoreForNegativeEvidence(selectedCheck.confidence))
         : positive
         ? passRatio
-        : 1 - passRatio;
+        : scoreForNegativeEvidence(passRatio);
       created.push(
         makeEvidence({
           nodeId: target.nodeId,
@@ -424,7 +453,6 @@ export function buildOpportunityEvidence(input: BuildOpportunityEvidenceInput) {
           opportunity: "explicit_target",
           score,
           confidence: selectedCheck ? selectedCheck.confidence : defaultConf,
-          impact,
           source: "rules",
           domain: "lo",
           usedForPromotion: true,
@@ -442,14 +470,17 @@ export function buildOpportunityEvidence(input: BuildOpportunityEvidenceInput) {
     }
 
     if (nodeType === "GSE_VOCAB") {
+      const selectedCheck = vocabChecks.find((c) => c.nodeId === target.nodeId) || null;
       const baseForms = buildVocabLexicalForms(target.node);
       const extra = input.targetNodeIdToExtraLexicalForms?.[target.nodeId];
       const lexicalForms = {
         lemmas: extra ? [...baseForms.lemmas, ...extra.lemmas] : baseForms.lemmas,
         phrases: extra ? [...baseForms.phrases, ...extra.phrases] : baseForms.phrases,
       };
-      const wasUsed = lexicalForms.lemmas.some((lemma) => lemmaSet.has(lemma)) ||
-        lexicalForms.phrases.some((phrase) => transcriptPhrasePadded.includes(` ${phrase} `));
+      const wasUsed = selectedCheck
+        ? selectedCheck.pass
+        : lexicalForms.lemmas.some((lemma) => lemmaSet.has(lemma)) ||
+          lexicalForms.phrases.some((phrase) => transcriptPhrasePadded.includes(` ${phrase} `));
       const explicitWordTask =
         input.taskType === "target_vocab" ||
         lexicalForms.lemmas.some((lemma) => requiredWordLemmas.has(lemma)) ||
@@ -466,7 +497,6 @@ export function buildOpportunityEvidence(input: BuildOpportunityEvidenceInput) {
             opportunity: "incidental",
             score: wasUsed ? 0.55 : 0.35,
             confidence: defaultConf * 0.6,
-            impact: Math.min(0.2, impact),
             source: "rules",
             domain: "vocab",
             usedForPromotion: false,
@@ -489,17 +519,17 @@ export function buildOpportunityEvidence(input: BuildOpportunityEvidenceInput) {
             signalType: wasUsed ? "vocab_target_used" : "vocab_target_missing",
             kind: wasUsed ? "direct" : "negative",
             opportunity: "explicit_target",
-            score: wasUsed ? 1 : 0,
-            confidence: defaultConf,
-            impact,
+            score: wasUsed ? 1 : scoreForNegativeEvidence(1),
+            confidence: selectedCheck ? selectedCheck.confidence : defaultConf,
             source: "rules",
             domain: "vocab",
             usedForPromotion: true,
             reliability,
             ageBand: input.ageBand,
-            evidenceText: input.transcript.slice(0, 220),
+            evidenceText: selectedCheck?.evidenceSpan || input.transcript.slice(0, 220),
             metadataJson: {
               checkId: wasUsed ? "vocab_target_used" : "vocab_target_missing",
+              matchedPhrase: selectedCheck?.matchedPhrase || null,
               ruleVersion: EVIDENCE_RULE_VERSION,
             },
           })
@@ -513,15 +543,15 @@ export function buildOpportunityEvidence(input: BuildOpportunityEvidenceInput) {
             opportunity: "incidental",
             score: 0.7,
             confidence: defaultConf,
-            impact,
             source: "rules",
             domain: "vocab",
             usedForPromotion: false,
             reliability,
             ageBand: input.ageBand,
-            evidenceText: input.transcript.slice(0, 220),
+            evidenceText: selectedCheck?.evidenceSpan || input.transcript.slice(0, 220),
             metadataJson: {
               checkId: "vocab_incidental_used",
+              matchedPhrase: selectedCheck?.matchedPhrase || null,
               ruleVersion: EVIDENCE_RULE_VERSION,
             },
           })
@@ -538,6 +568,7 @@ export function buildOpportunityEvidence(input: BuildOpportunityEvidenceInput) {
       if (!selectedCheck) continue;
       const grammarScore = selectedCheck.confidence;
       const correctEnough = selectedCheck.pass;
+      const score = correctEnough ? grammarScore : scoreForNegativeEvidence(grammarScore);
       created.push(
         makeEvidence({
           nodeId: target.nodeId,
@@ -548,9 +579,8 @@ export function buildOpportunityEvidence(input: BuildOpportunityEvidenceInput) {
             : input.taskType === "read_aloud"
             ? "incidental"
             : "elicited_incidental",
-          score: grammarScore,
+          score,
           confidence: selectedCheck ? selectedCheck.confidence : defaultConf,
-          impact,
           source: "rules",
           domain: "grammar",
           usedForPromotion: true,
@@ -568,6 +598,40 @@ export function buildOpportunityEvidence(input: BuildOpportunityEvidenceInput) {
     }
   }
 
+  // Incidental vocab: same rule as grammar/LO incidental — only when evidenced in transcript; pass → supporting, !pass → negative.
+  const incidentalVocab = vocabChecks
+    .filter((c) => c.opportunityType !== "explicit_target" && c.confidence >= 0.66 && !targetNodeIds.has(c.nodeId))
+    .slice(0, 12);
+  for (const check of incidentalVocab) {
+    const pass = check.pass;
+    created.push(
+      makeEvidence({
+        nodeId: check.nodeId,
+        signalType: pass ? "vocab_incidental_usage" : "vocab_incidental_error",
+        kind: pass ? "supporting" : "negative",
+        opportunity: "incidental",
+        score: pass
+          ? Math.max(0.6, Math.min(0.92, check.confidence * 0.92))
+          : scoreForNegativeEvidence(check.confidence),
+        confidence: check.confidence,
+        source: "rules",
+        domain: "vocab",
+        usedForPromotion: false,
+        targeted: false,
+        activationImpact: "observed",
+        reliability: reliability === "high" ? "medium" : reliability,
+        ageBand: input.ageBand,
+        evidenceText: check.evidenceSpan || input.transcript.slice(0, 220),
+        metadataJson: {
+          checkId: pass ? "vocab_incidental_usage" : "vocab_incidental_error",
+          matchedPhrase: check.matchedPhrase || null,
+          label: check.label,
+          ruleVersion: EVIDENCE_RULE_VERSION,
+        },
+      })
+    );
+  }
+
   const explicitLoNegatives = created.filter(
     (row) => row.domain === "lo" && row.opportunityType === "explicit_target" && row.evidenceKind === "negative"
   );
@@ -581,9 +645,8 @@ export function buildOpportunityEvidence(input: BuildOpportunityEvidenceInput) {
           signalType: "lo_check_negative_required",
           kind: "negative",
           opportunity: "explicit_target",
-          score: 0.2,
+          score: scoreForNegativeEvidence(0.8),
           confidence: 0.92,
-          impact: Math.max(0.35, Math.min(1, firstLo.weight || 1)),
           source: "rules",
           domain: "lo",
           usedForPromotion: true,
@@ -701,6 +764,10 @@ export async function persistAttemptGseEvidence(input: BuildAttemptEvidenceInput
   const targetNodeIds = new Set(taskTargets.map((row) => row.nodeId));
   const incidentalDefaultConf = confidenceFromReliability(input.scoreReliability);
 
+  const hasModelVocabChecks =
+    Array.isArray((input.taskEvaluation as unknown as { vocabChecks?: unknown }).vocabChecks) &&
+    ((input.taskEvaluation as unknown as { vocabChecks?: unknown[] }).vocabChecks || []).length > 0;
+
   const transcriptWords = mapTranscriptToWordSet(input.transcript)
     .map(normalizeWord)
     .filter((word) => word.length >= 3 && !requiredWordsSet.has(word) && !STOPWORDS.has(word))
@@ -710,7 +777,8 @@ export async function persistAttemptGseEvidence(input: BuildAttemptEvidenceInput
   const transcriptPhraseTokens = normalizePhrase(input.transcript).split(" ").filter((token) => token.length >= 2);
   const transcriptNgrams = buildNgrams(transcriptPhraseTokens, 3).filter((phrase) => phrase.length >= 3).slice(0, 220);
   const aliasCandidates = uniqueStrings([...transcriptCandidates, ...transcriptNgrams]).slice(0, 300);
-  if (transcriptWords.length > 0) {
+  // Legacy vocab incidental discovery (alias scan). Keep only as a fallback when evaluator did not emit vocab checks.
+  if (!hasModelVocabChecks && transcriptWords.length > 0) {
     const [vocabNodesByAlias, vocabNodesByDescriptor] = await Promise.all([
       prisma.gseNodeAlias.findMany({
         where: {
@@ -755,16 +823,15 @@ export async function persistAttemptGseEvidence(input: BuildAttemptEvidenceInput
           opportunity: "incidental",
           score: 0.68,
           confidence: incidentalDefaultConf,
-          impact: 0.8,
-          source: "rules",
-          domain: "vocab",
-          usedForPromotion: false,
-          targeted: false,
-          activationImpact: "observed",
-          reliability: input.scoreReliability,
-          ageBand: input.ageBand,
-          evidenceText: input.transcript.slice(0, 220),
-          metadataJson: {
+        source: "rules",
+        domain: "vocab",
+        usedForPromotion: false,
+        targeted: false,
+        activationImpact: "observed",
+        reliability: input.scoreReliability,
+        ageBand: input.ageBand,
+        evidenceText: input.transcript.slice(0, 220),
+        metadataJson: {
             checkId: "vocab_incidental_discovery",
             matchedWord: match.matchedWord,
             ruleVersion: EVIDENCE_RULE_VERSION,
@@ -805,9 +872,8 @@ export async function persistAttemptGseEvidence(input: BuildAttemptEvidenceInput
           signalType: pass ? "grammar_incidental_discovery" : "grammar_incidental_error",
           kind: pass ? "supporting" : "negative",
           opportunity: "incidental",
-          score: pass ? Math.max(0.62, Math.min(0.9, check.confidence * 0.92)) : Math.max(0.1, 1 - check.confidence),
+          score: pass ? Math.max(0.62, Math.min(0.9, check.confidence * 0.92)) : scoreForNegativeEvidence(check.confidence),
           confidence: check.confidence,
-          impact: 0.8,
           source: "rules",
           domain: "grammar",
           usedForPromotion: false,
@@ -829,6 +895,55 @@ export async function persistAttemptGseEvidence(input: BuildAttemptEvidenceInput
     }
   }
 
+  const loChecksForIncidental = normalizedLoChecks(input.taskEvaluation).filter((check) => check.confidence >= 0.66);
+  const loNodeIdCandidates = uniqueStrings(
+    loChecksForIncidental
+      .map((check) => check.nodeId || check.checkId)
+      .filter((value) => typeof value === "string" && value.startsWith("gse:"))
+  ).slice(0, 24);
+  if (loNodeIdCandidates.length > 0) {
+    const loNodes = await prisma.gseNode.findMany({
+      where: { nodeId: { in: loNodeIdCandidates }, type: "GSE_LO" },
+      select: { nodeId: true },
+    });
+    const loNodeSet = new Set(loNodes.map((row) => row.nodeId));
+    const usedLoNodeIds = new Set(created.filter((row) => row.domain === "lo").map((row) => row.nodeId));
+    let loAdded = 0;
+    for (const check of loChecksForIncidental) {
+      if (loAdded >= 6) break;
+      const nodeId = (check.nodeId || check.checkId || "").trim();
+      if (!nodeId || !loNodeSet.has(nodeId)) continue;
+      if (targetNodeIds.has(nodeId) || usedLoNodeIds.has(nodeId)) continue;
+      created.push(
+        makeEvidence({
+          nodeId,
+          signalType: check.pass ? "lo_eval_incidental_pass" : "lo_eval_incidental_fail",
+          kind: check.pass ? "supporting" : "negative",
+          opportunity: "incidental",
+          score: check.pass
+            ? Math.max(0.6, Math.min(0.92, check.confidence * 0.92))
+            : scoreForNegativeEvidence(check.confidence),
+          confidence: check.confidence,
+          source: "openai",
+          domain: "lo",
+          usedForPromotion: false,
+          targeted: false,
+          activationImpact: "observed",
+          reliability: check.confidence >= 0.84 ? "high" : "medium",
+          ageBand: input.ageBand,
+          evidenceText: check.evidenceSpan || input.transcript.slice(0, 220),
+          metadataJson: {
+            checkId: check.checkId,
+            ruleVersion: EVIDENCE_RULE_VERSION,
+            severity: check.severity || null,
+          },
+        })
+      );
+      usedLoNodeIds.add(nodeId);
+      loAdded += 1;
+    }
+  }
+
   const metricNodeKeys = metricSignals.map((s) => s.key);
   const metricNodes = await prisma.gseNode.findMany({
     where: { sourceKey: { in: metricNodeKeys } },
@@ -847,7 +962,6 @@ export async function persistAttemptGseEvidence(input: BuildAttemptEvidenceInput
         opportunity: "elicited_incidental",
         score: clamp01(signal.score / 100),
         confidence: conf,
-        impact: 0.5,
         source: "azure",
         domain: node.type === "GSE_GRAMMAR" ? "grammar" : "lo",
         usedForPromotion: true,
@@ -873,7 +987,29 @@ export async function persistAttemptGseEvidence(input: BuildAttemptEvidenceInput
     const prev = deduped.get(key);
     if (!prev || getEvidenceBaseWeight(row) > getEvidenceBaseWeight(prev)) deduped.set(key, row);
   }
-  const rows = Array.from(deduped.values());
+  let rows = Array.from(deduped.values());
+
+  const nodeIds = [...new Set(rows.map((r) => r.nodeId))];
+  const existingNodes = await prisma.gseNode.findMany({
+    where: { nodeId: { in: nodeIds } },
+    select: { nodeId: true },
+  });
+  const existingNodeIds = new Set(existingNodes.map((n) => n.nodeId));
+  const missing = nodeIds.filter((id) => !existingNodeIds.has(id));
+  if (missing.length > 0) {
+    console.warn(
+      JSON.stringify({
+        event: "gse_evidence_node_id_not_in_catalog",
+        attemptId: input.attemptId,
+        missingNodeIds: missing,
+        source: "log and fix the source; do not add more filters",
+      })
+    );
+  }
+  rows = rows.filter((r) => existingNodeIds.has(r.nodeId));
+  if (rows.length === 0) {
+    return { evidenceCount: 0, nodeOutcomes: [] as NodeMasteryOutcome[] };
+  }
 
   await prisma.attemptGseEvidence.createMany({
     data: rows.map((row) => ({
@@ -885,7 +1021,6 @@ export async function persistAttemptGseEvidence(input: BuildAttemptEvidenceInput
       opportunityType: row.opportunityType,
       score: row.score,
       confidence: row.confidence,
-      impact: row.impact,
       weight: getEvidenceBaseWeight(row),
       source: row.source,
       domain: row.domain,
@@ -900,7 +1035,6 @@ export async function persistAttemptGseEvidence(input: BuildAttemptEvidenceInput
   const masteryEvidences: MasteryEvidence[] = rows.map((row) => ({
     nodeId: row.nodeId,
     confidence: row.confidence,
-    impact: row.impact,
     reliability: row.reliability,
     evidenceKind: row.evidenceKind,
     opportunityType: row.opportunityType,

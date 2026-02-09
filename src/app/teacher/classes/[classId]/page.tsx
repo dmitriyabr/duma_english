@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 
 type Student = {
   id: string;
@@ -40,7 +40,6 @@ function formatDate(d: string | null) {
 
 export default function TeacherClassPage() {
   const params = useParams();
-  const router = useRouter();
   const classId = params.classId as string;
   const [data, setData] = useState<ClassData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -51,7 +50,7 @@ export default function TeacherClassPage() {
   const [generatingCodeFor, setGeneratingCodeFor] = useState<string | null>(null);
   const [newStudentCode, setNewStudentCode] = useState<{ id: string; code: string } | null>(null);
 
-  function load() {
+  const load = useCallback(() => {
     setError(null);
     fetch(`/api/teacher/classes/${classId}`)
       .then((r) => {
@@ -61,11 +60,11 @@ export default function TeacherClassPage() {
       .then(setData)
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }
+  }, [classId]);
 
   useEffect(() => {
     load();
-  }, [classId]);
+  }, [load]);
 
   async function addStudent(e: React.FormEvent) {
     e.preventDefault();

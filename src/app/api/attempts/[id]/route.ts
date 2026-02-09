@@ -263,7 +263,6 @@ export async function GET(_: Request, context: AttemptRouteContext) {
       opportunityType: row.opportunityType,
       score: row.score,
       confidence: row.confidence,
-      impact: row.impact,
       weight: row.weight,
       source: row.source,
       domain: row.domain,

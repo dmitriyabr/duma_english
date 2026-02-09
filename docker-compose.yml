@@ -16,6 +16,22 @@ services:
       timeout: 3s
       retries: 10
 
+  lemma_service:
+    build:
+      context: ./services/lemma_service
+    container_name: duma_lemma_service
+    ports:
+      - "8099:8099"
+    environment:
+      # Keep in sync with app env: LEMMA_SERVICE_URL=http://localhost:8099
+      PORT: "8099"
+      SPACY_MODEL: "en_core_web_sm"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8099/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   minio:
     image: minio/minio:latest
     container_name: duma_minio

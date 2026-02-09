@@ -4,7 +4,7 @@ import { prisma } from "../lib/db";
 import { getObjectBuffer, deleteObject } from "../lib/storage";
 import { analyzeSpeechFromBuffer } from "../lib/speech";
 import { calculateDerivedSpeechMetrics, composeScores } from "../lib/scoring";
-import { computeLanguageScoreFromTaskEvaluation, evaluateTaskQuality } from "../lib/evaluator";
+import { computeLanguageScoreFromTaskEvaluation, evaluateTaskQuality, type EvaluationInput } from "../lib/evaluator";
 import { recomputeMastery } from "../lib/adaptive";
 import { finishPlacement, submitPlacementAnswer } from "../lib/placement";
 import { persistAttemptGseEvidence } from "../lib/gse/evidence";
@@ -325,14 +325,29 @@ async function processAttempt(attemptId: string) {
 
     if (!analysis) throw lastError || new Error("Speech analysis failed");
 
-    const taskMeta = (attempt.task.metaJson || {}) as Record<string, unknown>;
-    const evaluated = await evaluateTaskQuality({
-      taskType: attempt.task.type,
-      taskPrompt: attempt.task.prompt,
-      transcript: analysis.transcript,
-      speechMetrics: calculateDerivedSpeechMetrics(analysis.metrics),
-      taskMeta,
-    });
+	    const taskMeta = (attempt.task.metaJson || {}) as Record<string, unknown>;
+	    const taskTargets = await prisma.taskGseTarget.findMany({
+	      where: { taskId: attempt.taskId },
+	      include: {
+	        node: {
+	          select: {
+	            nodeId: true,
+	            type: true,
+	            sourceKey: true,
+	            descriptor: true,
+	          },
+	        },
+	      },
+	    });
+	    const evaluated = await evaluateTaskQuality({
+	      taskId: attempt.taskId,
+	      taskType: attempt.task.type,
+	      taskPrompt: attempt.task.prompt,
+	      transcript: analysis.transcript,
+	      speechMetrics: calculateDerivedSpeechMetrics(analysis.metrics),
+	      taskMeta,
+	      taskTargets: taskTargets as unknown as EvaluationInput["taskTargets"],
+	    });
     const derivedMetrics = calculateDerivedSpeechMetrics(analysis.metrics);
     const languageScore = computeLanguageScoreFromTaskEvaluation(evaluated.taskEvaluation);
     const scores = composeScores({

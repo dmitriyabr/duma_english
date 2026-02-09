@@ -3,13 +3,16 @@ import { chatJson } from "@/lib/llm";
 
 /**
  * GET /api/debug/langsmith-test
- * Делает один тестовый вызов LLM. Если LANGCHAIN_TRACING_V2=true и LANGCHAIN_API_KEY задан,
+ * Делает один тестовый вызов LLM. Если tracing и LangSmith API key заданы,
  * этот run появится в LangSmith за несколько секунд.
  */
 export async function GET() {
   const apiKey = process.env.OPENAI_API_KEY;
-  const tracingV2 = process.env.LANGCHAIN_TRACING_V2 === "true";
-  const hasLangSmithKey = Boolean(process.env.LANGCHAIN_API_KEY);
+  const tracingFlag = process.env.LANGSMITH_TRACING || process.env.LANGCHAIN_TRACING_V2;
+  const tracingEnabled = tracingFlag === "true";
+  const langsmithApiKey = process.env.LANGSMITH_API_KEY || process.env.LANGCHAIN_API_KEY;
+  const hasLangSmithKey = Boolean(langsmithApiKey);
+  const project = process.env.LANGSMITH_PROJECT || process.env.LANGCHAIN_PROJECT || "default";
 
   if (!apiKey) {
     return NextResponse.json(
@@ -34,18 +37,19 @@ export async function GET() {
       ok: true,
       responsePreview: content.slice(0, 200),
       langsmith: {
-        tracingEnabled: tracingV2,
+        tracingEnabled,
         apiKeySet: hasLangSmithKey,
-        hint: tracingV2 && hasLangSmithKey
+        project,
+        hint: tracingEnabled && hasLangSmithKey
           ? "Check https://smith.langchain.com — this run should appear in a few seconds."
-          : "Set LANGCHAIN_TRACING_V2=true and LANGCHAIN_API_KEY in .env, then restart and call this URL again.",
+          : "Set LANGSMITH_TRACING=true (or LANGCHAIN_TRACING_V2=true) and LANGSMITH_API_KEY (or LANGCHAIN_API_KEY) in .env, then restart and call this URL again.",
       },
     });
   } catch (err) {
     return NextResponse.json(
       {
         error: err instanceof Error ? err.message : "LLM call failed",
-        langsmith: { tracingEnabled: tracingV2, apiKeySet: hasLangSmithKey },
+        langsmith: { tracingEnabled, apiKeySet: hasLangSmithKey, project },
       },
       { status: 500 }
     );

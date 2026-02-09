@@ -8,23 +8,19 @@ const PUBLIC_PATHS = ["/teacher/login", "/teacher/signup"];
 export function TeacherGuard({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const [allowed, setAllowed] = useState(false);
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    if (PUBLIC_PATHS.includes(pathname ?? "")) {
-      setAllowed(true);
-      setChecking(false);
-      return;
-    }
+    if (PUBLIC_PATHS.includes(pathname ?? "")) return;
     fetch("/api/auth/teacher/me")
       .then((res) => {
-        if (res.ok) setAllowed(true);
-        else router.replace("/teacher/login");
+        if (!res.ok) router.replace("/teacher/login");
       })
       .catch(() => router.replace("/teacher/login"))
       .finally(() => setChecking(false));
   }, [pathname, router]);
+
+  if (PUBLIC_PATHS.includes(pathname ?? "")) return <>{children}</>;
 
   if (checking) {
     return (

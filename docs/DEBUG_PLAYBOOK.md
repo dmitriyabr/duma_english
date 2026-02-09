@@ -45,7 +45,19 @@ Mastery = 100×α/(α+β). Each evidence: α += weight×score, β += weight×(1�
 **Ориентир при cap 12:** один evidence при cap — supporting и direct при одинаковых conf/rel/impact дают одинаковый прирост (~5–12 баллов в зависимости от streak). Порог «closed» value ≥ 70.
 
 ## A3) Evidence mix and streak
-Run **`npx tsx src/scripts/inspect_profile_evidence.ts [studentId]`** to see your evidence mix. Streak applies to both direct and supporting success. Supporting and direct: baseWeight 1, same formula (conf×rel×impact). Most evidence is **supporting + incidental** (word used in speech but task was not target_vocab with that word). Streak applies only when **kind=direct** and score≥0.7, so with almost no direct evidence you rarely see “streak ×1.15”. See MASTERY_METHODOLOGY for spec. See MASTERY_METHODOLOGY.md “Why you see so few streaks”.
+Run **`npx tsx src/scripts/inspect_profile_evidence.ts [studentId]`** to see your evidence mix.
+
+**Streak mechanics:**
+- **Streak accumulation:** only **direct success** (kind=direct, score≥0.7) increments `directSuccessStreak`; supporting or negative evidence resets it to 0.
+- **Weight bonus:** if ANY success (direct OR supporting with score≥0.6) AND `directSuccessStreak ≥ 1`, apply streak multiplier ×1.25 (2nd), ×1.56 (3rd), ×1.8 (4th+).
+- **N-CCR verification:** 2+ **direct successes** in a row → verified, even if mean < 70. Supporting success does NOT count for verification (only for weight bonus).
+
+**Example:**
+- Попытка 1: direct success → streak = 1
+- Попытка 2: supporting success (incidental grammar) → gets weight bonus ×1.25 (because prevStreak=1), but streak resets to 0, NOT verified
+- Попытка 3: direct success → streak = 1 again
+
+**Common case:** Most evidence is **supporting + incidental** (word used in speech but task was not target_vocab with that word). With almost no direct evidence you rarely see streak multipliers. Supporting and direct: baseWeight 1, same formula (conf×rel×impact). See MASTERY_METHODOLOGY.md "Why you see so few streaks".
 
 ## B) Why skills don't progress (no direct evidence)
 Progress and promotion depend on **direct** evidence (target nodes hit). Check:
@@ -72,6 +84,17 @@ Check:
 2. incidental evidence rows were written (`targeted=false`).
 3. activation state moved (`observed` or `candidate_for_verification`).
 4. planner scheduled verification tasks.
+
+## D2) Why semantic LO/Grammar incidental did not appear
+Check:
+1. `OPENAI_API_KEY` is set and `GSE_SEMANTIC_ENABLED=true`.
+2. `GseNodeEmbedding` has vectors for `GSE_LO` and `GSE_GRAMMAR` candidates.
+3. Evaluation produced LO/grammar checks (see `Attempt.taskEvaluationJson.loChecks` / `.grammarChecks`).
+4. confidence threshold was met (`GSE_SEMANTIC_CONF_THRESHOLD`, default `0.68`).
+5. matched node was not already targeted in `TaskGseTarget`.
+
+Debugging tip:
+- Enable local pipeline log: set `PIPELINE_DEBUG_LOG_ENABLED=true` and inspect `tmp/pipeline-debug.ndjson` for `semantic_parser_*`, `semantic_retrieval_*`, `evaluation_*` events.
 
 ## E) Why stage did not move
 Check:
@@ -172,6 +195,28 @@ All OpenAI calls (evaluator + task generator) go through LangChain. To trace pro
 5. Use filters by run name or project to find evaluator vs task-generator runs.
 
 Without these env vars, the app works as before; tracing is off.
+
+## G2) Debugging vocab matching (lemma + candidates)
+Vocabulary matching has non-LLM steps (lemmatization + lexical retrieval), so you will not see them in LangSmith.
+
+To inspect inputs/outputs for each step, enable the pipeline debug log:
+1. In `.env`: `PIPELINE_DEBUG_LOG_ENABLED=true`
+2. Optionally: `PIPELINE_DEBUG_LOG_PATH=tmp/pipeline-debug.ndjson`
+3. Re-run an attempt and inspect `tmp/pipeline-debug.ndjson` (NDJSON events).
+
+Key events:
+- `lemma_service_request` / `lemma_service_response` / `lemma_service_error`
+- `vocab_retrieval_phrase_candidates`
+- `vocab_retrieval_candidates`
+- `evaluation_prompt_inputs` (includes `vocabRetrieval` + the exact prompt inputs)
+
+Notes:
+- `evaluation_prompt_inputs` separates `Target ... options` vs `Candidate ... options`. Candidate options should not duplicate target options for LO/grammar/vocab.
+- `GSE_VOCAB_CATALOGS` affects incidental vocab retrieval only. Explicit task targets come from `TaskGseTarget` and can include nodes from other catalogs unless the planner is restricted.
+
+To use spaCy (higher-quality lemmas), start the optional lemma service and set:
+- `LEMMA_SERVICE_URL=http://localhost:8099`
+- `docker compose --profile nlp up -d lemma_service`
 
 ## H) Mandatory checks before saying “fixed”
 1. `npm test`

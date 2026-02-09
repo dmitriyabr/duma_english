@@ -1,0 +1,5007 @@
+{
+  "fetchedAt": "2026-02-08T02:09:02.527Z",
+  "grammar": {
+    "totalCount": 456,
+    "items": [
+      {
+        "descriptorId": "564ef1f38735425707959df7",
+        "descriptiveId": "GLGR0000",
+        "descriptor": "No grammar descriptor available.",
+        "attribution": "",
+        "syllabuses": [
+          {
+            "syllabusName": "GLGR",
+            "syllabusId": "54fe84e0070b48b42932d4c3"
+          },
+          {
+            "syllabusName": "YLGR",
+            "syllabusId": "599d5179b4c3d30e580e6d25"
+          }
+        ],
+        "relatedDescriptors": [],
+        "descriptorStatus": "published",
+        "additionalInformation": {
+          "Notes": "",
+          "Variant terms": "",
+          "Grammatical Categories": "",
+          "Structure": "",
+          "Communicative Categories": "",
+          "Business Skills": "",
+          "Academic Skills": "",
+          "YL simplified descriptor": "",
+          "Source Descriptor": "",
+          "Estimated Level": "",
+          "Anchor": "",
+          "Example": null,
+          "Function/Notion": "",
+          "Source": "",
+          "Batch": "",
+          "Draft IDs": "",
+          "Topic L1": "",
+          "N2000 Logit": "",
+          "CEFR Communicative activity": ""
+        },
+        "tags": [
+          {
+            "tagTypeId": "CEFR",
+            "tags": [
+              {
+                "tagName": "<A1 (10-21)",
+                "tagId": "CEFR00001"
+              }
+            ]
+          },
+          {
+            "tagTypeId": "SKL",
+            "tags": [
+              {
+                "tagName": "Grammar",
+                "tagId": "SKL00007"
+              }
+            ]
+          }
+        ],
+        "occupations": [],
+        "books": [
+          {
+            "ps": "Adult",
+            "isbn": "9780134498935"
+          },
+          {
+            "ps": "Adult",
+            "isbn": "9780134498911"
+          },
+          {
+            "ps": "Adult",
+            "isbn": "9780135178461"
+          },
+          {
+            "ps": "Adult",
+            "isbn": "9780135178430"
+          },
+          {
+            "ps": "Adult",
+            "isbn": "9780135178416"
+          },
+          {
+            "ps": "Academic",
+            "isbn": "9780134653211"
+          },
+          {
+            "ps": "Academic",
+            "isbn": "9780134652689"
+          },
+          {
+            "ps": "Academic",
+            "isbn": "9780134652702"
+          },
+          {
+            "ps": "Academic",
+            "isbn": "9780134652696"
+          },
+          {
+            "ps": "Young_Learner",
+            "isbn": "9781292203331"
+          },
+          {
+            "ps": "Young_Learner",
+            "isbn": "9781292203348"
+          },
+          {
+            "ps": "Young_Learner",
+            "isbn": "9781292203355"
+          },
+          {
+            "ps": "Young_Learner",
+            "isbn": "9781292203362"
+          },
+          {
+            "ps": "Young_Learner",
+            "isbn": "9781292268750"
+          },
+          {
+            "ps": "Young_Learner",
+            "isbn": "9781292268767"
+          },
+          {
+            "ps": "Professional",
+            "isbn": "9781292233543"
+          },
+          {
+            "ps": "Professional",
+            "isbn": "9781292248585"
+          },
+          {
+            "ps": "Professional",
+            "isbn": "9781292134796"
+          },
+          {
+            "ps": "Professional",
+            "isbn": "9781292134772"
+          },
+          {
+            "ps": "Professional",
+            "isbn": "9781292134819"
+          },
+          {
+            "ps": "Professional",
+            "isbn": "9781292135274"
+          },
+          {
+            "ps": "Young_Learner",
+            "isbn": "9781292209982"
+          },
+          {
+            "ps": "Young_Learner",
+            "isbn": "9781292210018"
+          },
+          {
+            "ps": "Young_Learner",
+            "isbn": "9781292275598"
+          },
+          {
+            "ps": "Young_Learner",
+            "isbn": "9781292275611"
+          },
+          {
+            "ps": "Young_Learner",
+            "isbn": "9781447989240"
+          },
+          {
+            "ps": "Young_Learner",
+            "isbn": "9781447989318"
+          },
+          {
+            "ps": "Young_Learner",
+            "isbn": "9781447989387"
+          },
+          {
+            "ps": "Young_Learner",
+            "isbn": "9781447989455"
+          },
+          {
+            "ps": "Young_Learner",
+            "isbn": "9781447989523"
+          },
+          {
+            "ps": "Young_Learner",
+            "isbn": "9781447989592"
+          },
+          {
+            "ps": "Young_Learner",
+            "isbn": "9780135232736"
+          },
+          {
+            "ps": "Young_Learner",
+            "isbn": "9781292313672"
+          },
+          {
+            "ps": "Young_Learner",
+            "isbn": "9781292194141"
+          },
+          {
+            "ps": "Adult",
+            "isbn": "9781292227955"
+          },
+          {
+            "ps": "Academic",
+            "isbn": "9780134616766"
+          },
+          {
+            "ps": "Academic",
+            "isbn": "9780134616759"
+          },
+          {
+            "ps": "Academic",
+            "isbn": "9780134645193"
+          },
+          {
+            "ps": "Academic",
+            "isbn": "9780132912747"
+          },
+          {
+            "ps": "Academic",
+            "isbn": "9780134616735"
+          },
+          {
+            "ps": "Academic",
+            "isbn": "9780134616728"
+          },
+          {
+            "ps": "Academic",
+            "isbn": "9780134773155"
+          },
+          {
+            "ps": "Young_Learner",
+            "isbn": "9781292247083"
+          },
+          {
+            "ps": "Adult",
+            "isbn": "9780133828993"
+          },
+          {
+            "ps": "Adult",
+            "isbn": "9781292227818"
+          },
+          {
+            "ps": "Adult",
+            "isbn": "9781292228372"
+          },
+          {
+            "ps": "Adult",
+            "isbn": "9781292228518"
+          },
+          {
+            "ps": "Professional",
+            "isbn": "9781292248622"
+          },
+          {
+            "ps": "Adult",
+            "isbn": "9780135178409"
+          },
+          {
+            "ps": "Adult",
+            "isbn": "9780135178393"
+          },
+          {
+            "ps": "Young_Learner",
+            "isbn": "9781292352527"
+          },
+          {
+            "ps": "Young_Learner",
+            "isbn": "9781292352282"
+          },
+          {
+            "ps": "Young_Learner",
+            "isbn": "9781292352275"
+          },
+          {
+            "ps": "Young_Learner",
+            "isbn": "9781292352336"
+          },
+          {
+            "ps": "Young_Learner",
+            "isbn": "9781292352343"
+          },
+          {
+            "ps": "Young_Learner",
+            "isbn": "9781292352350"
+          },
+          {
+            "ps": "Adult",
+            "isbn": "9781292300900"
+          },
+          {
+            "ps": "Adult",
+            "isbn": "9781292300894"
+          },
+          {
+            "ps": "Adult",
+            "isbn": "9781292300931"
+          },
+          {
+            "ps": "Adult",
+            "isbn": "9781292300979"
+          },
+          {
+            "ps": "Adult",
+            "isbn": "9781292227672"
+          },
+          {
+            "ps": "Adult",
+            "isbn": "9781292301839"
+          },
+          {
+            "ps": "Adult",
+            "isbn": "9781292301860"
+          },
+          {
+            "ps": "Adult",
+            "isbn": "9781292301891"
+          },
+          {
+            "ps": "Adult",
+            "isbn": "9781292301921"
+          },
+          {
+            "ps": "Adult",
+            "isbn": "9781292301952"
+          },
+          {
+            "ps": "Adult",
+            "isbn": "9789813130210"
+          },
+          {
+            "ps": "Adult",
+            "isbn": "9789813130227"
+          },
+          {
+            "ps": "Adult",
+            "isbn": "9789813130234"
+          },
+          {
+            "ps": "Adult",
+            "isbn": "9780136833314"
+          },
+          {
+            "ps": "Adult",
+            "isbn": "9780136833543"
+          },
+          {
+            "ps": "Adult",
+            "isbn": "9780136834472"
+          },
+          {
+            "ps": "Adult",
+            "isbn": "9780136834670"
+          },
+          {
+            "ps": "Adult",
+            "isbn": "9780137463961"
+          },
+          {
+            "ps": "Adult",
+            "isbn": "9780137463862"
+          },
+          {
+            "ps": "Young_Learner",
+            "isbn": "9781292441580"
+          },
+          {
+            "ps": "Young_Learner",
+            "isbn": "9781292441573"
+          },
+          {
+            "ps": "Young_Learner",
+            "isbn": "9781292441702"
+          },
+          {
+            "ps": "Young_Learner",
+            "isbn": "9781292441719"
+          },
+          {
+            "ps": "Young_Learner",
+            "isbn": "9781292441726"
+          },
+          {
+            "ps": "Young_Learner",
+            "isbn": "9781292441733"
+          }
+        ],
+        "sdf": [],
+        "relatedLOs": {
+          "YL": [],
+          "GL": [],
+          "AL": [],
+          "PL": []
+        },
+        "status": true,
+        "created": "2015-05-05T12:58:27.791Z",
+        "createdBy": {
+          "userId": "5548be7308ab6de93ce03a41",
+          "firstName": "Joe",
+          "lastName": "Worachek"
+        },
+        "updated": "2015-05-05T12:58:27.791Z",
+        "updatedBy": {
+          "userId": "5548be7308ab6de93ce03a41",
+          "firstName": "Joe",
+          "lastName": "Worachek"
+        },
+        "gse": [
+          {
+            "tagTypeId": "GSE",
+            "tags": [
+              {
+                "tagName": "10",
+                "tagId": "GSE00013"
+              }
+            ]
+          }
+        ],
+        "grammaticalCategories": [],
+        "businessSkills": [],
+        "communicativeCategories": []
+      },
+      {
+        "descriptorId": "55af750cd6c1560c41c6a575",
+        "descriptiveId": "GLGR0271",
+        "descriptor": "Can make simple statements with 'it's/it is'.",
+        "attribution": "(P)",
+        "syllabuses": [
+          {
+            "syllabusName": "GLGR",
+            "syllabusId": "54fe84e0070b48b42932d4c3"
+          }
+        ],
+        "relatedDescriptors": [
+          {
+            "descriptiveId": "GLWP0716",
+            "descriptor": "Can write times using both digits and words."
+          },
+          {
+            "descriptiveId": "GLSP0705",
+            "descriptor": "Can tell the time of day to within five minutes."
+          },
+          {
+            "descriptiveId": "GLSP0644",
+            "descriptor": "Can tell the time of day to the quarter hour."
+          },
+          {
+            "descriptiveId": "GLSI0691",
+            "descriptor": "Can give basic information about the price of something."
+          },
+          {
+            "descriptiveId": "GLSP0643",
+            "descriptor": "Can tell the time of day in full hours."
+          },
+          {
+            "descriptiveId": "NOSP0036",
+            "descriptor": "Can indicate time by such phrases as 'next week', 'last Friday', 'in November', 'three o’clock'."
+          }
+        ],
+        "descriptorStatus": "published",
+        "additionalInformation": {
+          "Notes": "",
+          "Variant terms": "anticipatory it | anticipatory it + adjective | anticipatory it + time | anticipatory it plus adjective | anticipatory it plus time | basic it's | copula | it as subject | it pronoun | personal pronouns | pronoun it | subject verb complement | verb be | word order",
+          "Grammatical Categories": "Phrase>With 'be'|Clause>Basic construction|Pronoun>Generic/impersonal",
+          "Structure": "'it' + 'be'",
+          "Communicative Categories": "",
+          "Business Skills": "",
+          "Academic Skills": "",
+          "YL simplified descriptor": "",
+          "Source Descriptor": "",
+          "Estimated Level": "A1 (22-29)",
+          "Anchor": "N",
+          "Example": "It’s cold.; It’s ten o’clock.; It’s Monday today.; It’s easy.; It’s late.",
+          "Function/Notion": "N8.2.2; N2.8.7; N3.1; F1.5.3.4; F1.5.4",
+          "Source": "",
+          "Batch": "GR_B3",
+          "Draft IDs": "",
+          "Topic L1": "",
+          "N2000 Logit": "",
+          "CEFR Communicative activity": ""
+        },
+        "tags": [
+          {
+            "tagTypeId": "CEFR",
+            "tags": [
+              {
+                "tagName": "A1 (22-29)",
+                "tagId": "CEFR00002"
+              }
+            ]
+          },
+          {
+            "tagTypeId": "SKL",
+            "tags": [
+              {
+                "tagName": "Grammar",
+                "tagId": "SKL00007"
+              }
+            ]
+          }
+        ],
+        "occupations": [],
+        "books": [
+          {
+            "ps": "Young_Learner",
+            "isbn": "9781292268736"
+          },
+          {
+            "ps": "Young_Learner",
+            "isbn": "9781447989240"
+          },
+          {
+            "ps": "Young_Learner",
+            "isbn": "9780135232699"
+          },
+          {
+            "ps": "Adult",
+            "isbn": "9781292359519"
+          }
+        ],
+        "sdf": [],
+        "relatedLOs": {
+          "YL": [],
+          "GL": [],
+          "AL": [],
+          "PL": []
+        },
+        "status": true,
+        "created": "2015-05-05T12:58:27.791Z",
+        "createdBy": {
+          "userId": "5548be7308ab6de93ce03a41",
+          "firstName": "Joe",
+          "lastName": "Worachek"
+        },
+        "updated": "2015-05-05T12:58:27.791Z",
+        "updatedBy": {
+          "userId": "5548be7308ab6de93ce03a41",
+          "firstName": "Joe",
+          "lastName": "Worachek"
+        },
+        "gse": [
+          {
+            "tagTypeId": "GSE",
+            "tags": [
+              {
+                "tagName": "24",
+                "tagId": "GSE00027"
+              }
+            ]
+          }
+        ],
+        "grammaticalCategories": [
+          [
+            "Phrase",
+            "With 'be'"
+          ],
+          [
+            "Clause",
+            "Basic construction"
+          ],
+          [
+            "Pronoun",
+            "Generic/impersonal"
+          ]
+        ],
+        "businessSkills": [],
+        "communicativeCategories": []
+      },
+      {
+        "descriptorId": "55af74f3d6c1560c41c6a10a",
+        "descriptiveId": "GLGR0110",
+        "descriptor": "Can use subject personal pronouns.",
+        "attribution": "(P)",
+        "syllabuses": [
+          {
+            "syllabusName": "GLGR",
+            "syllabusId": "54fe84e0070b48b42932d4c3"
+          }
+        ],
+        "relatedDescriptors": [
+          {
+            "descriptiveId": "GLWI1129",
+            "descriptor": "Can complete a simple form asking for medical information."
+          },
+          {
+            "descriptiveId": "GLSP0702",
+            "descriptor": "Can describe what someone is wearing using a limited range of expressions."
+          },
+          {
+            "descriptiveId": "GLSP0701",
+            "descriptor": "Can describe a person's hobbies and activities using simple language."
+          },
+          {
+            "descriptiveId": "NOSI0033",
+            "descriptor": "Can exchange personal details (e.g. where they live, things they have)."
+          },
+          {
+            "descriptiveId": "GLSP0642",
+            "descriptor": "Can say other people's nationalities."
+          },
+          {
+            "descriptiveId": "GLSI0583",
+            "descriptor": "Can ask and answer simple questions about people they know in a limited way."
+          },
+          {
+            "descriptiveId": "GLSP0286",
+            "descriptor": "Can say what they do (e.g. name of their job, student)."
+          },
+          {
+            "descriptiveId": "GLSI0001",
+            "descriptor": "Can ask and answer basic questions about family and friends in a limited way."
+          }
+        ],
+        "descriptorStatus": "published",
+        "additionalInformation": {
+          "Notes": "",
+          "Variant terms": "I | he | it | nominative case | personal pronouns | pronoun subjects | she | subject personal pronouns | subject pronouns | subjective case pronouns | they | we | you",
+          "Grammatical Categories": "Clause>With 'be'|Pronoun>Personal",
+          "Structure": "subject personal pronouns",
+          "Communicative Categories": "",
+          "Business Skills": "",
+          "Academic Skills": "",
+          "YL simplified descriptor": "",
+          "Source Descriptor": "",
+          "Estimated Level": "A1 (22-29)",
+          "Anchor": "N",
+          "Example": "I; you; he; she; it; we; they",
+          "Function/Notion": "F1.5.3.2; N7.3.1.1; F1.5.4; F1.5.3.4; F1.5.3.1; F1.1; N8.1.1.1",
+          "Source": "",
+          "Batch": "GR_B2",
+          "Draft IDs": "31183",
+          "Topic L1": "",
+          "N2000 Logit": "",
+          "CEFR Communicative activity": ""
+        },
+        "tags": [
+          {
+            "tagTypeId": "CEFR",
+            "tags": [
+              {
+                "tagName": "A1 (22-29)",
+                "tagId": "CEFR00002"
+              }
+            ]
+          },
+          {
+            "tagTypeId": "SKL",
+            "tags": [
+              {
+                "tagName": "Grammar",
+                "tagId": "SKL00007"
+              }
+            ]
+          }
+        ],
+        "occupations": [],
+        "books": [
+          {
+            "ps": "Young_Learner",
+            "isbn": "9781447989240"
+          },
+          {
+            "ps": "Adult",
+            "isbn": "9780133828740"
+          },
+          {
+            "ps": "Adult",
+            "isbn": "9780136833314"
+          },
+          {
+            "ps": "Adult",
+            "isbn": "9780136833543"
+          },
+          {
+            "ps": "Adult",
+            "isbn": "9781292359519"
+          }
+        ],
+        "sdf": [],
+        "relatedLOs": {
+          "YL": [],
+          "GL": [],
+          "AL": [],
+          "PL": []
+        },
+        "status": true,
+        "created": "2015-05-05T12:58:27.791Z",
+        "createdBy": {
+          "userId": "5548be7308ab6de93ce03a41",
+          "firstName": "Joe",
+          "lastName": "Worachek"
+        },
+        "updated": "2015-05-05T12:58:27.791Z",
+        "updatedBy": {
+          "userId": "5548be7308ab6de93ce03a41",
+          "firstName": "Joe",
+          "lastName": "Worachek"
+        },
+        "gse": [
+          {
+            "tagTypeId": "GSE",
+            "tags": [
+              {
+                "tagName": "24",
+                "tagId": "GSE00027"
+              }
+            ]
+          }
+        ],
+        "grammaticalCategories": [
+          [
+            "Clause",
+            "With 'be'"
+          ],
+          [
+            "Pronoun",
+            "Personal"
+          ]
+        ],
+        "businessSkills": [],
+        "communicativeCategories": []
+      },
+      {
+        "descriptorId": "57c6ff8d87baaec739c2e9f3",
+        "descriptiveId": "GLGR0427",
+        "descriptor": "Can ask basic questions using 'What's your ...?'",
+        "attribution": "(P)",
+        "syllabuses": [
+          {
+            "syllabusName": "GLGR",
+            "syllabusId": "54fe84e0070b48b42932d4c3"
+          }
+        ],
+        "relatedDescriptors": [
+          {
+            "descriptiveId": "GLSI1110",
+            "descriptor": "Can carry out a simple informal interview."
+          },
+          {
+            "descriptiveId": "GLWI0723",
+            "descriptor": "Can write a formal email/letter requesting information."
+          },
+          {
+            "descriptiveId": "GLSI0341",
+            "descriptor": "Can invite others to give their views on what to do next."
+          },
+          {
+            "descriptiveId": "GLSI0633",
+            "descriptor": "Can ask for simple directions from X to Y on foot or by public transport."
+          },
+          {
+            "descriptiveId": "GLSI0750",
+            "descriptor": "Can ask someone for their name."
+          },
+          {
+            "descriptiveId": "NOSI0200",
+            "descriptor": "Can ask and answer questions about what they do at work and in their free time."
+          },
+          {
+            "descriptiveId": "GLSI0697",
+            "descriptor": "Can ask someone what their nationality is."
+          },
+          {
+            "descriptiveId": "GLWI0299",
+            "descriptor": "Can write a basic formal email/letter requesting information."
+          },
+          {
+            "descriptiveId": "GLSI0369",
+            "descriptor": "Can ask and answer simple questions in areas of immediate need or on very familiar topics."
+          },
+          {
+            "descriptiveId": "GLSI0629",
+            "descriptor": "Can ask someone what their job is."
+          },
+          {
+            "descriptiveId": "GLSI0260",
+            "descriptor": "Can communicate in routine tasks requiring simple, direct exchanges of information."
+          },
+          {
+            "descriptiveId": "GLSI0567",
+            "descriptor": "Can use brief, everyday expressions to ask for and give personal details."
+          }
+        ],
+        "descriptorStatus": "published",
+        "additionalInformation": {
+          "Notes": "",
+          "Variant terms": "asking what is | basic questions with what | basic questions with what's | questions with be | wh-questions | what questions | what's questions | what's your questions",
+          "Grammatical Categories": "Verb>Tags and question forms|Clause>With 'be'|Pronoun>Question words",
+          "Structure": "'what's your' + NP?",
+          "Communicative Categories": "",
+          "Business Skills": "",
+          "Academic Skills": "",
+          "YL simplified descriptor": "",
+          "Source Descriptor": "",
+          "Estimated Level": "A1 (22-29)",
+          "Anchor": "N",
+          "Example": "What's your name?; What's your job?",
+          "Function/Notion": "F1.4.6.1",
+          "Source": "",
+          "Batch": "GR_B5",
+          "Draft IDs": " B5GR015",
+          "Topic L1": "",
+          "N2000 Logit": "",
+          "CEFR Communicative activity": ""
+        },
+        "tags": [
+          {
+            "tagTypeId": "CEFR",
+            "tags": [
+              {
+                "tagName": "A1 (22-29)",
+                "tagId": "CEFR00002"
+              }
+            ]
+          },
+          {
+            "tagTypeId": "SKL",
+            "tags": [
+              {
+                "tagName": "Grammar",
+                "tagId": "SKL00007"
+              }
+            ]
+          }
+        ],
+        "occupations": [],
+        "books": [
+          {
+            "ps": "Adult",
+            "isbn": "9780133828740"
+          },
+          {
+            "ps": "Adult",
+            "isbn": "9780136833314"
+          },
+          {
+            "ps": "Adult",
+            "isbn": "9781292359519"
+          }
+        ],
+        "sdf": [],
+        "relatedLOs": {
+          "YL": [],
+          "GL": [],
+          "AL": [],
+          "PL": []
+        },
+        "status": true,
+        "created": "2015-05-05T12:58:27.791Z",
+        "createdBy": {
+          "userId": "5548be7308ab6de93ce03a41",
+          "firstName": "Joe",
+          "lastName": "Worachek"
+        },
+        "updated": "2015-05-05T12:58:27.791Z",
+        "updatedBy": {
+          "userId": "5548be7308ab6de93ce03a41",
+          "firstName": "Joe",
+          "lastName": "Worachek"
+        },
+        "gse": [
+          {
+            "tagTypeId": "GSE",
+            "tags": [
+              {
+                "tagName": "24",
+                "tagId": "GSE00027"
+              }
+            ]
+          }
+        ],
+        "grammaticalCategories": [
+          [
+            "Verb",
+            "Tags and question forms"
+          ],
+          [
+            "Clause",
+            "With 'be'"
+          ],
+          [
+            "Pronoun",
+            "Question words"
+          ]
+        ],
+        "businessSkills": [],
+        "communicativeCategories": []
+      },
+      {
+        "descriptorId": "55af74f3d6c1560c41c6a0ee",
+        "descriptiveId": "GLGR0106",
+        "descriptor": "Can use regular nouns in the plural form.",
+        "attribution": "(P)",
+        "syllabuses": [
+          {
+            "syllabusName": "GLGR",
+            "syllabusId": "54fe84e0070b48b42932d4c3"
+          }
+        ],
+        "relatedDescriptors": [
+          {
+            "descriptiveId": "GLSI0452",
+            "descriptor": "Can say a range of basic numbers, quantities and prices."
+          }
+        ],
+        "descriptorStatus": "published",
+        "additionalInformation": {
+          "Notes": "",
+          "Variant terms": "noun + es | noun + s | nouns in plural | nouns in the plural | plural forms | plural nouns | plural with s | plurals with s | regular plurals",
+          "Grammatical Categories": "Noun>Plural",
+          "Structure": "regular nouns - plural",
+          "Communicative Categories": "",
+          "Business Skills": "",
+          "Academic Skills": "",
+          "YL simplified descriptor": "",
+          "Source Descriptor": "",
+          "Estimated Level": "A1 (22-29)",
+          "Anchor": "N",
+          "Example": "boys; classes; books; pens; days; chairs",
+          "Function/Notion": "N4.1.1",
+          "Source": "",
+          "Batch": "GR_B2",
+          "Draft IDs": "15336",
+          "Topic L1": "",
+          "N2000 Logit": "",
+          "CEFR Communicative activity": ""
+        },
+        "tags": [
+          {
+            "tagTypeId": "CEFR",
+            "tags": [
+              {
+                "tagName": "A1 (22-29)",
+                "tagId": "CEFR00002"
+              }
+            ]
+          },
+          {
+            "tagTypeId": "SKL",
+            "tags": [
+              {
+                "tagName": "Grammar",
+                "tagId": "SKL00007"
+              }
+            ]
+          }
+        ],
+        "occupations": [],
+        "books": [
+          {
+            "ps": "Adult",
+            "isbn": "9780135178461"
+          },
+          {
+            "ps": "Young_Learner",
+            "isbn": "9781292209982"
+          },
+          {
+            "ps": "Young_Learner",
+            "isbn": "9781292210018"
+          },
+          {
+            "ps": "Young_Learner",
+            "isbn": "9781292194141"
+          },
+          {
+            "ps": "Academic",
+            "isbn": "9780134616773"
+          },
+          {
+            "ps": "Young_Learner",
+            "isbn": "9781292247045"
+          },
+          {
+            "ps": "Adult",
+            "isbn": "9780133828740"
+          },
+          {
+            "ps": "Adult",
+            "isbn": "9781292359519"
+          }
+        ],
+        "sdf": [],
+        "relatedLOs": {
+          "YL": [],
+          "GL": [],
+          "AL": [],
+          "PL": []
+        },
+        "status": true,
+        "created": "2015-05-05T12:58:27.791Z",
+        "createdBy": {
+          "userId": "5548be7308ab6de93ce03a41",
+          "firstName": "Joe",
+          "lastName": "Worachek"
+        },
+        "updated": "2015-05-05T12:58:27.791Z",
+        "updatedBy": {
+          "userId": "5548be7308ab6de93ce03a41",
+          "firstName": "Joe",
+          "lastName": "Worachek"
+        },
+        "gse": [
+          {
+            "tagTypeId": "GSE",
+            "tags": [
+              {
+                "tagName": "24",
+                "tagId": "GSE00027"
+              }
+            ]
+          }
+        ],
+        "grammaticalCategories": [
+          [
+            "Noun",
+            "Plural"
+          ]
+        ],
+        "businessSkills": [],
+        "communicativeCategories": []
+      },
+      {
+        "descriptorId": "55af750dd6c1560c41c6a58a",
+        "descriptiveId": "GLGR0274",
+        "descriptor": "Can make basic statements with subject + verb + object.",
+        "attribution": "(P)",
+        "syllabuses": [
+          {
+            "syllabusName": "GLGR",
+            "syllabusId": "54fe84e0070b48b42932d4c3"
+          }
+        ],
+        "relatedDescriptors": [
+          {
+            "descriptiveId": "GLSI0624",
+            "descriptor": "Can use a limited range of fixed expressions to describe objects, possessions, or products."
+          },
+          {
+            "descriptiveId": "GLWP0710",
+            "descriptor": "Can write a short, simple description of a familiar device or product."
+          }
+        ],
+        "descriptorStatus": "published",
+        "additionalInformation": {
+          "Notes": "",
+          "Variant terms": "SVO | basic word order | direct object transitive verbs | object | subject | subject + verb + direct object | subject + verb + object | verb",
+          "Grammatical Categories": "Clause>Basic construction",
+          "Structure": "statements with subject + verb + object",
+          "Communicative Categories": "",
+          "Business Skills": "",
+          "Academic Skills": "",
+          "YL simplified descriptor": "",
+          "Source Descriptor": "",
+          "Estimated Level": "A1 (22-29)",
+          "Anchor": "N",
+          "Example": "I like rock music.; She drinks coffee.; We study English.",
+          "Function/Notion": "N7.3.2.2; N7.3.2.1",
+          "Source": "",
+          "Batch": "GR_B3",
+          "Draft IDs": "31691",
+          "Topic L1": "",
+          "N2000 Logit": "",
+          "CEFR Communicative activity": ""
+        },
+        "tags": [
+          {
+            "tagTypeId": "CEFR",
+            "tags": [
+              {
+                "tagName": "A1 (22-29)",
+                "tagId": "CEFR00002"
+              }
+            ]
+          },
+          {
+            "tagTypeId": "SKL",
+            "tags": [
+              {
+                "tagName": "Grammar",
+                "tagId": "SKL00007"
+              }
+            ]
+          }
+        ],
+        "occupations": [],
+        "books": [
+          {
+            "ps": "Young_Learner",
+            "isbn": "9781447989387"
+          },
+          {
+            "ps": "Academic",
+            "isbn": "9780134616773"
+          },
+          {
+            "ps": "Academic",
+            "isbn": "9780135227015"
+          }
+        ],
+        "sdf": [],
+        "relatedLOs": {
+          "YL": [],
+          "GL": [],
+          "AL": [],
+          "PL": []
+        },
+        "status": true,
+        "created": "2015-05-05T12:58:27.791Z",
+        "createdBy": {
+          "userId": "5548be7308ab6de93ce03a41",
+          "firstName": "Joe",
+          "lastName": "Worachek"
+        },
+        "updated": "2015-05-05T12:58:27.791Z",
+        "updatedBy": {
+          "userId": "5548be7308ab6de93ce03a41",
+          "firstName": "Joe",
+          "lastName": "Worachek"
+        },
+        "gse": [
+          {
+            "tagTypeId": "GSE",
+            "tags": [
+              {
+                "tagName": "24",
+                "tagId": "GSE00027"
+              }
+            ]
+          }
+        ],
+        "grammaticalCategories": [
+          [
+            "Clause",
+            "Basic construction"
+          ]
+        ],
+        "businessSkills": [],
+        "communicativeCategories": []
+      },
+      {
+        "descriptorId": "57c6ff9787baaec739c2ea05",
+        "descriptiveId": "GLGR0436",
+        "descriptor": "Can use subject pronouns with the correct form of the verb 'be' in the simple present.",
+        "attribution": "(P)",
+        "syllabuses": [
+          {
+            "syllabusName": "GLGR",
+            "syllabusId": "54fe84e0070b48b42932d4c3"
+          }
+        ],
+        "relatedDescriptors": [
+          {
+            "descriptiveId": "NOSI0090",
+            "descriptor": "Can make an introduction and use basic greeting and leave-taking expressions."
+          },
+          {
+            "descriptiveId": "GLSP0701",
+            "descriptor": "Can describe a person's hobbies and activities using simple language."
+          },
+          {
+            "descriptiveId": "GLSP0642",
+            "descriptor": "Can say other people's nationalities."
+          },
+          {
+            "descriptiveId": "GLSP0286",
+            "descriptor": "Can say what they do (e.g. name of their job, student)."
+          },
+          {
+            "descriptiveId": "GLSI0001",
+            "descriptor": "Can ask and answer basic questions about family and friends in a limited way."
+          },
+          {
+            "descriptiveId": "GLSI1083",
+            "descriptor": "Can introduce themselves in a basic way, giving some information about where they live, their family etc."
+          },
+          {
+            "descriptiveId": "GLWI1129",
+            "descriptor": "Can complete a simple form asking for medical information."
+          },
+          {
+            "descriptiveId": "GLSI0583",
+            "descriptor": "Can ask and answer simple questions about people they know in a limited way."
+          }
+        ],
+        "descriptorStatus": "published",
+        "additionalInformation": {
+          "Notes": "When rated, delete GLGR0029 (this replaces it)",
+          "Variant terms": "I | be + adjectives | be with adjectives | he | it | nominative case | personal pronouns | personal pronouns plus be | personal pronouns with be | pronoun subjects | she | subject personal pronouns | subject pronouns plus be | subject pronouns with be | subjective case pronouns | they | we | you",
+          "Grammatical Categories": "Clause>With 'be'|Clause>Basic construction|Pronoun>Personal",
+          "Structure": "subject pronouns + 'be' + adj",
+          "Communicative Categories": "",
+          "Business Skills": "",
+          "Academic Skills": "",
+          "YL simplified descriptor": "",
+          "Source Descriptor": "",
+          "Estimated Level": "A1 (22-29)",
+          "Anchor": "N",
+          "Example": "I'm French.; They're old.; She's nice.",
+          "Function/Notion": "F1.5.4; F1.1; F1.5.3.2; F1.5.3.4; F1.5.3.1; N8.1.1.1",
+          "Source": "",
+          "Batch": "GR_B5",
+          "Draft IDs": "GLGR0029",
+          "Topic L1": "",
+          "N2000 Logit": "",
+          "CEFR Communicative activity": ""
+        },
+        "tags": [
+          {
+            "tagTypeId": "CEFR",
+            "tags": [
+              {
+                "tagName": "A1 (22-29)",
+                "tagId": "CEFR00002"
+              }
+            ]
+          },
+          {
+            "tagTypeId": "SKL",
+            "tags": [
+              {
+                "tagName": "Grammar",
+                "tagId": "SKL00007"
+              }
+            ]
+          }
+        ],
+        "occupations": [],
+        "books": [
+          {
+            "ps": "Adult",
+            "isbn": "9780135178461"
+          },
+          {
+            "ps": "Young_Learner",
+            "isbn": "9780135232712"
+          },
+          {
+            "ps": "Young_Learner",
+            "isbn": "9780135232729"
+          },
+          {
+            "ps": "Academic",
+            "isbn": "9780134616773"
+          },
+          {
+            "ps": "Adult",
+            "isbn": "9780133828740"
+          },
+          {
+            "ps": "Professional",
+            "isbn": "9781292248615"
+          },
+          {
+            "ps": "Academic",
+            "isbn": "9780135227015"
+          },
+          {
+            "ps": "Young_Learner",
+            "isbn": "9781292352244"
+          },
+          {
+            "ps": "Young_Learner",
+            "isbn": "9781292352305"
+          },
+          {
+            "ps": "Adult",
+            "isbn": "9781292359519"
+          },
+          {
+            "ps": "Adult",
+            "isbn": "9781292359526"
+          }
+        ],
+        "sdf": [],
+        "relatedLOs": {
+          "YL": [],
+          "GL": [],
+          "AL": [],
+          "PL": []
+        },
+        "status": true,
+        "created": "2015-05-05T12:58:27.791Z",
+        "createdBy": {
+          "userId": "5548be7308ab6de93ce03a41",
+          "firstName": "Joe",
+          "lastName": "Worachek"
+        },
+        "updated": "2015-05-05T12:58:27.791Z",
+        "updatedBy": {
+          "userId": "5548be7308ab6de93ce03a41",
+          "firstName": "Joe",
+          "lastName": "Worachek"
+        },
+        "gse": [
+          {
+            "tagTypeId": "GSE",
+            "tags": [
+              {
+                "tagName": "24",
+                "tagId": "GSE00027"
+              }
+            ]
+          }
+        ],
+        "grammaticalCategories": [
+          [
+            "Clause",
+            "With 'be'"
+          ],
+          [
+            "Clause",
+            "Basic construction"
+          ],
+          [
+            "Pronoun",
+            "Personal"
+          ]
+        ],
+        "businessSkills": [],
+        "communicativeCategories": []
+      },
+      {
+        "descriptorId": "55af74e3d6c1560c41c69e1f",
+        "descriptiveId": "GLGR0017",
+        "descriptor": "Can use the correct form of 'be' with singular and plural nouns.",
+        "attribution": "(P)",
+        "syllabuses": [
+          {
+            "syllabusName": "GLGR",
+            "syllabusId": "54fe84e0070b48b42932d4c3"
+          }
+        ],
+        "relatedDescriptors": [
+          {
+            "descriptiveId": "GLSI0452",
+            "descriptor": "Can say a range of basic numbers, quantities and prices."
+          },
+          {
+            "descriptiveId": "NOSI0185",
+            "descriptor": "Can describe where they live."
+          }
+        ],
+        "descriptorStatus": "published",
+        "additionalInformation": {
+          "Notes": "",
+          "Variant terms": "agreement | agreement with to be | am | are | be | be + nouns | copula | is | nouns + be | subject verb agreement | to be",
+          "Grammatical Categories": "Clause>Basic construction|Clause>With 'be'|Noun>Plural",
+          "Structure": "agreement between nouns and verb 'be'",
+          "Communicative Categories": "",
+          "Business Skills": "",
+          "Academic Skills": "",
+          "YL simplified descriptor": "",
+          "Source Descriptor": "",
+          "Estimated Level": "A1 (22-29)",
+          "Anchor": "N",
+          "Example": "The coffee is hot.; The boys are Spanish.; I'm Chinese.; We're students.",
+          "Function/Notion": "N1.1; N4.1.2",
+          "Source": "",
+          "Batch": "GR_B1",
+          "Draft IDs": " 35662",
+          "Topic L1": "",
+          "N2000 Logit": "",
+          "CEFR Communicative activity": ""
+        },
+        "tags": [
+          {
+            "tagTypeId": "CEFR",
+            "tags": [
+              {
+                "tagName": "A1 (22-29)",
+                "tagId": "CEFR00002"
+              }
+            ]
+          },
+          {
+            "tagTypeId": "SKL",
+            "tags": [
+              {
+                "tagName": "Grammar",
+                "tagId": "SKL00007"
+              }
+            ]
+          }
+        ],
+        "occupations": [],
+        "books": [
+          {
+            "ps": "Adult",
+            "isbn": "9780135178461"
+          },
+          {
+            "ps": "Adult",
+            "isbn": "9780135178454"
+          },
+          {
+            "ps": "Professional",
+            "isbn": "9781292134758"
+          },
+          {
+            "ps": "Young_Learner",
+            "isbn": "9781292209982"
+          },
+          {
+            "ps": "Young_Learner",
+            "isbn": "9781447989240"
+          },
+          {
+            "ps": "Young_Learner",
+            "isbn": "9780135232729"
+          },
+          {
+            "ps": "Young_Learner",
+            "isbn": "9781292247045"
+          },
+          {
+            "ps": "Adult",
+            "isbn": "9780133828740"
+          },
+          {
+            "ps": "Professional",
+            "isbn": "9781292248615"
+          },
+          {
+            "ps": "Adult",
+            "isbn": "9789813130203"
+          },
+          {
+            "ps": "Adult",
+            "isbn": "9780136833314"
+          },
+          {
+            "ps": "Adult",
+            "isbn": "9781292359519"
+          },
+          {
+            "ps": "Adult",
+            "isbn": "9781292359526"
+          }
+        ],
+        "sdf": [],
+        "relatedLOs": {
+          "YL": [],
+          "GL": [],
+          "AL": [],
+          "PL": []
+        },
+        "status": true,
+        "created": "2015-05-05T12:58:27.791Z",
+        "createdBy": {
+          "userId": "5548be7308ab6de93ce03a41",
+          "firstName": "Joe",
+          "lastName": "Worachek"
+        },
+        "updated": "2015-05-05T12:58:27.791Z",
+        "updatedBy": {
+          "userId": "5548be7308ab6de93ce03a41",
+          "firstName": "Joe",
+          "lastName": "Worachek"
+        },
+        "gse": [
+          {
+            "tagTypeId": "GSE",
+            "tags": [
+              {
+                "tagName": "24",
+                "tagId": "GSE00027"
+              }
+            ]
+          }
+        ],
+        "grammaticalCategories": [
+          [
+            "Clause",
+            "Basic construction"
+          ],
+          [
+            "Clause",
+            "With 'be'"
+          ],
+          [
+            "Noun",
+            "Plural"
+          ]
+        ],
+        "businessSkills": [],
+        "communicativeCategories": []
+      },
+      {
+        "descriptorId": "57c6ff9587baaec739c2ea01",
+        "descriptiveId": "GLGR0434",
+        "descriptor": "Can say their own age using 'I'm [number]'.",
+        "attribution": "(P)",
+        "syllabuses": [
+          {
+            "syllabusName": "GLGR",
+            "syllabusId": "54fe84e0070b48b42932d4c3"
+          }
+        ],
+        "relatedDescriptors": [
+          {
+            "descriptiveId": "GLSI0329",
+            "descriptor": "Can say their own age and ask someone about their age."
+          },
+          {
+            "descriptiveId": "GLSI0260",
+            "descriptor": "Can communicate in routine tasks requiring simple, direct exchanges of information."
+          }
+        ],
+        "descriptorStatus": "published",
+        "additionalInformation": {
+          "Notes": "",
+          "Variant terms": "I am + age | I am plus age | I am plus number | say how old you are | say your age | saying how old you are | saying your age",
+          "Grammatical Categories": "Clause>Basic construction|Clause>With 'be'",
+          "Structure": "'I'm' + number for age",
+          "Communicative Categories": "",
+          "Business Skills": "",
+          "Academic Skills": "",
+          "YL simplified descriptor": "",
+          "Source Descriptor": "",
+          "Estimated Level": "A1 (22-29)",
+          "Anchor": "N",
+          "Example": "I'm 25.; I'm fifty.",
+          "Function/Notion": "F1.4.6.1; N5.1.10",
+          "Source": "",
+          "Batch": "GR_B5",
+          "Draft IDs": " B5GR022",
+          "Topic L1": "",
+          "N2000 Logit": "",
+          "CEFR Communicative activity": ""
+        },
+        "tags": [
+          {
+            "tagTypeId": "CEFR",
+            "tags": [
+              {
+                "tagName": "A1 (22-29)",
+                "tagId": "CEFR00002"
+              }
+            ]
+          },
+          {
+            "tagTypeId": "SKL",
+            "tags": [
+              {
+                "tagName": "Grammar",
+                "tagId": "SKL00007"
+              }
+            ]
+          }
+        ],
+        "occupations": [],
+        "books": [
+          {
+            "ps": "Young_Learner",
+            "isbn": "9780135231944"
+          }
+        ],
+        "sdf": [],
+        "relatedLOs": {
+          "YL": [],
+          "GL": [],
+          "AL": [],
+          "PL": []
+        },
+        "status": true,
+        "created": "2015-05-05T12:58:27.791Z",
+        "createdBy": {
+          "userId": "5548be7308ab6de93ce03a41",
+          "firstName": "Joe",
+          "lastName": "Worachek"
+        },
+        "updated": "2015-05-05T12:58:27.791Z",
+        "updatedBy": {
+          "userId": "5548be7308ab6de93ce03a41",
+          "firstName": "Joe",
+          "lastName": "Worachek"
+        },
+        "gse": [
+          {
+            "tagTypeId": "GSE",
+            "tags": [
+              {
+                "tagName": "24",
+                "tagId": "GSE00027"
+              }
+            ]
+          }
+        ],
+        "grammaticalCategories": [
+          [
+            "Clause",
+            "Basic construction"
+          ],
+          [
+            "Clause",
+            "With 'be'"
+          ]
+        ],
+        "businessSkills": [],
+        "communicativeCategories": []
+      },
+      {
+        "descriptorId": "55af74e3d6c1560c41c69e2d",
+        "descriptiveId": "GLGR0020",
+        "descriptor": "Can use 'and' to link nouns and noun phrases.",
+        "attribution": "(P)",
+        "syllabuses": [
+          {
+            "syllabusName": "GLGR",
+            "syllabusId": "54fe84e0070b48b42932d4c3"
+          }
+        ],
+        "relatedDescriptors": [
+          {
+            "descriptiveId": "GLWP0346",
+            "descriptor": "Can use very basic connectors like 'and', 'but', 'so' and 'then'."
+          }
+        ],
+        "descriptorStatus": "published",
+        "additionalInformation": {
+          "Notes": "",
+          "Variant terms": "additive conjunctions | and as conjunction | and with noun phrases | and with nouns | conjunctions | coordinating conjunctions | copulative conjunctions | noun and noun | noun phrase and noun phrase",
+          "Grammatical Categories": "Conjunction>Coordinating",
+          "Structure": "NP + 'and' + NP",
+          "Communicative Categories": "",
+          "Business Skills": "",
+          "Academic Skills": "",
+          "YL simplified descriptor": "",
+          "Source Descriptor": "",
+          "Estimated Level": "A1 (22-29)",
+          "Anchor": "Y",
+          "Example": "boys and girls; a cat and a dog; the tall man and the short woman",
+          "Function/Notion": "N7.6.1",
+          "Source": "",
+          "Batch": "GR_B1,GR_B2,GR_B3",
+          "Draft IDs": "85395",
+          "Topic L1": "",
+          "N2000 Logit": "",
+          "CEFR Communicative activity": ""
+        },
+        "tags": [
+          {
+            "tagTypeId": "CEFR",
+            "tags": [
+              {
+                "tagName": "A1 (22-29)",
+                "tagId": "CEFR00002"
+              }
+            ]
+          },
+          {
+            "tagTypeId": "SKL",
+            "tags": [
+              {
+                "tagName": "Grammar",
+                "tagId": "SKL00007"
+              }
+            ]
+          }
+        ],
+        "occupations": [],
+        "books": [
+          {
+            "ps": "Young_Learner",
+            "isbn": "9781292194141"
+          },
+          {
+            "ps": "Adult",
+            "isbn": "9781292359519"
+          }
+        ],
+        "sdf": [],
+        "relatedLOs": {
+          "YL": [],
+          "GL": [],
+          "AL": [],
+          "PL": []
+        },
+        "status": true,
+        "created": "2015-05-05T12:58:27.791Z",
+        "createdBy": {
+          "userId": "5548be7308ab6de93ce03a41",
+          "firstName": "Joe",
+          "lastName": "Worachek"
+        },
+        "updated": "2015-05-05T12:58:27.791Z",
+        "updatedBy": {
+          "userId": "5548be7308ab6de93ce03a41",
+          "firstName": "Joe",
+          "lastName": "Worachek"
+        },
+        "gse": [
+          {
+            "tagTypeId": "GSE",
+            "tags": [
+              {
+                "tagName": "25",
+                "tagId": "GSE00028"
+              }
+            ]
+          }
+        ],
+        "grammaticalCategories": [
+          [
+            "Conjunction",
+            "Coordinating"
+          ]
+        ],
+        "businessSkills": [],
+        "communicativeCategories": []
+      }
+    ]
+  },
+  "lo": {
+    "totalCount": 1413,
+    "items": [
+      {
+        "descriptorId": "555df92e1781222779dc6e5d",
+        "descriptiveId": "GLRD0353",
+        "descriptor": "Can recognise the letters of the alphabet.",
+        "attribution": "(P)",
+        "syllabuses": [
+          {
+            "syllabusName": "GL",
+            "syllabusId": "675ad205424bf505774294a4"
+          },
+          {
+            "syllabusName": "AL",
+            "syllabusId": "54fe84a2070b48b42932d4bd"
+          },
+          {
+            "syllabusName": "PL",
+            "syllabusId": "54fe84b8070b48b42932d4bf"
+          }
+        ],
+        "relatedDescriptors": [],
+        "descriptorStatus": "published",
+        "additionalInformation": {
+          "Notes": "4/30/15 MG (IRT analysis) - wording update  Apriil 2015 IRT Analysis Changes. Previous Score/CEFR were 22 - A1 -  Previous status was Published  -  Reasons for other changes -  updated wording",
+          "Variant terms": "",
+          "Grammatical Categories": "",
+          "Structure": "",
+          "Communicative Categories": "Linguistic competence>Dealing with times, dates, prices etc.",
+          "Business Skills": "Overall Reading>null",
+          "Academic Skills": "",
+          "YL simplified descriptor": "",
+          "Source Descriptor": "",
+          "Estimated Level": "",
+          "Anchor": "N",
+          "Example": "",
+          "Function/Notion": "",
+          "Source": "",
+          "Batch": "",
+          "Draft IDs": "37778",
+          "Topic L1": "",
+          "N2000 Logit": "",
+          "CEFR Communicative activity": ""
+        },
+        "tags": [
+          {
+            "tagTypeId": "SKL",
+            "tags": [
+              {
+                "tagName": "Reading",
+                "tagId": "SKL00001"
+              }
+            ]
+          },
+          {
+            "tagTypeId": "CEFR",
+            "tags": [
+              {
+                "tagName": "<A1 (10-21)",
+                "tagId": "CEFR00001"
+              }
+            ]
+          }
+        ],
+        "occupations": [],
+        "books": [
+          {
+            "ps": "Adult",
+            "isbn": "9780136833314"
+          },
+          {
+            "ps": "Adult",
+            "isbn": "9781292359519"
+          }
+        ],
+        "sdf": [
+          {
+            "sortCompetency": "Letters and Sounds",
+            "skill": "Reading",
+            "strand": "Accuracy",
+            "subStrand": "(R) Letter Formation, Spelling and Punctuation",
+            "competency": "(R) Letters and Sounds",
+            "development_indicator": "Recognize and understand individual written letter symbols and their corresponding sounds in isolation or within simple words. (10-25)",
+            "diRange": 1025
+          }
+        ],
+        "relatedLOs": {
+          "YL": [],
+          "GL": [],
+          "AL": [],
+          "PL": []
+        },
+        "di": "Recognize and understand individual written letter symbols and their corresponding sounds in isolation or within simple words. (10-25)",
+        "status": true,
+        "created": "2015-05-05T12:58:27.791Z",
+        "createdBy": {
+          "userId": "5548be7308ab6de93ce03a41",
+          "firstName": "Joe",
+          "lastName": "Worachek"
+        },
+        "updated": "2015-05-05T12:58:27.791Z",
+        "updatedBy": {
+          "userId": "5548be7308ab6de93ce03a41",
+          "firstName": "Joe",
+          "lastName": "Worachek"
+        },
+        "gse": [
+          {
+            "tagTypeId": "GSE",
+            "tags": [
+              {
+                "tagName": "10",
+                "tagId": "GSE00013"
+              }
+            ]
+          }
+        ],
+        "grammaticalCategories": [],
+        "businessSkills": [
+          [
+            "Overall Reading",
+            "null"
+          ]
+        ],
+        "communicativeCategories": [
+          [
+            "Linguistic competence",
+            "Dealing with times, dates, prices etc."
+          ]
+        ]
+      },
+      {
+        "descriptorId": "555df900744d90d415774d88",
+        "descriptiveId": "GLLI0677",
+        "descriptor": "Can recognise simple informal greetings.",
+        "attribution": "(P)",
+        "syllabuses": [
+          {
+            "syllabusName": "GL",
+            "syllabusId": "675ad205424bf505774294a4"
+          },
+          {
+            "syllabusName": "AL",
+            "syllabusId": "54fe84a2070b48b42932d4bd"
+          },
+          {
+            "syllabusName": "PL",
+            "syllabusId": "54fe84b8070b48b42932d4bf"
+          }
+        ],
+        "relatedDescriptors": [],
+        "descriptorStatus": "published",
+        "additionalInformation": {
+          "Notes": "Apriil 2015 IRT Analysis Changes. Previous Score/CEFR were 18 - T -  Previous status was Published  -  Reasons for other changes -",
+          "Variant terms": "",
+          "Grammatical Categories": "",
+          "Structure": "",
+          "Communicative Categories": "Forms of communication>Social interaction",
+          "Business Skills": "Socialising at work>Greetings and introductions",
+          "Academic Skills": "",
+          "YL simplified descriptor": "",
+          "Source Descriptor": "",
+          "Estimated Level": "A2 (30-35)",
+          "Anchor": "N",
+          "Example": "",
+          "Function/Notion": "",
+          "Source": "",
+          "Batch": "GL_B2b",
+          "Draft IDs": "63774",
+          "Topic L1": "",
+          "N2000 Logit": "",
+          "CEFR Communicative activity": ""
+        },
+        "tags": [
+          {
+            "tagTypeId": "SKL",
+            "tags": [
+              {
+                "tagName": "Listening",
+                "tagId": "SKL00003"
+              }
+            ]
+          },
+          {
+            "tagTypeId": "CEFR",
+            "tags": [
+              {
+                "tagName": "<A1 (10-21)",
+                "tagId": "CEFR00001"
+              }
+            ]
+          }
+        ],
+        "occupations": [],
+        "books": [
+          {
+            "ps": "Adult",
+            "isbn": "9780135178461"
+          },
+          {
+            "ps": "Professional",
+            "isbn": "9781292248615"
+          },
+          {
+            "ps": "Adult",
+            "isbn": "9780136833314"
+          }
+        ],
+        "sdf": [
+          {
+            "sortCompetency": "Understanding Social/Interpersonal Exchanges",
+            "skill": "Listening",
+            "strand": "Interactions & Communication",
+            "subStrand": "(L) Understanding Communicative Exchanges",
+            "competency": "(L) Understanding Social/Interpersonal Exchanges",
+            "development_indicator": "Understand simple words and phrases in basic social and interpersonal exchanges. (10-20)",
+            "diRange": 1020
+          }
+        ],
+        "relatedLOs": {
+          "YL": [],
+          "GL": [
+            "[GLSI0750] Can ask someone for their name. (10)",
+            "[GLSI0629] Can ask someone what their job is. (19)",
+            "[GLSI0222] Can ask for and give the day and date. (19)",
+            "[GLSI0697] Can ask someone what their nationality is. (13)",
+            "[GLSI0317] Can establish basic social contacts with simple, polite greetings and farewells. (19)",
+            "[GLSI0329] Can say their own age and ask someone about their age. (18)",
+            "[GLSI0543] Can ask for and give a phone number. (17)",
+            "[GLSI0632] Can greet people using a few basic fixed expressions. (12)",
+            "[GLSP0916] Can give very limited personal information using basic fixed expressions. (16)",
+            "[GLSI1262] Can introduce themselves using a basic phrase (e.g. 'My name's ...'). (12)",
+            "[GLSI1267] Can use a few basic words and phrases to show politeness (e.g. 'please', 'thank you'). (12)"
+          ],
+          "AL": [
+            "[GLSI0750] Can ask someone for their name. (10)",
+            "[GLSI0629] Can ask someone what their job is. (19)",
+            "[GLSI0222] Can ask for and give the day and date. (19)",
+            "[GLSI0697] Can ask someone what their nationality is. (13)",
+            "[GLSI0317] Can establish basic social contacts with simple, polite greetings and farewells. (19)",
+            "[GLSI0329] Can say their own age and ask someone about their age. (18)",
+            "[GLSI0543] Can ask for and give a phone number. (17)",
+            "[GLSI0632] Can greet people using a few basic fixed expressions. (12)",
+            "[GLSP0916] Can give very limited personal information using basic fixed expressions. (16)",
+            "[GLSI1262] Can introduce themselves using a basic phrase (e.g. 'My name's ...'). (12)",
+            "[GLSI1267] Can use a few basic words and phrases to show politeness (e.g. 'please', 'thank you'). (12)"
+          ],
+          "PL": [
+            "[GLSI0750] Can ask someone for their name. (10)",
+            "[GLSI0629] Can ask someone what their job is. (19)",
+            "[GLSI0222] Can ask for and give the day and date. (19)",
+            "[GLSI0697] Can ask someone what their nationality is. (13)",
+            "[GLSI0317] Can establish basic social contacts with simple, polite greetings and farewells. (19)",
+            "[GLSI0329] Can say their own age and ask someone about their age. (18)",
+            "[GLSI0543] Can ask for and give a phone number. (17)",
+            "[GLSI0632] Can greet people using a few basic fixed expressions. (12)",
+            "[GLSP0916] Can give very limited personal information using basic fixed expressions. (16)",
+            "[GLSI1262] Can introduce themselves using a basic phrase (e.g. 'My name's ...'). (12)",
+            "[GLSI1267] Can use a few basic words and phrases to show politeness (e.g. 'please', 'thank you'). (12)"
+          ]
+        },
+        "di": "Understand simple words and phrases in basic social and interpersonal exchanges. (10-20)",
+        "status": true,
+        "created": "2015-05-05T12:58:27.791Z",
+        "createdBy": {
+          "userId": "5548be7308ab6de93ce03a41",
+          "firstName": "Joe",
+          "lastName": "Worachek"
+        },
+        "updated": "2015-05-05T12:58:27.791Z",
+        "updatedBy": {
+          "userId": "5548be7308ab6de93ce03a41",
+          "firstName": "Joe",
+          "lastName": "Worachek"
+        },
+        "gse": [
+          {
+            "tagTypeId": "GSE",
+            "tags": [
+              {
+                "tagName": "10",
+                "tagId": "GSE00013"
+              }
+            ]
+          }
+        ],
+        "grammaticalCategories": [],
+        "businessSkills": [
+          [
+            "Socialising at work",
+            "Greetings and introductions"
+          ]
+        ],
+        "communicativeCategories": [
+          [
+            "Forms of communication",
+            "Social interaction"
+          ]
+        ]
+      },
+      {
+        "descriptorId": "555df8ae744d90d415774006",
+        "descriptiveId": "GLWP0468",
+        "descriptor": "Can write the letters of the alphabet in upper and lower case.",
+        "attribution": "(P)",
+        "syllabuses": [
+          {
+            "syllabusName": "GL",
+            "syllabusId": "675ad205424bf505774294a4"
+          },
+          {
+            "syllabusName": "AL",
+            "syllabusId": "54fe84a2070b48b42932d4bd"
+          },
+          {
+            "syllabusName": "PL",
+            "syllabusId": "54fe84b8070b48b42932d4bf"
+          }
+        ],
+        "relatedDescriptors": [],
+        "descriptorStatus": "published",
+        "additionalInformation": {
+          "Notes": "Apriil 2015 IRT Analysis Changes. Previous Score/CEFR were 22 - A1 -  Previous status was Published  -  Reasons for other changes -",
+          "Variant terms": "",
+          "Grammatical Categories": "",
+          "Structure": "",
+          "Communicative Categories": "Linguistic competence>Dealing with times, dates, prices etc.",
+          "Business Skills": "Overall Writing>null",
+          "Academic Skills": "",
+          "YL simplified descriptor": "",
+          "Source Descriptor": "",
+          "Estimated Level": "",
+          "Anchor": "N",
+          "Example": "",
+          "Function/Notion": "",
+          "Source": "",
+          "Batch": "",
+          "Draft IDs": "70172",
+          "Topic L1": "",
+          "N2000 Logit": "",
+          "CEFR Communicative activity": ""
+        },
+        "tags": [
+          {
+            "tagTypeId": "SKL",
+            "tags": [
+              {
+                "tagName": "Writing",
+                "tagId": "SKL00002"
+              }
+            ]
+          },
+          {
+            "tagTypeId": "CEFR",
+            "tags": [
+              {
+                "tagName": "<A1 (10-21)",
+                "tagId": "CEFR00001"
+              }
+            ]
+          }
+        ],
+        "occupations": [],
+        "books": [
+          {
+            "ps": "Adult",
+            "isbn": "9780136833314"
+          },
+          {
+            "ps": "Adult",
+            "isbn": "9781292359519"
+          }
+        ],
+        "sdf": [
+          {
+            "sortCompetency": "Letters and Spelling",
+            "skill": "Writing",
+            "strand": "Accuracy",
+            "subStrand": "(W) Letter Formation, Spelling and Punctuation",
+            "competency": "(W) Letters and Spelling",
+            "development_indicator": "Accurately copy out, trace or write letters and number symbols in isolation or to form simple words or sentences. (10-25)",
+            "diRange": 1025
+          }
+        ],
+        "relatedLOs": {
+          "YL": [],
+          "GL": [
+            "[GLRD0005] Can recognise basic plural forms of nouns (e.g. cars, books). (14)",
+            "[GLRD0353] Can recognise the letters of the alphabet. (10)"
+          ],
+          "AL": [
+            "[GLRD0005] Can recognise basic plural forms of nouns (e.g. cars, books). (14)",
+            "[GLRD0353] Can recognise the letters of the alphabet. (10)"
+          ],
+          "PL": [
+            "[GLRD0005] Can recognise basic plural forms of nouns (e.g. cars, books). (14)",
+            "[GLRD0353] Can recognise the letters of the alphabet. (10)"
+          ]
+        },
+        "di": "Accurately copy out, trace or write letters and number symbols in isolation or to form simple words or sentences. (10-25)",
+        "status": true,
+        "created": "2015-05-05T12:58:27.791Z",
+        "createdBy": {
+          "userId": "5548be7308ab6de93ce03a41",
+          "firstName": "Joe",
+          "lastName": "Worachek"
+        },
+        "updated": "2015-05-05T12:58:27.791Z",
+        "updatedBy": {
+          "userId": "5548be7308ab6de93ce03a41",
+          "firstName": "Joe",
+          "lastName": "Worachek"
+        },
+        "gse": [
+          {
+            "tagTypeId": "GSE",
+            "tags": [
+              {
+                "tagName": "10",
+                "tagId": "GSE00013"
+              }
+            ]
+          }
+        ],
+        "grammaticalCategories": [],
+        "businessSkills": [
+          [
+            "Overall Writing",
+            "null"
+          ]
+        ],
+        "communicativeCategories": [
+          [
+            "Linguistic competence",
+            "Dealing with times, dates, prices etc."
+          ]
+        ]
+      },
+      {
+        "descriptorId": "555df925744d90d415775403",
+        "descriptiveId": "GLSI0749",
+        "descriptor": "Can say their name.",
+        "attribution": "(P)",
+        "syllabuses": [
+          {
+            "syllabusName": "GL",
+            "syllabusId": "675ad205424bf505774294a4"
+          },
+          {
+            "syllabusName": "AL",
+            "syllabusId": "54fe84a2070b48b42932d4bd"
+          },
+          {
+            "syllabusName": "PL",
+            "syllabusId": "54fe84b8070b48b42932d4bf"
+          }
+        ],
+        "relatedDescriptors": [],
+        "descriptorStatus": "published",
+        "additionalInformation": {
+          "Notes": "Apriil 2015 IRT Analysis Changes. Previous Score/CEFR were 21 - T -  Previous status was Published  -  Reasons for other changes -",
+          "Variant terms": "",
+          "Grammatical Categories": "",
+          "Structure": "",
+          "Communicative Categories": "Language functions>Giving factual information",
+          "Business Skills": "Socialising at work>Greetings and introductions",
+          "Academic Skills": "",
+          "YL simplified descriptor": "",
+          "Source Descriptor": "",
+          "Estimated Level": "<A1 (10-21)",
+          "Anchor": "N",
+          "Example": "",
+          "Function/Notion": "F4.5.3.2; F4.5.3.1",
+          "Source": "",
+          "Batch": "",
+          "Draft IDs": "WSSI001a",
+          "Topic L1": "",
+          "N2000 Logit": "",
+          "CEFR Communicative activity": ""
+        },
+        "tags": [
+          {
+            "tagTypeId": "CEFR",
+            "tags": [
+              {
+                "tagName": "<A1 (10-21)",
+                "tagId": "CEFR00001"
+              }
+            ]
+          },
+          {
+            "tagTypeId": "SKL",
+            "tags": [
+              {
+                "tagName": "Speaking",
+                "tagId": "SKL00006"
+              }
+            ]
+          }
+        ],
+        "occupations": [],
+        "books": [],
+        "sdf": [
+          {
+            "sortCompetency": "Producing Spoken Output",
+            "skill": "Speaking",
+            "strand": "Comprehension, Production & Organization",
+            "subStrand": "(S) Production",
+            "competency": "(S) Producing Spoken Output",
+            "development_indicator": "Use a few words to name, talk about or describe familiar situations. (10-25)",
+            "diRange": 1025
+          }
+        ],
+        "relatedLOs": {
+          "YL": [],
+          "GL": [
+            "[GLLA0603] Can understand cardinal numbers from 1 to 20. (10)",
+            "[GLLA0605] Can understand ordinal numbers from 1 to 100. (20)",
+            "[GLLA0678] Can understand cardinal numbers from 101 to 1000. (25)",
+            "[GLLI0609] Can understand simple language related to prices and quantities. (20)",
+            "[GLLI0607] Can understand the time of day when expressed to the quarter hour. (23)",
+            "[GLLA0604] Can understand cardinal numbers from 21 to 100. (19)",
+            "[GLLI0676] Can understand basic information about someone's likes and dislikes. (25)",
+            "[GLLI0606] Can understand the time of day when expressed in full hours. (18)",
+            "[GLLI0608] Can understand the time of day when expressed to within five minutes. (23)",
+            "[GLLA0860] Can identify a caller's name and phone number from a short, simple telephone conversation. (23)",
+            "[GLLA0854] Can recognise a few familiar everyday words, if delivered slowly and clearly. (10)",
+            "[GLLI1244] Can recognise familiar words in short phrases and sentences spoken slowly and clearly, if supported by pictures. (19)",
+            "[GLLA1242] Can recognise basic time words (e.g. days, months) in simple phrases or sentences. (19)"
+          ],
+          "AL": [
+            "[GLLA0603] Can understand cardinal numbers from 1 to 20. (10)",
+            "[GLLA0605] Can understand ordinal numbers from 1 to 100. (20)",
+            "[GLLA0678] Can understand cardinal numbers from 101 to 1000. (25)",
+            "[GLLI0609] Can understand simple language related to prices and quantities. (20)",
+            "[GLLI0607] Can understand the time of day when expressed to the quarter hour. (23)",
+            "[GLLA0604] Can understand cardinal numbers from 21 to 100. (19)",
+            "[GLLI0676] Can understand basic information about someone's likes and dislikes. (25)",
+            "[GLLI0606] Can understand the time of day when expressed in full hours. (18)",
+            "[GLLI0608] Can understand the time of day when expressed to within five minutes. (23)",
+            "[GLLA0860] Can identify a caller's name and phone number from a short, simple telephone conversation. (23)",
+            "[GLLA0854] Can recognise a few familiar everyday words, if delivered slowly and clearly. (10)",
+            "[GLLI1244] Can recognise familiar words in short phrases and sentences spoken slowly and clearly, if supported by pictures. (19)",
+            "[GLLA1242] Can recognise basic time words (e.g. days, months) in simple phrases or sentences. (19)"
+          ],
+          "PL": [
+            "[GLLA0603] Can understand cardinal numbers from 1 to 20. (10)",
+            "[GLLA0605] Can understand ordinal numbers from 1 to 100. (20)",
+            "[GLLA0678] Can understand cardinal numbers from 101 to 1000. (25)",
+            "[GLLI0609] Can understand simple language related to prices and quantities. (20)",
+            "[GLLI0607] Can understand the time of day when expressed to the quarter hour. (23)",
+            "[GLLA0604] Can understand cardinal numbers from 21 to 100. (19)",
+            "[GLLI0676] Can understand basic information about someone's likes and dislikes. (25)",
+            "[GLLI0606] Can understand the time of day when expressed in full hours. (18)",
+            "[GLLI0608] Can understand the time of day when expressed to within five minutes. (23)",
+            "[GLLA0860] Can identify a caller's name and phone number from a short, simple telephone conversation. (23)",
+            "[GLLA0854] Can recognise a few familiar everyday words, if delivered slowly and clearly. (10)",
+            "[GLLI1244] Can recognise familiar words in short phrases and sentences spoken slowly and clearly, if supported by pictures. (19)",
+            "[GLLA1242] Can recognise basic time words (e.g. days, months) in simple phrases or sentences. (19)"
+          ]
+        },
+        "di": "Use a few words to name, talk about or describe familiar situations. (10-25)",
+        "status": true,
+        "created": "2015-05-05T12:58:27.791Z",
+        "createdBy": {
+          "userId": "5548be7308ab6de93ce03a41",
+          "firstName": "Joe",
+          "lastName": "Worachek"
+        },
+        "updated": "2015-05-05T12:58:27.791Z",
+        "updatedBy": {
+          "userId": "5548be7308ab6de93ce03a41",
+          "firstName": "Joe",
+          "lastName": "Worachek"
+        },
+        "gse": [
+          {
+            "tagTypeId": "GSE",
+            "tags": [
+              {
+                "tagName": "10",
+                "tagId": "GSE00013"
+              }
+            ]
+          }
+        ],
+        "grammaticalCategories": [],
+        "businessSkills": [
+          [
+            "Socialising at work",
+            "Greetings and introductions"
+          ]
+        ],
+        "communicativeCategories": [
+          [
+            "Language functions",
+            "Giving factual information"
+          ]
+        ]
+      },
+      {
+        "descriptorId": "555df88b744d90d415773a8e",
+        "descriptiveId": "GLLA0603",
+        "descriptor": "Can understand cardinal numbers from 1 to 20.",
+        "attribution": "(P)",
+        "syllabuses": [
+          {
+            "syllabusName": "GL",
+            "syllabusId": "675ad205424bf505774294a4"
+          },
+          {
+            "syllabusName": "AL",
+            "syllabusId": "54fe84a2070b48b42932d4bd"
+          },
+          {
+            "syllabusName": "PL",
+            "syllabusId": "54fe84b8070b48b42932d4bf"
+          }
+        ],
+        "relatedDescriptors": [],
+        "descriptorStatus": "published",
+        "additionalInformation": {
+          "Notes": "Apriil 2015 IRT Analysis Changes. Previous Score/CEFR were 20 - T -  Previous status was Published  -  Reasons for other changes -",
+          "Variant terms": "",
+          "Grammatical Categories": "",
+          "Structure": "",
+          "Communicative Categories": "Linguistic competence>Dealing with times, dates, prices etc.",
+          "Business Skills": "Overall Listening>null",
+          "Academic Skills": "",
+          "YL simplified descriptor": "",
+          "Source Descriptor": "",
+          "Estimated Level": "A1 (22-29)",
+          "Anchor": "Y",
+          "Example": "",
+          "Function/Notion": "",
+          "Source": "",
+          "Batch": "GL_B2a",
+          "Draft IDs": "49227",
+          "Topic L1": "",
+          "N2000 Logit": "",
+          "CEFR Communicative activity": ""
+        },
+        "tags": [
+          {
+            "tagTypeId": "SKL",
+            "tags": [
+              {
+                "tagName": "Listening",
+                "tagId": "SKL00003"
+              }
+            ]
+          },
+          {
+            "tagTypeId": "CEFR",
+            "tags": [
+              {
+                "tagName": "<A1 (10-21)",
+                "tagId": "CEFR00001"
+              }
+            ]
+          }
+        ],
+        "occupations": [],
+        "books": [
+          {
+            "ps": "Young_Learner",
+            "isbn": "9781292118482"
+          },
+          {
+            "ps": "Professional",
+            "isbn": "9781292248615"
+          },
+          {
+            "ps": "Adult",
+            "isbn": "9780136833314"
+          }
+        ],
+        "sdf": [
+          {
+            "sortCompetency": "Comprehension of Details/ Parts",
+            "skill": "Listening",
+            "strand": "Comprehension, Production & Organization",
+            "subStrand": "(L) Literal Comprehension",
+            "competency": "(L) Comprehension of Details/ Parts",
+            "development_indicator": "Recognize and understand familiar words and phrases in speech. (10-25)",
+            "diRange": 1025
+          }
+        ],
+        "relatedLOs": {
+          "YL": [],
+          "GL": [
+            "[GLSP0348] Can name very common forms of transport. (17)",
+            "[GLSP0643] Can tell the time of day in full hours. (16)",
+            "[GLSP0641] Can name a few common jobs. (16)",
+            "[GLSP0705] Can tell the time of day to within five minutes. (22)",
+            "[GLSP0645] Can say where they and other people are in a limited way. (22)",
+            "[GLSP0321] Can describe the position of something in a very basic way. (23)",
+            "[GLSI0452] Can say a range of basic numbers, quantities and prices. (20)",
+            "[GLSP0286] Can say what they do (e.g. name of their job, student). (19)",
+            "[GLSI0749] Can say their name. (10)",
+            "[GLSP0463] Can name a few very common everyday objects. (12)",
+            "[GLSP0536] Can recognise and say the name of their own country, nationality and language. (12)",
+            "[GLSP0644] Can tell the time of day to the quarter hour. (24)",
+            "[GLSP0642] Can say other people's nationalities. (15)",
+            "[GLSP1268] Can use a few simple words to describe objects (e.g. colour, number), if supported by pictures. (18)",
+            "[GLSP1322] Can say how much something costs using basic language. (26)"
+          ],
+          "AL": [
+            "[GLSP0348] Can name very common forms of transport. (17)",
+            "[GLSP0643] Can tell the time of day in full hours. (16)",
+            "[GLSP0641] Can name a few common jobs. (16)",
+            "[GLSP0705] Can tell the time of day to within five minutes. (22)",
+            "[GLSP0645] Can say where they and other people are in a limited way. (22)",
+            "[GLSP0321] Can describe the position of something in a very basic way. (23)",
+            "[GLSI0452] Can say a range of basic numbers, quantities and prices. (20)",
+            "[GLSP0286] Can say what they do (e.g. name of their job, student). (19)",
+            "[GLSI0749] Can say their name. (10)",
+            "[GLSP0463] Can name a few very common everyday objects. (12)",
+            "[GLSP0536] Can recognise and say the name of their own country, nationality and language. (12)",
+            "[GLSP0644] Can tell the time of day to the quarter hour. (24)",
+            "[GLSP0642] Can say other people's nationalities. (15)",
+            "[GLSP1268] Can use a few simple words to describe objects (e.g. colour, number), if supported by pictures. (18)",
+            "[GLSP1322] Can say how much something costs using basic language. (26)"
+          ],
+          "PL": [
+            "[GLSP0348] Can name very common forms of transport. (17)",
+            "[GLSP0643] Can tell the time of day in full hours. (16)",
+            "[GLSP0641] Can name a few common jobs. (16)",
+            "[GLSP0705] Can tell the time of day to within five minutes. (22)",
+            "[GLSP0645] Can say where they and other people are in a limited way. (22)",
+            "[GLSP0321] Can describe the position of something in a very basic way. (23)",
+            "[GLSI0452] Can say a range of basic numbers, quantities and prices. (20)",
+            "[GLSP0286] Can say what they do (e.g. name of their job, student). (19)",
+            "[GLSI0749] Can say their name. (10)",
+            "[GLSP0463] Can name a few very common everyday objects. (12)",
+            "[GLSP0536] Can recognise and say the name of their own country, nationality and language. (12)",
+            "[GLSP0644] Can tell the time of day to the quarter hour. (24)",
+            "[GLSP0642] Can say other people's nationalities. (15)",
+            "[GLSP1268] Can use a few simple words to describe objects (e.g. colour, number), if supported by pictures. (18)",
+            "[GLSP1322] Can say how much something costs using basic language. (26)"
+          ]
+        },
+        "di": "Recognize and understand familiar words and phrases in speech. (10-25)",
+        "status": true,
+        "created": "2015-05-05T12:58:27.791Z",
+        "createdBy": {
+          "userId": "5548be7308ab6de93ce03a41",
+          "firstName": "Joe",
+          "lastName": "Worachek"
+        },
+        "updated": "2015-05-05T12:58:27.791Z",
+        "updatedBy": {
+          "userId": "5548be7308ab6de93ce03a41",
+          "firstName": "Joe",
+          "lastName": "Worachek"
+        },
+        "gse": [
+          {
+            "tagTypeId": "GSE",
+            "tags": [
+              {
+                "tagName": "10",
+                "tagId": "GSE00013"
+              }
+            ]
+          }
+        ],
+        "grammaticalCategories": [],
+        "businessSkills": [
+          [
+            "Overall Listening",
+            "null"
+          ]
+        ],
+        "communicativeCategories": [
+          [
+            "Linguistic competence",
+            "Dealing with times, dates, prices etc."
+          ]
+        ]
+      },
+      {
+        "descriptorId": "5624bd317f25287b557e8f68",
+        "descriptiveId": "GLLA0854",
+        "descriptor": "Can recognise a few familiar everyday words, if delivered slowly and clearly.",
+        "attribution": "(CJA)",
+        "syllabuses": [
+          {
+            "syllabusName": "GL",
+            "syllabusId": "675ad205424bf505774294a4"
+          },
+          {
+            "syllabusName": "AL",
+            "syllabusId": "54fe84a2070b48b42932d4bd"
+          },
+          {
+            "syllabusName": "PL",
+            "syllabusId": "54fe84b8070b48b42932d4bf"
+          }
+        ],
+        "relatedDescriptors": [],
+        "descriptorStatus": "published",
+        "additionalInformation": {
+          "Notes": "",
+          "Variant terms": "",
+          "Grammatical Categories": "",
+          "Structure": "",
+          "Communicative Categories": "Comprehension>Overall listening/reading comprehension",
+          "Business Skills": "Overall Listening>null",
+          "Academic Skills": "",
+          "YL simplified descriptor": "",
+          "Source Descriptor": "",
+          "Estimated Level": "<A1 (10-21)",
+          "Anchor": "N",
+          "Example": "",
+          "Function/Notion": "",
+          "Source": "",
+          "Batch": "GL_B4",
+          "Draft IDs": "",
+          "Topic L1": "",
+          "N2000 Logit": "",
+          "CEFR Communicative activity": ""
+        },
+        "tags": [
+          {
+            "tagTypeId": "SKL",
+            "tags": [
+              {
+                "tagName": "Listening",
+                "tagId": "SKL00003"
+              }
+            ]
+          },
+          {
+            "tagTypeId": "CEFR",
+            "tags": [
+              {
+                "tagName": "<A1 (10-21)",
+                "tagId": "CEFR00001"
+              }
+            ]
+          }
+        ],
+        "occupations": [],
+        "books": [],
+        "sdf": [
+          {
+            "sortCompetency": "Comprehension of Details/ Parts",
+            "skill": "Listening",
+            "strand": "Comprehension, Production & Organization",
+            "subStrand": "(L) Literal Comprehension",
+            "competency": "(L) Comprehension of Details/ Parts",
+            "development_indicator": "Recognize and understand familiar words and phrases in speech. (10-25)",
+            "diRange": 1025
+          }
+        ],
+        "relatedLOs": {
+          "YL": [],
+          "GL": [
+            "[GLSP0348] Can name very common forms of transport. (17)",
+            "[GLSP0643] Can tell the time of day in full hours. (16)",
+            "[GLSP0641] Can name a few common jobs. (16)",
+            "[GLSP0705] Can tell the time of day to within five minutes. (22)",
+            "[GLSP0645] Can say where they and other people are in a limited way. (22)",
+            "[GLSP0321] Can describe the position of something in a very basic way. (23)",
+            "[GLSI0452] Can say a range of basic numbers, quantities and prices. (20)",
+            "[GLSP0286] Can say what they do (e.g. name of their job, student). (19)",
+            "[GLSI0749] Can say their name. (10)",
+            "[GLSP0463] Can name a few very common everyday objects. (12)",
+            "[GLSP0536] Can recognise and say the name of their own country, nationality and language. (12)",
+            "[GLSP0644] Can tell the time of day to the quarter hour. (24)",
+            "[GLSP0642] Can say other people's nationalities. (15)",
+            "[GLSP1268] Can use a few simple words to describe objects (e.g. colour, number), if supported by pictures. (18)",
+            "[GLSP1322] Can say how much something costs using basic language. (26)"
+          ],
+          "AL": [
+            "[GLSP0348] Can name very common forms of transport. (17)",
+            "[GLSP0643] Can tell the time of day in full hours. (16)",
+            "[GLSP0641] Can name a few common jobs. (16)",
+            "[GLSP0705] Can tell the time of day to within five minutes. (22)",
+            "[GLSP0645] Can say where they and other people are in a limited way. (22)",
+            "[GLSP0321] Can describe the position of something in a very basic way. (23)",
+            "[GLSI0452] Can say a range of basic numbers, quantities and prices. (20)",
+            "[GLSP0286] Can say what they do (e.g. name of their job, student). (19)",
+            "[GLSI0749] Can say their name. (10)",
+            "[GLSP0463] Can name a few very common everyday objects. (12)",
+            "[GLSP0536] Can recognise and say the name of their own country, nationality and language. (12)",
+            "[GLSP0644] Can tell the time of day to the quarter hour. (24)",
+            "[GLSP0642] Can say other people's nationalities. (15)",
+            "[GLSP1268] Can use a few simple words to describe objects (e.g. colour, number), if supported by pictures. (18)",
+            "[GLSP1322] Can say how much something costs using basic language. (26)"
+          ],
+          "PL": [
+            "[GLSP0348] Can name very common forms of transport. (17)",
+            "[GLSP0643] Can tell the time of day in full hours. (16)",
+            "[GLSP0641] Can name a few common jobs. (16)",
+            "[GLSP0705] Can tell the time of day to within five minutes. (22)",
+            "[GLSP0645] Can say where they and other people are in a limited way. (22)",
+            "[GLSP0321] Can describe the position of something in a very basic way. (23)",
+            "[GLSI0452] Can say a range of basic numbers, quantities and prices. (20)",
+            "[GLSP0286] Can say what they do (e.g. name of their job, student). (19)",
+            "[GLSI0749] Can say their name. (10)",
+            "[GLSP0463] Can name a few very common everyday objects. (12)",
+            "[GLSP0536] Can recognise and say the name of their own country, nationality and language. (12)",
+            "[GLSP0644] Can tell the time of day to the quarter hour. (24)",
+            "[GLSP0642] Can say other people's nationalities. (15)",
+            "[GLSP1268] Can use a few simple words to describe objects (e.g. colour, number), if supported by pictures. (18)",
+            "[GLSP1322] Can say how much something costs using basic language. (26)"
+          ]
+        },
+        "di": "Recognize and understand familiar words and phrases in speech. (10-25)",
+        "status": true,
+        "created": "2015-05-05T12:58:27.791Z",
+        "createdBy": {
+          "userId": "5548be7308ab6de93ce03a41",
+          "firstName": "Joe",
+          "lastName": "Worachek"
+        },
+        "updated": "2015-05-05T12:58:27.791Z",
+        "updatedBy": {
+          "userId": "5548be7308ab6de93ce03a41",
+          "firstName": "Joe",
+          "lastName": "Worachek"
+        },
+        "gse": [
+          {
+            "tagTypeId": "GSE",
+            "tags": [
+              {
+                "tagName": "10",
+                "tagId": "GSE00013"
+              }
+            ]
+          }
+        ],
+        "grammaticalCategories": [],
+        "businessSkills": [
+          [
+            "Overall Listening",
+            "null"
+          ]
+        ],
+        "communicativeCategories": [
+          [
+            "Comprehension",
+            "Overall listening/reading comprehension"
+          ]
+        ]
+      },
+      {
+        "descriptorId": "555df8b7744d90d41577416b",
+        "descriptiveId": "GLWP0531",
+        "descriptor": "Can write their name, address and nationality.",
+        "attribution": "(CA)",
+        "syllabuses": [
+          {
+            "syllabusName": "GL",
+            "syllabusId": "675ad205424bf505774294a4"
+          },
+          {
+            "syllabusName": "AL",
+            "syllabusId": "54fe84a2070b48b42932d4bd"
+          },
+          {
+            "syllabusName": "PL",
+            "syllabusId": "54fe84b8070b48b42932d4bf"
+          }
+        ],
+        "relatedDescriptors": [],
+        "descriptorStatus": "published",
+        "additionalInformation": {
+          "Notes": "8/30/14 CEFR alignment confirmed.   | Apriil 2015 IRT Analysis Changes. Previous Score/CEFR were 21 - T -  Previous status was Alt version  -  Reasons for other changes -  Was a band descriptor, use new wording",
+          "Variant terms": "",
+          "Grammatical Categories": "",
+          "Structure": "",
+          "Communicative Categories": "Language functions>Giving factual information",
+          "Business Skills": "Overall Writing>null",
+          "Academic Skills": "",
+          "YL simplified descriptor": "",
+          "Source Descriptor": "",
+          "Estimated Level": "",
+          "Anchor": "N",
+          "Example": "",
+          "Function/Notion": "N2.6; F5.21.2; F1.5.3.1",
+          "Source": "",
+          "Batch": "",
+          "Draft IDs": "85898",
+          "Topic L1": "",
+          "N2000 Logit": "",
+          "CEFR Communicative activity": ""
+        },
+        "tags": [
+          {
+            "tagTypeId": "SKL",
+            "tags": [
+              {
+                "tagName": "Writing",
+                "tagId": "SKL00002"
+              }
+            ]
+          },
+          {
+            "tagTypeId": "CEFR",
+            "tags": [
+              {
+                "tagName": "<A1 (10-21)",
+                "tagId": "CEFR00001"
+              }
+            ]
+          }
+        ],
+        "occupations": [],
+        "books": [
+          {
+            "ps": "Adult",
+            "isbn": "9780133828740"
+          },
+          {
+            "ps": "Adult",
+            "isbn": "9780136833314"
+          }
+        ],
+        "sdf": [
+          {
+            "sortCompetency": "Producing Written Output",
+            "skill": "Writing",
+            "strand": "Comprehension, Production & Organization",
+            "subStrand": "(W) Production",
+            "competency": "(W) Producing Written Output",
+            "development_indicator": "Write simple familiar words. (10-24)",
+            "diRange": 1024
+          }
+        ],
+        "relatedLOs": {
+          "YL": [],
+          "GL": [
+            "[GLRD0425] Can recognise familiar names, words and very basic phrases on simple notices. (15)",
+            "[GLRD0004] Can recognise cardinal numbers up to 10. (10)",
+            "[GLRD0438] Can read and understand simple prices. (12)",
+            "[GLRD0461] Can identify very common food and drink on a menu. (14)",
+            "[GLRD0876] Can recognise cardinal numbers from 11-100. (22)",
+            "[GLRD1103] Can understand familiar phrases in a simple text. (29)",
+            "[GLRD1315] Can understand simple phrases related to familiar, everyday activities. (29)",
+            "[GLRD1311] Can understand basic factual statements relating to pictures or simple texts. (29)",
+            "[GLRD1441] Can understand a few simple phrases related to familiar, everyday activities. (28)",
+            "[GLRD1252] Can understand basic phrases in short, simple texts. (27)"
+          ],
+          "AL": [
+            "[GLRD0425] Can recognise familiar names, words and very basic phrases on simple notices. (15)",
+            "[GLRD0004] Can recognise cardinal numbers up to 10. (10)",
+            "[GLRD0438] Can read and understand simple prices. (12)",
+            "[GLRD0461] Can identify very common food and drink on a menu. (14)",
+            "[GLRD0876] Can recognise cardinal numbers from 11-100. (22)",
+            "[GLRD1103] Can understand familiar phrases in a simple text. (29)",
+            "[GLRD1315] Can understand simple phrases related to familiar, everyday activities. (29)",
+            "[GLRD1311] Can understand basic factual statements relating to pictures or simple texts. (29)",
+            "[GLRD1441] Can understand a few simple phrases related to familiar, everyday activities. (28)",
+            "[GLRD1252] Can understand basic phrases in short, simple texts. (27)"
+          ],
+          "PL": [
+            "[GLRD0425] Can recognise familiar names, words and very basic phrases on simple notices. (15)",
+            "[GLRD0004] Can recognise cardinal numbers up to 10. (10)",
+            "[GLRD0438] Can read and understand simple prices. (12)",
+            "[GLRD0461] Can identify very common food and drink on a menu. (14)",
+            "[GLRD0876] Can recognise cardinal numbers from 11-100. (22)",
+            "[GLRD1103] Can understand familiar phrases in a simple text. (29)",
+            "[GLRD1315] Can understand simple phrases related to familiar, everyday activities. (29)",
+            "[GLRD1311] Can understand basic factual statements relating to pictures or simple texts. (29)",
+            "[GLRD1441] Can understand a few simple phrases related to familiar, everyday activities. (28)",
+            "[GLRD1252] Can understand basic phrases in short, simple texts. (27)"
+          ]
+        },
+        "di": "Write simple familiar words. (10-24)",
+        "status": true,
+        "created": "2015-05-05T12:58:27.791Z",
+        "createdBy": {
+          "userId": "5548be7308ab6de93ce03a41",
+          "firstName": "Joe",
+          "lastName": "Worachek"
+        },
+        "updated": "2015-05-05T12:58:27.791Z",
+        "updatedBy": {
+          "userId": "5548be7308ab6de93ce03a41",
+          "firstName": "Joe",
+          "lastName": "Worachek"
+        },
+        "gse": [
+          {
+            "tagTypeId": "GSE",
+            "tags": [
+              {
+                "tagName": "10",
+                "tagId": "GSE00013"
+              }
+            ]
+          }
+        ],
+        "grammaticalCategories": [],
+        "businessSkills": [
+          [
+            "Overall Writing",
+            "null"
+          ]
+        ],
+        "communicativeCategories": [
+          [
+            "Language functions",
+            "Giving factual information"
+          ]
+        ]
+      },
+      {
+        "descriptorId": "5d4035e499d8de49e556d247",
+        "descriptiveId": "MESI0013",
+        "descriptor": "Can relay (in Language B) very basic information (e.g. numbers and prices) from short, simple, illustrated texts (in Language A).",
+        "attribution": "(C2018A)",
+        "syllabuses": [
+          {
+            "syllabusName": "GL",
+            "syllabusId": "675ad205424bf505774294a4"
+          },
+          {
+            "syllabusName": "AL",
+            "syllabusId": "54fe84a2070b48b42932d4bd"
+          },
+          {
+            "syllabusName": "PL",
+            "syllabusId": "54fe84b8070b48b42932d4bf"
+          }
+        ],
+        "relatedDescriptors": [],
+        "descriptorStatus": "published",
+        "additionalInformation": {
+          "Notes": "",
+          "Variant terms": "",
+          "Grammatical Categories": "",
+          "Structure": "",
+          "Communicative Categories": "Mediation>Relaying specific information in speech",
+          "Business Skills": "",
+          "Academic Skills": "",
+          "YL simplified descriptor": "",
+          "Source Descriptor": "",
+          "Estimated Level": "",
+          "Anchor": "N",
+          "Example": null,
+          "Function/Notion": "",
+          "Source": "",
+          "Batch": "ME_OI_B1",
+          "Draft IDs": "",
+          "Topic L1": "",
+          "N2000 Logit": "",
+          "CEFR Communicative activity": ""
+        },
+        "tags": [
+          {
+            "tagTypeId": "CEFR",
+            "tags": [
+              {
+                "tagName": "<A1 (10-21)",
+                "tagId": "CEFR00001"
+              }
+            ]
+          },
+          {
+            "tagTypeId": "SKL",
+            "tags": [
+              {
+                "tagName": "Speaking",
+                "tagId": "SKL00006"
+              }
+            ]
+          }
+        ],
+        "occupations": [],
+        "books": [],
+        "sdf": [
+          {
+            "sortCompetency": "Informing and Instructing",
+            "skill": "Speaking",
+            "strand": "Interactions & Communication",
+            "subStrand": "(S) Informing and Instructing",
+            "competency": "(S) Informing and Instructing",
+            "development_indicator": "Use simple language to inform, instruct or direct a listener. (10-45)",
+            "diRange": 1045
+          }
+        ],
+        "relatedLOs": {
+          "YL": [],
+          "GL": [
+            "[GLLI0243] Can understand simple directions from X to Y on foot or public transport. (26)",
+            "[GLLI0443] Can understand a phone number from a recorded message. (27)",
+            "[NOLI0001] Can understand short, simple instructions addressed carefully and slowly. (23)",
+            "[GLLI0574] Can understand very basic common classroom instructions. (16)",
+            "[GLLI0868] Can understand simple spoken commands in a game or sport. (26)",
+            "[GLLI1299] Can understand simple directions, if spoken slowly and clearly. (28)"
+          ],
+          "AL": [
+            "[GLLI0243] Can understand simple directions from X to Y on foot or public transport. (26)",
+            "[GLLI0443] Can understand a phone number from a recorded message. (27)",
+            "[NOLI0001] Can understand short, simple instructions addressed carefully and slowly. (23)",
+            "[GLLI0574] Can understand very basic common classroom instructions. (16)",
+            "[GLLI0868] Can understand simple spoken commands in a game or sport. (26)",
+            "[GLLI1299] Can understand simple directions, if spoken slowly and clearly. (28)"
+          ],
+          "PL": [
+            "[GLLI0243] Can understand simple directions from X to Y on foot or public transport. (26)",
+            "[GLLI0443] Can understand a phone number from a recorded message. (27)",
+            "[PLLA0062] Can understand the main information in a simple work-related phone message. (37)",
+            "[NOLI0001] Can understand short, simple instructions addressed carefully and slowly. (23)",
+            "[GLLI0574] Can understand very basic common classroom instructions. (16)",
+            "[GLLI0868] Can understand simple spoken commands in a game or sport. (26)",
+            "[GLLI1299] Can understand simple directions, if spoken slowly and clearly. (28)"
+          ]
+        },
+        "di": "Use simple language to inform, instruct or direct a listener. (10-45)",
+        "status": true,
+        "created": "2015-05-05T12:58:27.791Z",
+        "createdBy": {
+          "userId": "5548be7308ab6de93ce03a41",
+          "firstName": "Joe",
+          "lastName": "Worachek"
+        },
+        "updated": "2015-05-05T12:58:27.791Z",
+        "updatedBy": {
+          "userId": "5548be7308ab6de93ce03a41",
+          "firstName": "Joe",
+          "lastName": "Worachek"
+        },
+        "gse": [
+          {
+            "tagTypeId": "GSE",
+            "tags": [
+              {
+                "tagName": "10",
+                "tagId": "GSE00013"
+              }
+            ]
+          }
+        ],
+        "grammaticalCategories": [],
+        "businessSkills": [],
+        "communicativeCategories": [
+          [
+            "Mediation",
+            "Relaying specific information in speech"
+          ]
+        ]
+      },
+      {
+        "descriptorId": "555df88f744d90d415773b3d",
+        "descriptiveId": "GLSI0750",
+        "descriptor": "Can ask someone for their name.",
+        "attribution": "(P)",
+        "syllabuses": [
+          {
+            "syllabusName": "GL",
+            "syllabusId": "675ad205424bf505774294a4"
+          },
+          {
+            "syllabusName": "AL",
+            "syllabusId": "54fe84a2070b48b42932d4bd"
+          },
+          {
+            "syllabusName": "PL",
+            "syllabusId": "54fe84b8070b48b42932d4bf"
+          }
+        ],
+        "relatedDescriptors": [
+          {
+            "descriptiveId": "GLGR0427",
+            "descriptor": "Can ask basic questions using 'What's your ...?'"
+          },
+          {
+            "descriptiveId": "GLGR0465",
+            "descriptor": "Can ask wh- questions using the present simple."
+          }
+        ],
+        "descriptorStatus": "published",
+        "additionalInformation": {
+          "Notes": "Apriil 2015 IRT Analysis Changes. Previous Score/CEFR were 19 - T -  Previous status was flagged  -  Reasons for other changes -",
+          "Variant terms": "",
+          "Grammatical Categories": "",
+          "Structure": "",
+          "Communicative Categories": "Language functions>Exchanging factual information|Forms of communication>Social interaction",
+          "Business Skills": "Socialising at work>Greetings and introductions",
+          "Academic Skills": "",
+          "YL simplified descriptor": "",
+          "Source Descriptor": "",
+          "Estimated Level": "<A1 (10-21)",
+          "Anchor": "N",
+          "Example": "",
+          "Function/Notion": "F1.4.6.1; F1.4.7",
+          "Source": "",
+          "Batch": "",
+          "Draft IDs": "WSSI001b",
+          "Topic L1": "",
+          "N2000 Logit": "",
+          "CEFR Communicative activity": ""
+        },
+        "tags": [
+          {
+            "tagTypeId": "CEFR",
+            "tags": [
+              {
+                "tagName": "<A1 (10-21)",
+                "tagId": "CEFR00001"
+              }
+            ]
+          },
+          {
+            "tagTypeId": "SKL",
+            "tags": [
+              {
+                "tagName": "Speaking",
+                "tagId": "SKL00006"
+              }
+            ]
+          }
+        ],
+        "occupations": [],
+        "books": [
+          {
+            "ps": "Adult",
+            "isbn": "9780133828740"
+          }
+        ],
+        "sdf": [
+          {
+            "sortCompetency": "Social/Interpersonal Exchanges",
+            "skill": "Speaking",
+            "strand": "Interactions & Communication",
+            "subStrand": "(S) Communicative Exchanges",
+            "competency": "(S) Social/Interpersonal Exchanges",
+            "development_indicator": "Use simple words and phrases in basic, brief social and interpersonal exchanges. (10-21)",
+            "diRange": 1021
+          }
+        ],
+        "relatedLOs": {
+          "YL": [],
+          "GL": [
+            "[GLLI0677] Can recognise simple informal greetings. (10)",
+            "[GLLI0602] Can recognise simple formal greetings. (13)"
+          ],
+          "AL": [
+            "[GLLI0677] Can recognise simple informal greetings. (10)",
+            "[GLLI0602] Can recognise simple formal greetings. (13)"
+          ],
+          "PL": [
+            "[GLLI0677] Can recognise simple informal greetings. (10)",
+            "[GLLI0602] Can recognise simple formal greetings. (13)"
+          ]
+        },
+        "di": "Use simple words and phrases in basic, brief social and interpersonal exchanges. (10-21)",
+        "status": true,
+        "created": "2015-05-05T12:58:27.791Z",
+        "createdBy": {
+          "userId": "5548be7308ab6de93ce03a41",
+          "firstName": "Joe",
+          "lastName": "Worachek"
+        },
+        "updated": "2015-05-05T12:58:27.791Z",
+        "updatedBy": {
+          "userId": "5548be7308ab6de93ce03a41",
+          "firstName": "Joe",
+          "lastName": "Worachek"
+        },
+        "gse": [
+          {
+            "tagTypeId": "GSE",
+            "tags": [
+              {
+                "tagName": "10",
+                "tagId": "GSE00013"
+              }
+            ]
+          }
+        ],
+        "grammaticalCategories": [],
+        "businessSkills": [
+          [
+            "Socialising at work",
+            "Greetings and introductions"
+          ]
+        ],
+        "communicativeCategories": [
+          [
+            "Language functions",
+            "Exchanging factual information"
+          ],
+          [
+            "Forms of communication",
+            "Social interaction"
+          ]
+        ]
+      },
+      {
+        "descriptorId": "5d40361bdd5dfe50e7d24012",
+        "descriptiveId": "MEWP0004",
+        "descriptor": "Can list (in Language B) names, numbers, prices and very simple information from texts (in Language A) that are of immediate interest, that are composed in very simple language and contain illustrations.",
+        "attribution": "(C2018A)",
+        "syllabuses": [
+          {
+            "syllabusName": "GL",
+            "syllabusId": "675ad205424bf505774294a4"
+          },
+          {
+            "syllabusName": "AL",
+            "syllabusId": "54fe84a2070b48b42932d4bd"
+          },
+          {
+            "syllabusName": "PL",
+            "syllabusId": "54fe84b8070b48b42932d4bf"
+          }
+        ],
+        "relatedDescriptors": [],
+        "descriptorStatus": "published",
+        "additionalInformation": {
+          "Notes": "",
+          "Variant terms": "",
+          "Grammatical Categories": "",
+          "Structure": "",
+          "Communicative Categories": "Mediation>Relaying specific information in writing",
+          "Business Skills": "",
+          "Academic Skills": "",
+          "YL simplified descriptor": "",
+          "Source Descriptor": "",
+          "Estimated Level": "",
+          "Anchor": "N",
+          "Example": null,
+          "Function/Notion": "",
+          "Source": "",
+          "Batch": "ME_OI_B1",
+          "Draft IDs": "",
+          "Topic L1": "",
+          "N2000 Logit": "",
+          "CEFR Communicative activity": ""
+        },
+        "tags": [
+          {
+            "tagTypeId": "SKL",
+            "tags": [
+              {
+                "tagName": "Writing",
+                "tagId": "SKL00002"
+              }
+            ]
+          },
+          {
+            "tagTypeId": "CEFR",
+            "tags": [
+              {
+                "tagName": "<A1 (10-21)",
+                "tagId": "CEFR00001"
+              }
+            ]
+          }
+        ],
+        "occupations": [],
+        "books": [
+          {
+            "ps": "Professional",
+            "isbn": "9781292248615"
+          }
+        ],
+        "sdf": [
+          {
+            "sortCompetency": "Synthesizing and Summarizing",
+            "skill": "Writing",
+            "strand": "Strategies",
+            "subStrand": "(W) Analysis and Evaluation Strategies",
+            "competency": "(W) Synthesizing and Summarizing",
+            "development_indicator": "Extract basic key information from short texts or sources and synthesize it in a list or series of sentences. (10-30)",
+            "diRange": 1030
+          }
+        ],
+        "relatedLOs": {
+          "YL": [],
+          "GL": [],
+          "AL": [],
+          "PL": []
+        },
+        "di": "Extract basic key information from short texts or sources and synthesize it in a list or series of sentences. (10-30)",
+        "status": true,
+        "created": "2015-05-05T12:58:27.791Z",
+        "createdBy": {
+          "userId": "5548be7308ab6de93ce03a41",
+          "firstName": "Joe",
+          "lastName": "Worachek"
+        },
+        "updated": "2015-05-05T12:58:27.791Z",
+        "updatedBy": {
+          "userId": "5548be7308ab6de93ce03a41",
+          "firstName": "Joe",
+          "lastName": "Worachek"
+        },
+        "gse": [
+          {
+            "tagTypeId": "GSE",
+            "tags": [
+              {
+                "tagName": "10",
+                "tagId": "GSE00013"
+              }
+            ]
+          }
+        ],
+        "grammaticalCategories": [],
+        "businessSkills": [],
+        "communicativeCategories": [
+          [
+            "Mediation",
+            "Relaying specific information in writing"
+          ]
+        ]
+      }
+    ]
+  },
+  "vocab": {
+    "totalCount": 41402,
+    "items": [
+      {
+        "itemId": "ua8444abd28d0e715-00051ee1.96ca9485.06cdcbf8.23927c7f",
+        "expression": "avoid judgment",
+        "audioFiles": {
+          "ame": "",
+          "bre": ""
+        },
+        "thesaurus": "",
+        "definition": "to not express an opinion, or to try not to form an opinion, at least for a period of time",
+        "example": "The chairperson should allow for plenty of discussion of the ideas, but avoid judgment him or herself. | Acknowledge how someone is feeling, but avoid judgment.",
+        "audience": "SSGL",
+        "cefr": "B1+ (51-58)",
+        "gse": "54",
+        "grammaticalCategories": [
+          "phrase"
+        ],
+        "collos": [],
+        "variants": [],
+        "topics": [
+          [
+            {
+              "id": "2000",
+              "description": "Collaboration",
+              "level": "1"
+            },
+            {
+              "id": "2001",
+              "description": "Engaging with ideas",
+              "level": "2"
+            },
+            {
+              "id": "2002",
+              "description": "Listening and building on ideas",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2040",
+              "description": "Leadership",
+              "level": "1"
+            },
+            {
+              "id": "2044",
+              "description": "Emotional intelligence",
+              "level": "2"
+            },
+            {
+              "id": "2045",
+              "description": "Identifying emotions",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2040",
+              "description": "Leadership",
+              "level": "1"
+            },
+            {
+              "id": "2060",
+              "description": "Inclusion",
+              "level": "2"
+            },
+            {
+              "id": "2062",
+              "description": "Promoting inclusion",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2040",
+              "description": "Leadership",
+              "level": "1"
+            },
+            {
+              "id": "2060",
+              "description": "Inclusion",
+              "level": "2"
+            },
+            {
+              "id": "2061",
+              "description": "Understanding others",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2040",
+              "description": "Leadership",
+              "level": "1"
+            },
+            {
+              "id": "2050",
+              "description": "Influence",
+              "level": "2"
+            },
+            {
+              "id": "2051",
+              "description": "Building trust",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2040",
+              "description": "Leadership",
+              "level": "1"
+            },
+            {
+              "id": "2050",
+              "description": "Influence",
+              "level": "2"
+            },
+            {
+              "id": "2052",
+              "description": "Inspiring change",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2040",
+              "description": "Leadership",
+              "level": "1"
+            },
+            {
+              "id": "2056",
+              "description": "Integrity",
+              "level": "2"
+            },
+            {
+              "id": "2059",
+              "description": "Maintaining and modelling integrity",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2040",
+              "description": "Leadership",
+              "level": "1"
+            },
+            {
+              "id": "2047",
+              "description": "Working collaboratively",
+              "level": "2"
+            },
+            {
+              "id": "2048",
+              "description": "Identifying and dealing with differences",
+              "level": "3"
+            }
+          ]
+        ],
+        "region": {
+          "note": "",
+          "label": "",
+          "variants": []
+        },
+        "expression_bre": ""
+      },
+      {
+        "itemId": "ua8444abd28d0e715-000c9e77.7b7af5fe.6a6f1e91.37aaa43d",
+        "expression": "county",
+        "audioFiles": {
+          "ame": "",
+          "bre": ""
+        },
+        "thesaurus": "",
+        "definition": "an area of a state or country that has its own local government",
+        "example": "Orange Country, near Los Angeles, tends to be more conservative than its neighbor. | Large parts of the county flooded in the recent storms.",
+        "audience": "SSGL",
+        "cefr": "B1+ (51-58)",
+        "gse": "57",
+        "grammaticalCategories": [
+          "noun"
+        ],
+        "collos": [],
+        "variants": [],
+        "topics": [
+          [
+            {
+              "id": "2089",
+              "description": "Social Responsibility",
+              "level": "1"
+            },
+            {
+              "id": "2096",
+              "description": "Civic engagement",
+              "level": "2"
+            },
+            {
+              "id": "2098",
+              "description": "Positively contributing to society",
+              "level": "3"
+            }
+          ]
+        ],
+        "region": {
+          "note": "",
+          "label": "",
+          "variants": []
+        },
+        "expression_bre": ""
+      },
+      {
+        "itemId": "ua8444abd28d0e715-def287bc.001ae63e.64829bff.bbe3ed78",
+        "expression": "If I were you, I'd...",
+        "audioFiles": {
+          "ame": "",
+          "bre": ""
+        },
+        "thesaurus": "",
+        "definition": "used when telling someone what you think they should do",
+        "example": "If I were you, I'd deal with this first.",
+        "audience": "SSGL",
+        "cefr": "B1 (43-50)",
+        "gse": "50",
+        "grammaticalCategories": [
+          "phrase"
+        ],
+        "collos": [],
+        "variants": [],
+        "topics": [
+          [
+            {
+              "id": "2000",
+              "description": "Collaboration",
+              "level": "1"
+            },
+            {
+              "id": "2001",
+              "description": "Engaging with ideas",
+              "level": "2"
+            },
+            {
+              "id": "2003",
+              "description": "Engaging in group dialogue around differing ideas/opinions",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2000",
+              "description": "Collaboration",
+              "level": "1"
+            },
+            {
+              "id": "2001",
+              "description": "Engaging with ideas",
+              "level": "2"
+            },
+            {
+              "id": "2002",
+              "description": "Listening and building on ideas",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2000",
+              "description": "Collaboration",
+              "level": "1"
+            },
+            {
+              "id": "2005",
+              "description": "Interpersonal communication",
+              "level": "2"
+            },
+            {
+              "id": "2006",
+              "description": "Receiving and giving feedback",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2000",
+              "description": "Collaboration",
+              "level": "1"
+            },
+            {
+              "id": "2008",
+              "description": "Task management",
+              "level": "2"
+            },
+            {
+              "id": "2010",
+              "description": "Making progress on group work",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2000",
+              "description": "Collaboration",
+              "level": "1"
+            },
+            {
+              "id": "2008",
+              "description": "Task management",
+              "level": "2"
+            },
+            {
+              "id": "2009",
+              "description": "Managing work responsibilities within a group",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2024",
+              "description": "Critical thinking",
+              "level": "1"
+            },
+            {
+              "id": "2037",
+              "description": "Improve",
+              "level": "2"
+            },
+            {
+              "id": "2039",
+              "description": "Making improvements",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2040",
+              "description": "Leadership",
+              "level": "1"
+            },
+            {
+              "id": "2050",
+              "description": "Influence",
+              "level": "2"
+            },
+            {
+              "id": "2052",
+              "description": "Inspiring change",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2040",
+              "description": "Leadership",
+              "level": "1"
+            },
+            {
+              "id": "2041",
+              "description": "Initiative",
+              "level": "2"
+            },
+            {
+              "id": "2043",
+              "description": "Adapting to change",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2040",
+              "description": "Leadership",
+              "level": "1"
+            },
+            {
+              "id": "2041",
+              "description": "Initiative",
+              "level": "2"
+            },
+            {
+              "id": "2042",
+              "description": "Taking charge",
+              "level": "3"
+            }
+          ]
+        ],
+        "region": {
+          "note": "",
+          "label": "",
+          "variants": []
+        },
+        "expression_bre": ""
+      },
+      {
+        "itemId": "ua8444abd28d0e715-83a5e8d2.d0d3e03a.90e11b1f.00210e34",
+        "expression": "action",
+        "audioFiles": {
+          "ame": "",
+          "bre": ""
+        },
+        "thesaurus": "",
+        "definition": "the process of doing something, or something that someone does",
+        "example": "They called for urgent action to reduce unemployment. | Her actions probably saved my life.",
+        "audience": "SSGL",
+        "cefr": "B2 (59-66)",
+        "gse": "64",
+        "grammaticalCategories": [
+          "noun"
+        ],
+        "collos": [],
+        "variants": [],
+        "topics": [
+          [
+            {
+              "id": "2000",
+              "description": "Collaboration",
+              "level": "1"
+            },
+            {
+              "id": "2008",
+              "description": "Task management",
+              "level": "2"
+            },
+            {
+              "id": "2010",
+              "description": "Making progress on group work",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2000",
+              "description": "Collaboration",
+              "level": "1"
+            },
+            {
+              "id": "2008",
+              "description": "Task management",
+              "level": "2"
+            },
+            {
+              "id": "2011",
+              "description": "Managing setbacks and challenges in group work",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2000",
+              "description": "Collaboration",
+              "level": "1"
+            },
+            {
+              "id": "2008",
+              "description": "Task management",
+              "level": "2"
+            },
+            {
+              "id": "2009",
+              "description": "Managing work responsibilities within a group",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2040",
+              "description": "Leadership",
+              "level": "1"
+            },
+            {
+              "id": "2053",
+              "description": "Developing shared vision",
+              "level": "2"
+            },
+            {
+              "id": "2055",
+              "description": "Goal setting",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2040",
+              "description": "Leadership",
+              "level": "1"
+            },
+            {
+              "id": "2041",
+              "description": "Initiative",
+              "level": "2"
+            },
+            {
+              "id": "2043",
+              "description": "Adapting to change",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2040",
+              "description": "Leadership",
+              "level": "1"
+            },
+            {
+              "id": "2041",
+              "description": "Initiative",
+              "level": "2"
+            },
+            {
+              "id": "2042",
+              "description": "Taking charge",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2040",
+              "description": "Leadership",
+              "level": "1"
+            },
+            {
+              "id": "2047",
+              "description": "Working collaboratively",
+              "level": "2"
+            },
+            {
+              "id": "2049",
+              "description": "Fostering collaboration",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2066",
+              "description": "Self-management",
+              "level": "1"
+            },
+            {
+              "id": "2082",
+              "description": "Attention to detail",
+              "level": "2"
+            },
+            {
+              "id": "2083",
+              "description": "Maintaining attention",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2066",
+              "description": "Self-management",
+              "level": "1"
+            },
+            {
+              "id": "2075",
+              "description": "Persistence",
+              "level": "2"
+            },
+            {
+              "id": "2077",
+              "description": "Anticipating persistence challenges",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2066",
+              "description": "Self-management",
+              "level": "1"
+            },
+            {
+              "id": "2075",
+              "description": "Persistence",
+              "level": "2"
+            },
+            {
+              "id": "2076",
+              "description": "Persistence behaviors",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2066",
+              "description": "Self-management",
+              "level": "1"
+            },
+            {
+              "id": "2075",
+              "description": "Persistence",
+              "level": "2"
+            },
+            {
+              "id": "2078",
+              "description": "Persistence mindset",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2066",
+              "description": "Self-management",
+              "level": "1"
+            },
+            {
+              "id": "2067",
+              "description": "Planning",
+              "level": "2"
+            },
+            {
+              "id": "2070",
+              "description": "Breaking down tasks",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2066",
+              "description": "Self-management",
+              "level": "1"
+            },
+            {
+              "id": "2067",
+              "description": "Planning",
+              "level": "2"
+            },
+            {
+              "id": "2069",
+              "description": "Estimating time and effort",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2066",
+              "description": "Self-management",
+              "level": "1"
+            },
+            {
+              "id": "2067",
+              "description": "Planning",
+              "level": "2"
+            },
+            {
+              "id": "2071",
+              "description": "Prioritizing",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2066",
+              "description": "Self-management",
+              "level": "1"
+            },
+            {
+              "id": "2067",
+              "description": "Planning",
+              "level": "2"
+            },
+            {
+              "id": "2068",
+              "description": "Setting goals",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2066",
+              "description": "Self-management",
+              "level": "1"
+            },
+            {
+              "id": "2086",
+              "description": "Progress monitoring",
+              "level": "2"
+            },
+            {
+              "id": "2088",
+              "description": "Adapting and adjusting",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2066",
+              "description": "Self-management",
+              "level": "1"
+            },
+            {
+              "id": "2086",
+              "description": "Progress monitoring",
+              "level": "2"
+            },
+            {
+              "id": "2087",
+              "description": "Monitoring",
+              "level": "3"
+            }
+          ]
+        ],
+        "region": {
+          "note": "",
+          "label": "",
+          "variants": []
+        },
+        "expression_bre": ""
+      },
+      {
+        "itemId": "ua8444abd28d0e715-00380f93.68e41e7a.6a0728d3.95dd7fbc",
+        "expression": "organization",
+        "audioFiles": {
+          "ame": "",
+          "bre": ""
+        },
+        "thesaurus": "",
+        "definition": "the activity of planning and arranging something so that it is successful or effective",
+        "example": "Putting on a show of this kind involves considerable organisation.",
+        "audience": "SSGL",
+        "cefr": "B2 (59-66)",
+        "gse": "59",
+        "grammaticalCategories": [
+          "noun"
+        ],
+        "collos": [],
+        "variants": [],
+        "topics": [
+          [
+            {
+              "id": "2066",
+              "description": "Self-management",
+              "level": "1"
+            },
+            {
+              "id": "2073",
+              "description": "Organization",
+              "level": "2"
+            },
+            {
+              "id": "2074",
+              "description": "Organizing workspace and materials",
+              "level": "3"
+            }
+          ]
+        ],
+        "region": {
+          "note": "",
+          "label": "",
+          "variants": []
+        },
+        "expression_bre": ""
+      },
+      {
+        "itemId": "ua8444abd28d0e715-0043c112.ac8d9d01.b2a86252.e3a8cc33",
+        "expression": "give an illustration",
+        "audioFiles": {
+          "ame": "",
+          "bre": ""
+        },
+        "thesaurus": "",
+        "definition": "to use something as an example, in order to make something easier to understand, or prove that it is true",
+        "example": "I want to give you an illustration of how the media can influence people's opinions.",
+        "audience": "SSGL",
+        "cefr": "B2+ (67-75)",
+        "gse": "70",
+        "grammaticalCategories": [
+          "phrase"
+        ],
+        "collos": [],
+        "variants": [],
+        "topics": [
+          [
+            {
+              "id": "2000",
+              "description": "Collaboration",
+              "level": "1"
+            },
+            {
+              "id": "2001",
+              "description": "Engaging with ideas",
+              "level": "2"
+            },
+            {
+              "id": "2004",
+              "description": "Building consensus",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2000",
+              "description": "Collaboration",
+              "level": "1"
+            },
+            {
+              "id": "2008",
+              "description": "Task management",
+              "level": "2"
+            },
+            {
+              "id": "2011",
+              "description": "Managing setbacks and challenges in group work",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2012",
+              "description": "Communication",
+              "level": "1"
+            },
+            {
+              "id": "2016",
+              "description": "Composing messages",
+              "level": "2"
+            },
+            {
+              "id": "2018",
+              "description": "Organize the message",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2012",
+              "description": "Communication",
+              "level": "1"
+            },
+            {
+              "id": "2016",
+              "description": "Composing messages",
+              "level": "2"
+            },
+            {
+              "id": "2017",
+              "description": "Select appropriate content",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2012",
+              "description": "Communication",
+              "level": "1"
+            },
+            {
+              "id": "2021",
+              "description": "Understanding messages",
+              "level": "2"
+            },
+            {
+              "id": "2023",
+              "description": "Engage in Deep Reading",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2024",
+              "description": "Critical thinking",
+              "level": "1"
+            },
+            {
+              "id": "2025",
+              "description": "Accumulate and interpret",
+              "level": "2"
+            },
+            {
+              "id": "2027",
+              "description": "Collecting evidence",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2024",
+              "description": "Critical thinking",
+              "level": "1"
+            },
+            {
+              "id": "2025",
+              "description": "Accumulate and interpret",
+              "level": "2"
+            },
+            {
+              "id": "2028",
+              "description": "Evaluating evidence",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2024",
+              "description": "Critical thinking",
+              "level": "1"
+            },
+            {
+              "id": "2025",
+              "description": "Accumulate and interpret",
+              "level": "2"
+            },
+            {
+              "id": "2029",
+              "description": "Organizing, summarizing and interpreting evidence",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2024",
+              "description": "Critical thinking",
+              "level": "1"
+            },
+            {
+              "id": "2030",
+              "description": "Create",
+              "level": "2"
+            },
+            {
+              "id": "2031",
+              "description": "Composing arguments",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2024",
+              "description": "Critical thinking",
+              "level": "1"
+            },
+            {
+              "id": "2034",
+              "description": "Critique",
+              "level": "2"
+            },
+            {
+              "id": "2036",
+              "description": "Critiquing evidence",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2024",
+              "description": "Critical thinking",
+              "level": "1"
+            },
+            {
+              "id": "2034",
+              "description": "Critique",
+              "level": "2"
+            },
+            {
+              "id": "2035",
+              "description": "Describing evidence",
+              "level": "3"
+            }
+          ]
+        ],
+        "region": {
+          "note": "",
+          "label": "",
+          "variants": []
+        },
+        "expression_bre": ""
+      },
+      {
+        "itemId": "ua8444abd28d0e715-98d4cab9.b64b49da.00455cc5.2dcd0676",
+        "expression": "What's your take on...?",
+        "audioFiles": {
+          "ame": "",
+          "bre": ""
+        },
+        "thesaurus": "",
+        "definition": "use this to ask someone's opinion about a situation or idea",
+        "example": "What's your take on the political situation? | Maria, you've worked on similar projects before, what's your take on the problem?",
+        "audience": "SSGL",
+        "cefr": "C1 (76-84)",
+        "gse": "80",
+        "grammaticalCategories": [
+          "phrase"
+        ],
+        "collos": [],
+        "variants": [],
+        "topics": [
+          [
+            {
+              "id": "2000",
+              "description": "Collaboration",
+              "level": "1"
+            },
+            {
+              "id": "2001",
+              "description": "Engaging with ideas",
+              "level": "2"
+            },
+            {
+              "id": "2004",
+              "description": "Building consensus",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2000",
+              "description": "Collaboration",
+              "level": "1"
+            },
+            {
+              "id": "2001",
+              "description": "Engaging with ideas",
+              "level": "2"
+            },
+            {
+              "id": "2003",
+              "description": "Engaging in group dialogue around differing ideas/opinions",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2024",
+              "description": "Critical thinking",
+              "level": "1"
+            },
+            {
+              "id": "2030",
+              "description": "Create",
+              "level": "2"
+            },
+            {
+              "id": "2031",
+              "description": "Composing arguments",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2024",
+              "description": "Critical thinking",
+              "level": "1"
+            },
+            {
+              "id": "2034",
+              "description": "Critique",
+              "level": "2"
+            },
+            {
+              "id": "2036",
+              "description": "Critiquing evidence",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2040",
+              "description": "Leadership",
+              "level": "1"
+            },
+            {
+              "id": "2053",
+              "description": "Developing shared vision",
+              "level": "2"
+            },
+            {
+              "id": "2055",
+              "description": "Goal setting",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2040",
+              "description": "Leadership",
+              "level": "1"
+            },
+            {
+              "id": "2053",
+              "description": "Developing shared vision",
+              "level": "2"
+            },
+            {
+              "id": "2054",
+              "description": "Identifying values",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2040",
+              "description": "Leadership",
+              "level": "1"
+            },
+            {
+              "id": "2050",
+              "description": "Influence",
+              "level": "2"
+            },
+            {
+              "id": "2052",
+              "description": "Inspiring change",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2040",
+              "description": "Leadership",
+              "level": "1"
+            },
+            {
+              "id": "2063",
+              "description": "Innovation",
+              "level": "2"
+            },
+            {
+              "id": "2064",
+              "description": "Challenging established ideas",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2040",
+              "description": "Leadership",
+              "level": "1"
+            },
+            {
+              "id": "2063",
+              "description": "Innovation",
+              "level": "2"
+            },
+            {
+              "id": "2065",
+              "description": "Generating new ideas and methods",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2040",
+              "description": "Leadership",
+              "level": "1"
+            },
+            {
+              "id": "2047",
+              "description": "Working collaboratively",
+              "level": "2"
+            },
+            {
+              "id": "2049",
+              "description": "Fostering collaboration",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2040",
+              "description": "Leadership",
+              "level": "1"
+            },
+            {
+              "id": "2047",
+              "description": "Working collaboratively",
+              "level": "2"
+            },
+            {
+              "id": "2048",
+              "description": "Identifying and dealing with differences",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2089",
+              "description": "Social Responsibility",
+              "level": "1"
+            },
+            {
+              "id": "2096",
+              "description": "Civic engagement",
+              "level": "2"
+            },
+            {
+              "id": "2098",
+              "description": "Positively contributing to society",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2089",
+              "description": "Social Responsibility",
+              "level": "1"
+            },
+            {
+              "id": "2090",
+              "description": "Cultural responsiveness",
+              "level": "2"
+            },
+            {
+              "id": "2092",
+              "description": "Promoting equity",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2089",
+              "description": "Social Responsibility",
+              "level": "1"
+            },
+            {
+              "id": "2099",
+              "description": "Environmental stewardship",
+              "level": "2"
+            },
+            {
+              "id": "2101",
+              "description": "Engaging in sustainable behaviour",
+              "level": "3"
+            }
+          ]
+        ],
+        "region": {
+          "note": "",
+          "label": "",
+          "variants": []
+        },
+        "expression_bre": ""
+      },
+      {
+        "itemId": "ua8444abd28d0e715-a435932.435b80d.0047284e.9b0ab0a8",
+        "expression": "try to...",
+        "audioFiles": {
+          "ame": "",
+          "bre": ""
+        },
+        "thesaurus": "",
+        "definition": "used when telling someone that they should try to do something, when giving instructions",
+        "example": "Try to keep your back straight and your legs bent.",
+        "audience": "SSGL",
+        "cefr": "B1 (43-50)",
+        "gse": "45",
+        "grammaticalCategories": [
+          "phrase"
+        ],
+        "collos": [],
+        "variants": [],
+        "topics": [
+          [
+            {
+              "id": "2000",
+              "description": "Collaboration",
+              "level": "1"
+            },
+            {
+              "id": "2001",
+              "description": "Engaging with ideas",
+              "level": "2"
+            },
+            {
+              "id": "2003",
+              "description": "Engaging in group dialogue around differing ideas/opinions",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2000",
+              "description": "Collaboration",
+              "level": "1"
+            },
+            {
+              "id": "2001",
+              "description": "Engaging with ideas",
+              "level": "2"
+            },
+            {
+              "id": "2002",
+              "description": "Listening and building on ideas",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2000",
+              "description": "Collaboration",
+              "level": "1"
+            },
+            {
+              "id": "2005",
+              "description": "Interpersonal communication",
+              "level": "2"
+            },
+            {
+              "id": "2006",
+              "description": "Receiving and giving feedback",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2000",
+              "description": "Collaboration",
+              "level": "1"
+            },
+            {
+              "id": "2008",
+              "description": "Task management",
+              "level": "2"
+            },
+            {
+              "id": "2010",
+              "description": "Making progress on group work",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2000",
+              "description": "Collaboration",
+              "level": "1"
+            },
+            {
+              "id": "2008",
+              "description": "Task management",
+              "level": "2"
+            },
+            {
+              "id": "2009",
+              "description": "Managing work responsibilities within a group",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2024",
+              "description": "Critical thinking",
+              "level": "1"
+            },
+            {
+              "id": "2037",
+              "description": "Improve",
+              "level": "2"
+            },
+            {
+              "id": "2039",
+              "description": "Making improvements",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2040",
+              "description": "Leadership",
+              "level": "1"
+            },
+            {
+              "id": "2060",
+              "description": "Inclusion",
+              "level": "2"
+            },
+            {
+              "id": "2062",
+              "description": "Promoting inclusion",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2040",
+              "description": "Leadership",
+              "level": "1"
+            },
+            {
+              "id": "2050",
+              "description": "Influence",
+              "level": "2"
+            },
+            {
+              "id": "2052",
+              "description": "Inspiring change",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2040",
+              "description": "Leadership",
+              "level": "1"
+            },
+            {
+              "id": "2041",
+              "description": "Initiative",
+              "level": "2"
+            },
+            {
+              "id": "2043",
+              "description": "Adapting to change",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2040",
+              "description": "Leadership",
+              "level": "1"
+            },
+            {
+              "id": "2041",
+              "description": "Initiative",
+              "level": "2"
+            },
+            {
+              "id": "2042",
+              "description": "Taking charge",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2040",
+              "description": "Leadership",
+              "level": "1"
+            },
+            {
+              "id": "2063",
+              "description": "Innovation",
+              "level": "2"
+            },
+            {
+              "id": "2065",
+              "description": "Generating new ideas and methods",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2040",
+              "description": "Leadership",
+              "level": "1"
+            },
+            {
+              "id": "2047",
+              "description": "Working collaboratively",
+              "level": "2"
+            },
+            {
+              "id": "2049",
+              "description": "Fostering collaboration",
+              "level": "3"
+            }
+          ]
+        ],
+        "region": {
+          "note": "",
+          "label": "",
+          "variants": []
+        },
+        "expression_bre": ""
+      },
+      {
+        "itemId": "ua8444abd28d0e715-0051688e.8f2f25c9.6048ca6c.3654db9c",
+        "expression": "what",
+        "audioFiles": {
+          "ame": "",
+          "bre": ""
+        },
+        "thesaurus": "",
+        "definition": "used to ask for information about something",
+        "example": "What does your audience know already? What attitudes or biases do they have?",
+        "audience": "SSGL",
+        "cefr": "<A1 (10-21)",
+        "gse": "18",
+        "grammaticalCategories": [
+          "determiner"
+        ],
+        "collos": [],
+        "variants": [],
+        "topics": [
+          [
+            {
+              "id": "2012",
+              "description": "Communication",
+              "level": "1"
+            },
+            {
+              "id": "2013",
+              "description": "Understanding the context",
+              "level": "2"
+            },
+            {
+              "id": "2014",
+              "description": "Understand the goals of communication",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2040",
+              "description": "Leadership",
+              "level": "1"
+            },
+            {
+              "id": "2044",
+              "description": "Emotional intelligence",
+              "level": "2"
+            },
+            {
+              "id": "2045",
+              "description": "Identifying emotions",
+              "level": "3"
+            }
+          ]
+        ],
+        "region": {
+          "note": "",
+          "label": "",
+          "variants": []
+        },
+        "expression_bre": ""
+      },
+      {
+        "itemId": "ua8444abd28d0e715-4793702a.0e4cf72d.0059f0ba.802de7b8",
+        "expression": "racist",
+        "audioFiles": {
+          "ame": "",
+          "bre": ""
+        },
+        "thesaurus": "",
+        "definition": "feeling or expressing fear or hatred of people from other races",
+        "example": "racist views",
+        "audience": "SSGL",
+        "cefr": "B2 (59-66)",
+        "gse": "59",
+        "grammaticalCategories": [
+          "adjective"
+        ],
+        "collos": [],
+        "variants": [],
+        "topics": [
+          [
+            {
+              "id": "2040",
+              "description": "Leadership",
+              "level": "1"
+            },
+            {
+              "id": "2044",
+              "description": "Emotional intelligence",
+              "level": "2"
+            },
+            {
+              "id": "2045",
+              "description": "Identifying emotions",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2040",
+              "description": "Leadership",
+              "level": "1"
+            },
+            {
+              "id": "2060",
+              "description": "Inclusion",
+              "level": "2"
+            },
+            {
+              "id": "2062",
+              "description": "Promoting inclusion",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2040",
+              "description": "Leadership",
+              "level": "1"
+            },
+            {
+              "id": "2060",
+              "description": "Inclusion",
+              "level": "2"
+            },
+            {
+              "id": "2061",
+              "description": "Understanding others",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2040",
+              "description": "Leadership",
+              "level": "1"
+            },
+            {
+              "id": "2050",
+              "description": "Influence",
+              "level": "2"
+            },
+            {
+              "id": "2051",
+              "description": "Building trust",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2040",
+              "description": "Leadership",
+              "level": "1"
+            },
+            {
+              "id": "2050",
+              "description": "Influence",
+              "level": "2"
+            },
+            {
+              "id": "2052",
+              "description": "Inspiring change",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2040",
+              "description": "Leadership",
+              "level": "1"
+            },
+            {
+              "id": "2056",
+              "description": "Integrity",
+              "level": "2"
+            },
+            {
+              "id": "2057",
+              "description": "Identifying integrity",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2040",
+              "description": "Leadership",
+              "level": "1"
+            },
+            {
+              "id": "2047",
+              "description": "Working collaboratively",
+              "level": "2"
+            },
+            {
+              "id": "2048",
+              "description": "Identifying and dealing with differences",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2089",
+              "description": "Social Responsibility",
+              "level": "1"
+            },
+            {
+              "id": "2096",
+              "description": "Civic engagement",
+              "level": "2"
+            },
+            {
+              "id": "2097",
+              "description": "Awareness of injustice",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2089",
+              "description": "Social Responsibility",
+              "level": "1"
+            },
+            {
+              "id": "2096",
+              "description": "Civic engagement",
+              "level": "2"
+            },
+            {
+              "id": "2098",
+              "description": "Positively contributing to society",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2089",
+              "description": "Social Responsibility",
+              "level": "1"
+            },
+            {
+              "id": "2090",
+              "description": "Cultural responsiveness",
+              "level": "2"
+            },
+            {
+              "id": "2092",
+              "description": "Promoting equity",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2089",
+              "description": "Social Responsibility",
+              "level": "1"
+            },
+            {
+              "id": "2090",
+              "description": "Cultural responsiveness",
+              "level": "2"
+            },
+            {
+              "id": "2091",
+              "description": "Understanding culture",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2089",
+              "description": "Social Responsibility",
+              "level": "1"
+            },
+            {
+              "id": "2093",
+              "description": "Ethical reasoning",
+              "level": "2"
+            },
+            {
+              "id": "2095",
+              "description": "Applying ethical reasoning",
+              "level": "3"
+            }
+          ],
+          [
+            {
+              "id": "2089",
+              "description": "Social Responsibility",
+              "level": "1"
+            },
+            {
+              "id": "2093",
+              "description": "Ethical reasoning",
+              "level": "2"
+            },
+            {
+              "id": "2094",
+              "description": "Knowledge of ethical issues",
+              "level": "3"
+            }
+          ]
+        ],
+        "region": {
+          "note": "",
+          "label": "",
+          "variants": []
+        },
+        "expression_bre": ""
+      }
+    ]
+  }
+}

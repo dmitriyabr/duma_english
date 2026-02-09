@@ -140,11 +140,9 @@ test("target_vocab prefers prompt words over stale taskMeta words", async () => 
   if (originalKey) process.env.OPENAI_API_KEY = originalKey;
 });
 
-test("evaluateTaskQuality with EVAL_SPLIT_BY_DOMAIN=true falls back to rules when OPENAI_API_KEY is missing", async () => {
+test("evaluateTaskQuality falls back to rules when OPENAI_API_KEY is missing", async () => {
   const originalKey = process.env.OPENAI_API_KEY;
-  const originalSplit = process.env.EVAL_SPLIT_BY_DOMAIN;
   delete process.env.OPENAI_API_KEY;
-  process.env.EVAL_SPLIT_BY_DOMAIN = "true";
 
   const result = await evaluateTaskQuality({
     taskType: "qa_prompt",
@@ -160,6 +158,4 @@ test("evaluateTaskQuality with EVAL_SPLIT_BY_DOMAIN=true falls back to rules whe
   assert.ok(typeof result.feedback.summary === "string");
 
   if (originalKey) process.env.OPENAI_API_KEY = originalKey;
-  if (originalSplit !== undefined) process.env.EVAL_SPLIT_BY_DOMAIN = originalSplit;
-  else delete process.env.EVAL_SPLIT_BY_DOMAIN;
 });

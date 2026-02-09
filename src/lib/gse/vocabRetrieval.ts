@@ -185,7 +185,7 @@ async function getStageIndex(params: { stage: string; ageBand?: string | null })
     where: {
       type: "GSE_VOCAB",
       descriptor: { notIn: ["", "No descriptor available."] },
-      gseCenter: { gte: range.min - 18, lte: range.max + 18 },
+      gseCenter: { gte: range.min - 30, lte: range.max + 30 },
       ...(allowedCatalogs.length > 0 ? { catalog: { in: allowedCatalogs } } : {}),
       OR: [{ audience: { in: allowedAudiences } }, { audience: null }],
     },

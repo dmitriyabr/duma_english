@@ -344,7 +344,7 @@ async function loadCandidates(params: {
       where: {
         type: "GSE_LO",
         descriptor: { notIn: ["", "No descriptor available."] },
-        gseCenter: { gte: range.min - 15, lte: range.max + 15 },
+        gseCenter: { gte: range.min - 30, lte: range.max + 30 },
         audience: { in: [audience, "AL", "AE", "YL"] },
       },
       orderBy: [{ gseCenter: "asc" }],
@@ -364,7 +364,7 @@ async function loadCandidates(params: {
       where: {
         type: "GSE_GRAMMAR",
         descriptor: { notIn: ["", "No grammar descriptor available."] },
-        gseCenter: { gte: range.min - 15, lte: range.max + 15 },
+        gseCenter: { gte: range.min - 30, lte: range.max + 30 },
         audience: { in: [audience, "AL", "AE", "YL"] },
       },
       orderBy: [{ gseCenter: "asc" }],

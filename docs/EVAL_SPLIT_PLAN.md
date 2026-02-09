@@ -71,7 +71,7 @@
 ## Шаги реализации (черновик)
 
 1. **Конфиг/флаги**  
-   Ввести флаг (env или конфиг), например `EVAL_SPLIT_BY_DOMAIN=true`, под которым включается новая схема (три запроса + merge). При `false` — текущее поведение (один запрос).
+   ~~Флаг~~ Реализовано без флага: всегда три запроса + merge.
 
 2. **Retrieval**  
    В evaluator при split-режиме не применять жёсткие slice(0, 6/8/10); использовать увеличенные лимиты (16/14/20) для lo/grammar/vocab кандидатов. Общие вызовы `buildSemanticEvaluationContext` и `buildVocabEvaluationContext` оставить как есть; менять только объём данных, передаваемых в промпт.
@@ -88,12 +88,7 @@
    Функция `mergeSplitEvaluationResults(loResult, grammarResult, vocabResult, generalResult)` → один объект типа `TaskEvaluation` + feedback. Проверка: структура совместима с текущим `taskEvaluationJson` и с `buildOpportunityEvidence`.
 
 6. **Интеграция в evaluateTaskQuality**  
-   При `EVAL_SPLIT_BY_DOMAIN=true`:  
-   - параллельно вызвать три доменных запроса;  
-   - получить общую оценку (и при необходимости feedback);  
-   - собрать merge;  
-   - дальше как сейчас (attachStructuredChecks, нормализация feedback, возврат).  
-   При `false` — текущий путь (один `evaluateWithOpenAI`).
+   Всегда: параллельно три доменных запроса → общая оценка + feedback → merge → attachStructuredChecks и возврат как раньше.
 
 7. **Лимиты и промпты**  
    Вынести лимиты (сколько кандидатов отправлять, сколько чеков разрешать в ответе) в константы или env; в каждом из трёх промптов явно указать эти лимиты и правило «не быть минималистичным при наличии доказательств».
@@ -122,9 +117,9 @@
 
 ## Реализовано (2026-02-08)
 
-- Флаг `EVAL_SPLIT_BY_DOMAIN` (env). При `true`: вызываются `evaluateWithOpenAISplit` вместо `evaluateWithOpenAI`.
+- Split включён всегда, флаг убран.
 - Константы: LO 16 кандидатов / 8 чеков, Grammar 14/10, Vocab 20/12.
 - Три доменных вызова: `evaluateLoOnly`, `evaluateGrammarOnly`, `evaluateVocabOnly` — каждый со своим промптом и схемой (zod), параллельно через `Promise.all`.
 - Общий вызов: `evaluateGeneralOnly` — taskScore, languageScore, rubricChecks, artifacts, evidence, feedback; в промпт передаётся domainSummary (loPass, grammarPass, vocabPass).
 - Сборка: один `TaskEvaluation` из general + loChecks/grammarChecks/vocabChecks; возврат в том же формате, что и однозапросный путь; `attachStructuredChecks` и запись в навыки без изменений.
-- `.env.example`: закомментированная строка `# EVAL_SPLIT_BY_DOMAIN=true`.
+- Флаг и переменные окружения для split не используются.

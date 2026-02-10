@@ -1130,7 +1130,17 @@ export async function startPlacementExtended(studentId: string) {
       where: { metaJson: { path: ["placementSessionId"], equals: existing.id } },
       orderBy: { createdAt: "desc" },
     });
-    if (lastTask) return { session: existing, task: lastTask };
+    if (lastTask) {
+      const meta = (lastTask.metaJson || {}) as Record<string, unknown>;
+      if (typeof meta.maxDurationSec !== "number") {
+        await prisma.task.update({
+          where: { id: lastTask.id },
+          data: { metaJson: { ...meta, maxDurationSec: 300 } },
+        });
+        lastTask.metaJson = { ...meta, maxDurationSec: 300 };
+      }
+      return { session: existing, task: lastTask };
+    }
   }
 
   const session = await prisma.placementSession.create({
@@ -1171,6 +1181,7 @@ export async function startPlacementExtended(studentId: string) {
         placementAttemptNumber: 1,
         stage: initialStage,
         scaffoldingLevel: "minimal",
+        maxDurationSec: 300,
       } as unknown as Prisma.InputJsonValue,
     },
   });
@@ -1258,6 +1269,7 @@ export async function submitPlacementExtendedAnswer(
         placementAttemptNumber: updatedSession.questionCount + 1,
         stage: targetStage,
         scaffoldingLevel,
+        maxDurationSec: 300,
       } as unknown as Prisma.InputJsonValue,
     },
   });

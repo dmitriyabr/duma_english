@@ -50,6 +50,78 @@ function estimateWavDurationSec(buffer: Buffer) {
   return Number((dataLength / byteRate).toFixed(2));
 }
 
+const WAV_HEADER_SIZE = 44;
+
+function splitWavBuffer(buffer: Buffer, chunkSeconds: number): Buffer[] {
+  if (buffer.length < WAV_HEADER_SIZE) return [buffer];
+  const byteRate = buffer.readUInt32LE(28);
+  if (!byteRate) return [buffer];
+  const totalDataLength = buffer.length - WAV_HEADER_SIZE;
+  const chunkDataSize = byteRate * chunkSeconds;
+  if (totalDataLength <= chunkDataSize) return [buffer];
+
+  const chunks: Buffer[] = [];
+  let offset = 0;
+  while (offset < totalDataLength) {
+    const sliceLen = Math.min(chunkDataSize, totalDataLength - offset);
+    const chunk = Buffer.alloc(WAV_HEADER_SIZE + sliceLen);
+    buffer.copy(chunk, 0, 0, WAV_HEADER_SIZE); // copy header
+    buffer.copy(chunk, WAV_HEADER_SIZE, WAV_HEADER_SIZE + offset, WAV_HEADER_SIZE + offset + sliceLen);
+    // patch RIFF file size (offset 4) = total file size - 8
+    chunk.writeUInt32LE(chunk.length - 8, 4);
+    // patch data chunk size (offset 40)
+    chunk.writeUInt32LE(sliceLen, 40);
+    chunks.push(chunk);
+    offset += sliceLen;
+  }
+  return chunks;
+}
+
+function mergeChunkResults(
+  results: { transcript: string; metrics: SpeechMetrics }[]
+): { transcript: string; metrics: SpeechMetrics } {
+  const transcript = results.map((r) => r.transcript).join(" ");
+  const totalDuration = results.reduce((s, r) => s + (r.metrics.durationSec || 0), 0);
+  const totalWords = results.reduce((s, r) => s + (r.metrics.wordCount || 0), 0);
+
+  let weightedConfidence = 0;
+  let confidenceDuration = 0;
+  const paKeys = ["accuracy", "fluency", "completeness", "prosody", "pronunciation"] as const;
+  const paWeighted: Record<string, number> = {};
+  const paDuration: Record<string, number> = {};
+
+  for (const r of results) {
+    const dur = r.metrics.durationSec || 0;
+    if (typeof r.metrics.confidence === "number") {
+      weightedConfidence += r.metrics.confidence * dur;
+      confidenceDuration += dur;
+    }
+    for (const k of paKeys) {
+      if (typeof r.metrics[k] === "number") {
+        paWeighted[k] = (paWeighted[k] || 0) + r.metrics[k]! * dur;
+        paDuration[k] = (paDuration[k] || 0) + dur;
+      }
+    }
+  }
+
+  const metrics: SpeechMetrics = {
+    durationSec: Number(totalDuration.toFixed(2)),
+    wordCount: totalWords,
+    speechRate: estimateSpeechRate(totalWords, totalDuration),
+    fillerCount: countFillers(transcript),
+    pauseCount: countPausesFromText(transcript),
+    confidence: confidenceDuration > 0 ? Number((weightedConfidence / confidenceDuration).toFixed(4)) : undefined,
+  };
+
+  for (const k of paKeys) {
+    if (paDuration[k] && paDuration[k] > 0) {
+      (metrics as Record<string, unknown>)[k] = Number((paWeighted[k] / paDuration[k]).toFixed(2));
+    }
+  }
+
+  return { transcript, metrics };
+}
+
 function countFillers(text: string) {
   const matches = text.match(/\b(um|uh|like|you know)\b/gi);
   return matches ? matches.length : 0;
@@ -112,7 +184,7 @@ async function callAzureRecognition(
   }
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 20_000);
+  const timeout = setTimeout(() => controller.abort(), 60_000);
   console.log(
     JSON.stringify({
       event: "azure_request_sent",
@@ -219,6 +291,52 @@ export async function analyzeSpeechFromBuffer(
     throw new Error(`Unsupported SPEECH_PROVIDER: ${provider}`);
   }
 
+  const CHUNK_SECONDS = 55;
+  const audioDurationSec = estimateWavDurationSec(buffer) || 0;
+
+  // Long audio: split into chunks, transcribe in parallel, merge results
+  if (audioDurationSec > CHUNK_SECONDS) {
+    const chunks = splitWavBuffer(buffer, CHUNK_SECONDS);
+    console.log(JSON.stringify({ event: "audio_chunked", chunks: chunks.length, audioDurationSec }));
+    const sttOptions: SpeechAnalyzeOptions = {
+      ...options,
+      meta: { ...options.meta, supportsPronAssessment: false, referenceText: undefined },
+    };
+    const chunkResults = await Promise.all(
+      chunks.map(async (chunk) => {
+        const { response } = await callAzureRecognition(chunk, sttOptions);
+        const chunkDuration = estimateWavDurationSec(chunk) || 0;
+        return parseAzureResponseToMetrics(response, chunkDuration, "none");
+      })
+    );
+    const merged = mergeChunkResults(chunkResults);
+
+    // Self-ref PA on the first chunk using the merged transcript
+    const enableSelfRefPa = process.env.ENABLE_SELF_REF_PA === "true";
+    if (enableSelfRefPa) {
+      const pseudoReference = normalizeTranscriptForReference(merged.transcript);
+      if (pseudoReference.split(/\s+/).filter(Boolean).length >= 3) {
+        const selfRefOptions: SpeechAnalyzeOptions = {
+          ...options,
+          meta: { supportsPronAssessment: true, referenceText: pseudoReference },
+        };
+        const { response: paResponse } = await callAzureRecognition(chunks[0], selfRefOptions);
+        const paParsed = parseAzureResponseToMetrics(paResponse, estimateWavDurationSec(chunks[0]) || 0, "self_ref");
+        merged.metrics.pronunciationSelfRef =
+          paParsed.metrics.pronunciationSelfRef ?? paParsed.metrics.pronunciation ?? paParsed.metrics.accuracy;
+        console.log(JSON.stringify({ event: "pa_detected", mode: "self_ref", taskType: options.taskType }));
+      }
+    }
+
+    return {
+      transcript: merged.transcript,
+      metrics: merged.metrics,
+      raw: { chunked: true, chunkCount: chunks.length },
+      provider: "azure",
+    };
+  }
+
+  // Short audio: single-call path (unchanged)
   let lastError: unknown = null;
   for (let attempt = 1; attempt <= 2; attempt += 1) {
     try {

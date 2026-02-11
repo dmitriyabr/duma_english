@@ -185,6 +185,20 @@ export async function GET(
     perStageBundleTotal[row.stage] = row.bundleRows.reduce((sum, b) => sum + b.totalRequired, 0);
   }
 
+  // Domain bundle blockers for target stage
+  const targetStage = (progress as { promotionReadiness?: { targetStage?: string } }).promotionReadiness?.targetStage;
+  const domainBundleBlockers: Record<string, Array<{ nodeId: string; descriptor: string; value: number }>> = {};
+  if (targetStage) {
+    const targetRows = bundleReadiness.rows.filter((r) => r.stage === targetStage);
+    for (const row of targetRows) {
+      const domain = row.domain;
+      const blockers = row.blockers.sort((a, b) => a.value - b.value).slice(0, 8);
+      if (blockers.length > 0) {
+        domainBundleBlockers[domain] = blockers;
+      }
+    }
+  }
+
   return NextResponse.json({
     student: {
       id: student.id,
@@ -207,5 +221,6 @@ export async function GET(
     })),
     fullMastery,
     recentNodeOutcomes: recentNodeOutcomes.slice(0, 80),
+    domainBundleBlockers,
   });
 }

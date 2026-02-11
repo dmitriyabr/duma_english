@@ -96,6 +96,16 @@ export async function getBundleNodeIdsForStage(stage: CEFRStage): Promise<string
   return dedupe(bundles.flatMap((b) => b.nodes.map((n) => n.nodeId)));
 }
 
+/** Node IDs from bundles for a given stage AND domain (required nodes only). */
+export async function getBundleNodeIdsForStageAndDomain(stage: CEFRStage, domain: BundleDomain): Promise<string[]> {
+  await ensureDefaultGseBundles();
+  const bundles = await prisma.gseBundle.findMany({
+    where: { active: true, stage, domain },
+    include: { nodes: { where: { required: true }, select: { nodeId: true } } },
+  });
+  return dedupe(bundles.flatMap((b) => b.nodes.map((n) => n.nodeId)));
+}
+
 function dedupe<T>(arr: T[]): T[] {
   return Array.from(new Set(arr));
 }

@@ -121,10 +121,13 @@ type LevelNodeRow = {
   inBundle?: boolean;
 };
 
+type BundleBlocker = { nodeId: string; descriptor: string; value: number };
+
 type StudentProfile = {
   catalogNodesByBand?: Record<string, number>;
   perStageCredited?: Record<string, number>;
   perStageBundleTotal?: Record<string, number>;
+  domainBundleBlockers?: Record<string, BundleBlocker[]>;
   student: {
     id: string;
     displayName: string;
@@ -153,18 +156,16 @@ const STAGE_PCT: Record<string, number> = {
   A0: 5, A1: 17, A2: 33, B1: 50, B2: 67, C1: 83, C2: 95,
 };
 
-function computeDomainStats(nodes: MasteryRow[]) {
+function computeDomainStats(nodes: MasteryRow[], bundleBlockers?: BundleBlocker[]) {
   const now = Date.now();
-  let mastered = 0, inProgress = 0, overdue = 0;
-  const weakest: MasteryRow[] = [];
+  let confirmed = 0, detected = 0, overdue = 0;
 
   for (const n of nodes) {
     const val = n.decayedMastery;
     if (val >= 70 && n.activationState === "verified") {
-      mastered++;
+      confirmed++;
     } else if (n.evidenceCount > 0) {
-      inProgress++;
-      weakest.push(n);
+      detected++;
     }
 
     if (n.lastEvidenceAt) {
@@ -174,8 +175,25 @@ function computeDomainStats(nodes: MasteryRow[]) {
     }
   }
 
-  weakest.sort((a, b) => a.decayedMastery - b.decayedMastery);
-  return { mastered, inProgress, overdue, total: nodes.length, weakest: weakest.slice(0, 5) };
+  // Use bundle blockers for focus list when available, otherwise fall back to weakest detected nodes
+  let focusItems: Array<{ nodeId: string; descriptor: string; decayedMastery: number }>;
+  let hasBundleData = false;
+  if (bundleBlockers && bundleBlockers.length > 0) {
+    hasBundleData = true;
+    focusItems = bundleBlockers.slice(0, 5).map((b) => ({
+      nodeId: b.nodeId,
+      descriptor: b.descriptor,
+      decayedMastery: b.value,
+    }));
+  } else {
+    const weakest = nodes
+      .filter((n) => n.evidenceCount > 0 && !(n.decayedMastery >= 70 && n.activationState === "verified"))
+      .sort((a, b) => a.decayedMastery - b.decayedMastery)
+      .slice(0, 5);
+    focusItems = weakest.map((n) => ({ nodeId: n.nodeId, descriptor: n.descriptor, decayedMastery: n.decayedMastery }));
+  }
+
+  return { confirmed, detected, overdue, total: nodes.length, focusItems, hasBundleData };
 }
 
 function confLabel(confidence: number): string {
@@ -247,18 +265,20 @@ function DomainFocusCard({
       </div>
 
       <div style={{ display: "flex", gap: 16, fontSize: "0.85rem", color: "var(--ink-2)", marginBottom: 14, flexWrap: "wrap" }}>
-        <span><strong style={{ color: "#0d9668" }}>{stats.mastered}</strong> mastered</span>
-        <span><strong>{stats.inProgress}</strong> in progress</span>
+        <span><strong style={{ color: "#0d9668" }}>{stats.confirmed}</strong> confirmed</span>
+        <span><strong>{stats.detected}</strong> detected</span>
         {stats.overdue > 0 && (
           <span><strong style={{ color: "var(--accent-1)" }}>{stats.overdue}</strong> overdue</span>
         )}
       </div>
 
-      {stats.weakest.length > 0 && (
+      {stats.focusItems.length > 0 && (
         <>
-          <p style={{ fontSize: "0.8rem", color: "var(--ink-3)", marginBottom: 8 }}>Needs work</p>
+          <p style={{ fontSize: "0.8rem", color: "var(--ink-3)", marginBottom: 8 }}>
+            {stats.hasBundleData ? "Focus for promotion" : "Needs work"}
+          </p>
           <ul style={{ listStyle: "none", paddingLeft: 0, margin: 0 }}>
-            {stats.weakest.map((n) => (
+            {stats.focusItems.map((n) => (
               <li
                 key={n.nodeId}
                 style={{
@@ -291,7 +311,7 @@ function DomainFocusCard({
         </>
       )}
 
-      {stats.weakest.length === 0 && stats.inProgress === 0 && stats.mastered === 0 && (
+      {stats.focusItems.length === 0 && stats.detected === 0 && stats.confirmed === 0 && (
         <p style={{ fontSize: "0.85rem", color: "var(--ink-3)" }}>No evidence yet in this domain.</p>
       )}
     </div>
@@ -385,7 +405,7 @@ export default function TeacherStudentProfilePage() {
     );
   }
 
-  const { student, progress, recentAttempts, fullMastery, catalogNodesByBand, perStageCredited, perStageBundleTotal } = data;
+  const { student, progress, recentAttempts, fullMastery, catalogNodesByBand, perStageCredited, perStageBundleTotal, domainBundleBlockers } = data;
   const pr = progress.promotionReadiness;
   const np = progress.nodeProgress;
 
@@ -395,9 +415,9 @@ export default function TeacherStudentProfilePage() {
     grammar: fullMastery.filter((m) => m.type === "GSE_GRAMMAR"),
     communication: fullMastery.filter((m) => m.type === "GSE_LO"),
   };
-  const vocabStats = computeDomainStats(domainNodes.vocab);
-  const grammarStats = computeDomainStats(domainNodes.grammar);
-  const communicationStats = computeDomainStats(domainNodes.communication);
+  const vocabStats = computeDomainStats(domainNodes.vocab, domainBundleBlockers?.vocab);
+  const grammarStats = computeDomainStats(domainNodes.grammar, domainBundleBlockers?.grammar);
+  const communicationStats = computeDomainStats(domainNodes.communication, domainBundleBlockers?.lo);
 
   const lastAttemptDate = progress.recentAttempts?.[0]?.createdAt;
 

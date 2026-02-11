@@ -2,9 +2,10 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "./db";
 import { CEFRStage, SkillKey } from "./curriculum";
 import { mapStageToGseRange } from "./gse/utils";
-import { projectLearnerStageFromGse, refreshLearnerProfileFromGse, gseBandFromCenter } from "./gse/stageProjection";
+import { projectLearnerStageFromGse, refreshLearnerProfileFromGse, gseBandFromCenter, DomainStages } from "./gse/stageProjection";
 import { generateTaskSpec } from "./taskGenerator";
 import { assignTaskTargetsFromCatalog } from "./gse/planner";
+import { getBundleNodeIdsForStageAndDomain } from "./gse/bundles";
 
 export type PlacementItemView = {
   id: string;
@@ -1226,6 +1227,108 @@ export async function startPlacementExtended(studentId: string) {
   return { session, task };
 }
 
+const STAGE_ORDER_CREDIT: CEFRStage[] = ["A1", "A2", "B1", "B2", "C1", "C2"];
+const DOMAIN_TO_KEY: Record<"vocab" | "grammar" | "lo", keyof DomainStages> = {
+  vocab: "vocab",
+  grammar: "grammar",
+  lo: "communication",
+};
+
+export async function applyPlacementDownwardCredit(
+  studentId: string,
+  domainStages: DomainStages,
+) {
+  const domains = ["vocab", "grammar", "lo"] as const;
+  const now = new Date();
+
+  for (const domain of domains) {
+    const domainStage = domainStages[DOMAIN_TO_KEY[domain]].stage;
+    const domainIdx = STAGE_ORDER_CREDIT.indexOf(domainStage);
+    if (domainIdx < 0) continue;
+
+    const belowStages = STAGE_ORDER_CREDIT.slice(0, domainIdx);
+    const currentStage = domainStage;
+
+    // Below stages: alpha=3.5, beta=2.5 (~58 mastery)
+    for (const stage of belowStages) {
+      const nodeIds = await getBundleNodeIdsForStageAndDomain(stage, domain);
+      if (nodeIds.length === 0) continue;
+
+      const existing = await prisma.studentGseMastery.findMany({
+        where: { studentId, nodeId: { in: nodeIds } },
+        select: { nodeId: true },
+      });
+      const existingSet = new Set(existing.map((r) => r.nodeId));
+      const missing = nodeIds.filter((id) => !existingSet.has(id));
+      if (missing.length === 0) continue;
+
+      await prisma.studentGseMastery.createMany({
+        data: missing.map((nodeId) => ({
+          studentId,
+          nodeId,
+          masteryScore: 58,
+          masteryMean: 58,
+          masterySigma: 20,
+          decayedMastery: 58,
+          alpha: 3.5,
+          beta: 2.5,
+          uncertainty: 0.35,
+          reliability: "low",
+          evidenceCount: 0,
+          directEvidenceCount: 0,
+          activationState: "observed",
+          calculationVersion: "placement_inferred",
+          spacingStateJson: { source: "placement_inferred" },
+          createdAt: now,
+        })),
+        skipDuplicates: true,
+      });
+    }
+
+    // Current stage: alpha=2.0, beta=3.0 (~40 mastery)
+    {
+      const nodeIds = await getBundleNodeIdsForStageAndDomain(currentStage, domain);
+      if (nodeIds.length === 0) continue;
+
+      const existing = await prisma.studentGseMastery.findMany({
+        where: { studentId, nodeId: { in: nodeIds } },
+        select: { nodeId: true },
+      });
+      const existingSet = new Set(existing.map((r) => r.nodeId));
+      const missing = nodeIds.filter((id) => !existingSet.has(id));
+      if (missing.length === 0) continue;
+
+      await prisma.studentGseMastery.createMany({
+        data: missing.map((nodeId) => ({
+          studentId,
+          nodeId,
+          masteryScore: 40,
+          masteryMean: 40,
+          masterySigma: 22,
+          decayedMastery: 40,
+          alpha: 2.0,
+          beta: 3.0,
+          uncertainty: 0.4,
+          reliability: "low",
+          evidenceCount: 0,
+          directEvidenceCount: 0,
+          activationState: "observed",
+          calculationVersion: "placement_inferred",
+          spacingStateJson: { source: "placement_inferred" },
+          createdAt: now,
+        })),
+        skipDuplicates: true,
+      });
+    }
+  }
+
+  // Re-project after creating inferred mastery rows
+  await refreshLearnerProfileFromGse({
+    studentId,
+    reason: "placement_downward_credit",
+  });
+}
+
 export async function submitPlacementExtendedAnswer(
   sessionId: string,
   attemptId: string,
@@ -1262,6 +1365,10 @@ export async function submitPlacementExtendedAnswer(
       placementMode: true,
     });
 
+    if (projection.domainStages) {
+      await applyPlacementDownwardCredit(session.studentId, projection.domainStages);
+    }
+
     await prisma.placementSession.update({
       where: { id: sessionId },
       data: {
@@ -1273,6 +1380,8 @@ export async function submitPlacementExtendedAnswer(
           confidence: projection.placementConfidence,
           uncertainty: projection.placementUncertainty,
           nodeCoverage: projection.nodeCoverageByBand,
+          domainStages: projection.domainStages,
+          pronunciationScore: projection.pronunciationScore,
         } as unknown as Prisma.InputJsonValue,
       },
     });
@@ -1283,6 +1392,8 @@ export async function submitPlacementExtendedAnswer(
       result: {
         stage: projection.placementStage,
         confidence: projection.placementConfidence,
+        domainStages: projection.domainStages,
+        pronunciationScore: projection.pronunciationScore,
       },
     };
   }

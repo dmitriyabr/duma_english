@@ -188,6 +188,11 @@ export async function assignTaskTargetsFromCatalog(params: {
   ageBand?: string | null;
   studentId?: string;
   preferredNodeIds?: string[];
+  domainStages?: {
+    vocab?: string;
+    grammar?: string;
+    communication?: string;
+  };
 }) {
   if (params.preferredNodeIds && params.preferredNodeIds.length > 0) {
     const selected = params.preferredNodeIds.slice(0, 3);
@@ -207,6 +212,10 @@ export async function assignTaskTargetsFromCatalog(params: {
   }
 
   const stageRange = mapStageToGseRange(params.stage || "A1");
+  const ds = params.domainStages;
+  const vocabRange = ds?.vocab ? mapStageToGseRange(ds.vocab) : stageRange;
+  const grammarRange = ds?.grammar ? mapStageToGseRange(ds.grammar) : stageRange;
+  const commRange = ds?.communication ? mapStageToGseRange(ds.communication) : stageRange;
   const audience = params.ageBand === "6-8" || params.ageBand === "9-11" || params.ageBand === "12-14" ? "YL" : "AL";
   const domainWeights = taskDomainWeights(params.taskType);
   const skills = [
@@ -224,29 +233,41 @@ export async function assignTaskTargetsFromCatalog(params: {
     skill: string | null;
   }> = [];
   if (params.studentId) {
-    const weakest = await prisma.studentGseMastery.findMany({
-      where: {
-        studentId: params.studentId,
-        node: {
-          audience: { in: [audience, "AL", "AE"] },
-          skill: { in: skills },
-          gseCenter: { gte: stageRange.min - 3, lte: stageRange.max + 3 },
+    const audienceFilter = { in: [audience, "AL", "AE"] };
+    const [vocabWeakest, grammarWeakest, loWeakest] = await Promise.all([
+      domainWeights.vocab >= 0.4 ? prisma.studentGseMastery.findMany({
+        where: {
+          studentId: params.studentId,
+          node: { audience: audienceFilter, type: "GSE_VOCAB", gseCenter: { gte: vocabRange.min - 3, lte: vocabRange.max + 3 } },
         },
-      },
-      include: {
-        node: {
-          select: {
-            nodeId: true,
-            descriptor: true,
-            gseCenter: true,
-            skill: true,
-          },
+        include: { node: { select: { nodeId: true, descriptor: true, gseCenter: true, skill: true } } },
+        orderBy: [{ decayedMastery: "asc" }, { masteryScore: "asc" }],
+        take: 4,
+      }) : Promise.resolve([]),
+      domainWeights.grammar >= 0.5 ? prisma.studentGseMastery.findMany({
+        where: {
+          studentId: params.studentId,
+          node: { audience: audienceFilter, type: "GSE_GRAMMAR", gseCenter: { gte: grammarRange.min - 3, lte: grammarRange.max + 3 } },
         },
-      },
-      orderBy: [{ decayedMastery: "asc" }, { masteryScore: "asc" }],
-      take: 8,
-    });
-    candidateNodes = weakest.map((row) => row.node);
+        include: { node: { select: { nodeId: true, descriptor: true, gseCenter: true, skill: true } } },
+        orderBy: [{ decayedMastery: "asc" }, { masteryScore: "asc" }],
+        take: 3,
+      }) : Promise.resolve([]),
+      prisma.studentGseMastery.findMany({
+        where: {
+          studentId: params.studentId,
+          node: { audience: audienceFilter, type: "GSE_LO", skill: { in: ["speaking", "listening", "writing"] }, gseCenter: { gte: commRange.min - 3, lte: commRange.max + 3 } },
+        },
+        include: { node: { select: { nodeId: true, descriptor: true, gseCenter: true, skill: true } } },
+        orderBy: [{ decayedMastery: "asc" }, { masteryScore: "asc" }],
+        take: 3,
+      }),
+    ]);
+    const merged = [...vocabWeakest, ...grammarWeakest, ...loWeakest];
+    const seen = new Set<string>();
+    candidateNodes = merged
+      .map((row) => row.node)
+      .filter((n) => { if (seen.has(n.nodeId)) return false; seen.add(n.nodeId); return true; });
   }
 
   if (candidateNodes.length === 0) {
@@ -301,17 +322,23 @@ export async function assignTaskTargetsFromCatalog(params: {
 }
 
 export async function nextTargetNodesForStudent(studentId: string, limit = 3) {
-  const rows = await prisma.studentGseMastery.findMany({
-    where: { studentId },
-    orderBy: [{ decayedMastery: "asc" }, { masteryScore: "asc" }, { updatedAt: "asc" }],
-    take: limit,
-    include: {
-      node: {
-        select: { nodeId: true, descriptor: true, gseCenter: true, skill: true, audience: true },
-      },
-    },
-  });
-  return rows.map((row) => ({
+  type Result = {
+    nodeId: string;
+    descriptor: string;
+    skill: string | null;
+    audience: string | null;
+    gseCenter: number | null;
+    masteryScore: number;
+    reliability: "high" | "medium" | "low";
+  };
+  const toResult = (row: {
+    nodeId: string;
+    node: { descriptor: string; skill: string | null; audience: string | null; gseCenter: number | null };
+    decayedMastery: number | null;
+    masteryMean: number | null;
+    masteryScore: number;
+    reliability: string;
+  }): Result => ({
     nodeId: row.nodeId,
     descriptor: row.node.descriptor,
     skill: row.node.skill,
@@ -319,7 +346,83 @@ export async function nextTargetNodesForStudent(studentId: string, limit = 3) {
     gseCenter: row.node.gseCenter,
     masteryScore: row.decayedMastery ?? row.masteryMean ?? row.masteryScore,
     reliability: row.reliability as "high" | "medium" | "low",
-  }));
+  });
+
+  const nodeSelect = { nodeId: true, descriptor: true, gseCenter: true, skill: true, audience: true } as const;
+
+  // Get student's target stage from LearnerProfile
+  const profile = await prisma.learnerProfile.findUnique({ where: { studentId }, select: { stage: true } });
+  const currentStage = (profile?.stage as CEFRStage) || "A1";
+  const target = nextStage(currentStage);
+
+  // Priority 1: Bundle nodes for target stage, weakest by decayedMastery, excluding verified+70
+  const bundleNodeIds = await getBundleNodeIdsForStage(target);
+  if (bundleNodeIds.length > 0) {
+    const bundleRows = await prisma.studentGseMastery.findMany({
+      where: {
+        studentId,
+        nodeId: { in: bundleNodeIds },
+        NOT: { activationState: "verified", decayedMastery: { gte: 70 } },
+      },
+      orderBy: [{ decayedMastery: "asc" }, { masteryScore: "asc" }],
+      take: limit,
+      include: { node: { select: nodeSelect } },
+    });
+    if (bundleRows.length >= limit) return bundleRows.map(toResult);
+
+    // Also include bundle nodes with no mastery row at all
+    const seenIds = new Set(bundleRows.map((r) => r.nodeId));
+    const missingBundleIds = bundleNodeIds.filter((id) => !seenIds.has(id));
+    if (missingBundleIds.length > 0 && bundleRows.length < limit) {
+      const missingNodes = await prisma.gseNode.findMany({
+        where: { nodeId: { in: missingBundleIds.slice(0, limit - bundleRows.length) } },
+        select: nodeSelect,
+      });
+      const results: Result[] = bundleRows.map(toResult);
+      for (const n of missingNodes) {
+        results.push({
+          nodeId: n.nodeId,
+          descriptor: n.descriptor,
+          skill: n.skill,
+          audience: n.audience,
+          gseCenter: n.gseCenter,
+          masteryScore: 0,
+          reliability: "low",
+        });
+      }
+      if (results.length > 0) return results.slice(0, limit);
+    }
+
+    if (bundleRows.length > 0) return bundleRows.map(toResult);
+  }
+
+  // Priority 2: Verification candidates (by verificationDueAt)
+  const verificationRows = await prisma.studentGseMastery.findMany({
+    where: { studentId, activationState: "candidate_for_verification" },
+    orderBy: [{ verificationDueAt: "asc" }],
+    take: limit,
+    include: { node: { select: nodeSelect } },
+  });
+  if (verificationRows.length >= limit) return verificationRows.map(toResult);
+
+  // Priority 3: Fallback — weakest by decayedMastery
+  const fallbackRows = await prisma.studentGseMastery.findMany({
+    where: { studentId },
+    orderBy: [{ decayedMastery: "asc" }, { masteryScore: "asc" }, { updatedAt: "asc" }],
+    take: limit,
+    include: { node: { select: nodeSelect } },
+  });
+
+  // Merge: verification candidates first, then fallback (deduped)
+  const seen = new Set<string>();
+  const merged: Result[] = [];
+  for (const row of [...verificationRows, ...fallbackRows]) {
+    if (seen.has(row.nodeId)) continue;
+    seen.add(row.nodeId);
+    merged.push(toResult(row));
+    if (merged.length >= limit) break;
+  }
+  return merged;
 }
 
 async function loadNodeState(params: {
@@ -327,8 +430,21 @@ async function loadNodeState(params: {
   stage: string;
   ageBand?: string | null;
   taskTypes: string[];
+  domainStages?: {
+    vocab?: string;
+    grammar?: string;
+    communication?: string;
+  };
 }) {
   const stageRange = mapStageToGseRange(params.stage || "A1");
+  // Expand GSE center range to cover all domain stages
+  const ds = params.domainStages;
+  const allRanges = [stageRange];
+  if (ds?.vocab) allRanges.push(mapStageToGseRange(ds.vocab));
+  if (ds?.grammar) allRanges.push(mapStageToGseRange(ds.grammar));
+  if (ds?.communication) allRanges.push(mapStageToGseRange(ds.communication));
+  const gseMin = Math.min(...allRanges.map(r => r.min));
+  const gseMax = Math.max(...allRanges.map(r => r.max));
   const audience = params.ageBand === "6-8" || params.ageBand === "9-11" || params.ageBand === "12-14" ? "YL" : "AL";
   const now = new Date();
 
@@ -337,7 +453,7 @@ async function loadNodeState(params: {
       studentId: params.studentId,
       node: {
         audience: { in: [audience, "AL", "AE"] },
-        gseCenter: { gte: stageRange.min - 5, lte: stageRange.max + 5 },
+        gseCenter: { gte: gseMin - 5, lte: gseMax + 5 },
       },
     },
     include: {
@@ -726,6 +842,11 @@ export async function planNextTaskDecision(params: {
   diagnosticMode?: boolean;
   preferredNodeIds?: string[];
   qualityDomainFocus?: DomainKey | null;
+  domainStages?: {
+    vocab?: string;
+    grammar?: string;
+    communication?: string;
+  };
 }) : Promise<PlannerDecision> {
   const startedAt = Date.now();
   const candidateTaskTypes = dedupe(
@@ -743,6 +864,7 @@ export async function planNextTaskDecision(params: {
       stage: params.stage,
       ageBand: params.ageBand,
       taskTypes,
+      domainStages: params.domainStages,
     }),
     prisma.attempt.findMany({
       where: { studentId: params.studentId, status: "completed" },

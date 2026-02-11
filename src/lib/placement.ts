@@ -1081,7 +1081,6 @@ async function generatePlacementExtendedTask(params: {
   attemptNumber: number;
   targetStage: CEFRStage;
   observedStage?: string;
-  previousPrompt?: string;
 }) {
   const lastTranscript = params.session.transcriptHistory[params.session.transcriptHistory.length - 1];
 
@@ -1090,7 +1089,7 @@ async function generatePlacementExtendedTask(params: {
 
   if (params.attemptNumber === 1) {
     plannerReason = "Placement test. Start a friendly conversation to assess the student's speaking level.";
-    primaryGoal = "Start a friendly open-ended conversation. Ask one question the student can answer at any level — from a few simple words to a detailed response.";
+    primaryGoal = "Ask one open-ended question about a broad, multi-faceted topic (e.g. daily life and routines, school and free time, weekend activities, dreams and plans). Pick a topic that naturally branches into many directions: the student can describe experiences, share opinions, compare things, or talk about future intentions. The question should invite a long, rich answer at any level.";
   } else {
     const snippet = lastTranscript
       ? `The student just said: "${lastTranscript.slice(0, 500)}"`
@@ -1100,7 +1099,7 @@ async function generatePlacementExtendedTask(params: {
       snippet,
       "Continue the conversation naturally — ask a follow-up that builds on what the student said.",
     ].filter(Boolean).join(" ");
-    primaryGoal = "Continue the conversation naturally. Ask an open-ended follow-up question that encourages a long, detailed answer. Vary grammar elicitation — e.g. ask about future plans, past experiences, comparisons, or opinions depending on context.";
+    primaryGoal = "Continue the conversation naturally. Pick up on something the student mentioned and steer into a new angle — e.g. shift from describing to comparing, from past to future, from personal to general opinion. The follow-up should open a fresh direction for a long, detailed answer while keeping the conversation flowing.";
   }
 
   const spec = await generateTaskSpec({
@@ -1114,7 +1113,7 @@ async function generatePlacementExtendedTask(params: {
     focusSkills: ["fluency", "vocabulary", "grammar"],
     plannerReason,
     primaryGoal,
-    recentPrompts: params.previousPrompt ? [params.previousPrompt] : [],
+    recentPrompts: [],
   });
 
   spec.maxDurationSec = 300;
@@ -1266,10 +1265,10 @@ export async function submitPlacementExtendedAnswer(
   const projection = await projectLearnerStageFromGse(session.studentId, { placementMode: true });
   const projectedStage = (projection.placementStage as CEFRStage) || "A2";
 
-  // Get previous task stage and prompt from the attempt's task
+  // Get previous task stage from the attempt's task metadata
   const attemptWithTask = await prisma.attempt.findUnique({
     where: { id: attemptId },
-    select: { task: { select: { metaJson: true, prompt: true } } },
+    select: { task: { select: { metaJson: true } } },
   });
   const prevMeta = (attemptWithTask?.task?.metaJson ?? {}) as Record<string, unknown>;
   const previousTaskStage = typeof prevMeta.stage === "string" ? prevMeta.stage : undefined;
@@ -1298,7 +1297,6 @@ export async function submitPlacementExtendedAnswer(
     attemptNumber: updatedSession.questionCount + 1,
     targetStage,
     observedStage: nodeAnalysis.highestObservedStage,
-    previousPrompt: attemptWithTask?.task?.prompt || undefined,
   });
 
   const task = await prisma.task.create({

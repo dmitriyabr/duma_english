@@ -1255,11 +1255,36 @@ export async function submitPlacementExtendedAnswer(
   const { continue: shouldContinue, reason } = await shouldContinuePlacement(updatedSession);
 
   if (!shouldContinue) {
+    const projection = await refreshLearnerProfileFromGse({
+      studentId: session.studentId,
+      reason: "placement_extended_finish",
+      placementFresh: true,
+      placementMode: true,
+    });
+
     await prisma.placementSession.update({
       where: { id: sessionId },
-      data: { status: "completed", completedAt: new Date() },
+      data: {
+        status: "completed",
+        completedAt: new Date(),
+        resultJson: {
+          stage: projection.placementStage,
+          promotionStage: projection.promotionStage,
+          confidence: projection.placementConfidence,
+          uncertainty: projection.placementUncertainty,
+          nodeCoverage: projection.nodeCoverageByBand,
+        } as unknown as Prisma.InputJsonValue,
+      },
     });
-    return { finished: true, reason };
+
+    return {
+      finished: true,
+      reason,
+      result: {
+        stage: projection.placementStage,
+        confidence: projection.placementConfidence,
+      },
+    };
   }
 
   const projection = await projectLearnerStageFromGse(session.studentId, { placementMode: true });

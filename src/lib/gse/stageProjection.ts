@@ -430,10 +430,13 @@ export async function refreshLearnerProfileFromGse(params: {
   studentId: string;
   reason: string;
   placementFresh?: boolean;
+  placementMode?: boolean;
   uncertainNodeIds?: string[];
   carryoverSummary?: Prisma.InputJsonValue;
 }) {
-  const projection = await projectLearnerStageFromGse(params.studentId);
+  const projection = await projectLearnerStageFromGse(params.studentId, {
+    placementMode: params.placementMode,
+  });
   if (projection.blockedBundles.length > 0) {
     console.log(
       JSON.stringify({

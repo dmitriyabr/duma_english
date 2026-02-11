@@ -39,6 +39,7 @@ export async function POST(
     return NextResponse.json({
       finished: true,
       reason: result.reason,
+      result: result.result,
     });
   }
 

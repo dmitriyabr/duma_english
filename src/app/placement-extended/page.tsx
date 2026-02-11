@@ -13,6 +13,11 @@ type Phase =
   | "submitting"
   | "done";
 
+type PlacementResult = {
+  stage: string;
+  confidence: number;
+};
+
 type TaskInfo = {
   taskId: string;
   type: string;
@@ -110,6 +115,17 @@ function encodeWav(pcm16: Int16Array, sampleRate: number) {
 
 const MAX_ATTEMPTS = 6;
 
+function stageLabel(stage: string) {
+  if (stage === "A0") return "Beginner";
+  if (stage === "A1") return "Elementary";
+  if (stage === "A2") return "Pre-Intermediate";
+  if (stage === "B1") return "Intermediate";
+  if (stage === "B2") return "Upper-Intermediate";
+  if (stage === "C1") return "Advanced";
+  if (stage === "C2") return "Proficient";
+  return "";
+}
+
 export default function PlacementExtendedPage() {
   const [phase, setPhase] = useState<Phase>("starting");
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -120,6 +136,7 @@ export default function PlacementExtendedPage() {
   const [error, setError] = useState<string | null>(null);
   const [seconds, setSeconds] = useState(0);
   const [doneReason, setDoneReason] = useState<string | null>(null);
+  const [placementResult, setPlacementResult] = useState<PlacementResult | null>(null);
 
   const streamRef = useRef<MediaStream | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -328,6 +345,7 @@ export default function PlacementExtendedPage() {
 
       if (data.finished) {
         setDoneReason(data.reason || "Placement complete");
+        if (data.result) setPlacementResult(data.result);
         setPhase("done");
       } else {
         setTask(data.nextTask);
@@ -483,20 +501,47 @@ export default function PlacementExtendedPage() {
           {/* Done phase */}
           {phase === "done" && (
             <>
-              <p className="subtitle">Placement test complete!</p>
-              <div className="metric">
-                <span>Attempts completed</span>
-                <strong>{attemptNumber}</strong>
-              </div>
-              {doneReason && (
-                <div className="metric">
-                  <span>Reason</span>
-                  <p className="subtitle">{doneReason}</p>
-                </div>
+              <p className="subtitle" style={{ marginBottom: 4 }}>Placement test complete!</p>
+              {placementResult ? (
+                <>
+                  <p className="subtitle" style={{ fontSize: "0.9rem", opacity: 0.7, marginBottom: 16 }}>
+                    Based on {attemptNumber} conversation{attemptNumber > 1 ? "s" : ""}, here is your speaking level:
+                  </p>
+                  <div style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    padding: "24px 0",
+                    gap: 8,
+                  }}>
+                    <div style={{
+                      fontSize: "3rem",
+                      fontWeight: 700,
+                      fontFamily: "var(--font-display)",
+                      color: "#2d6a4f",
+                    }}>
+                      {placementResult.stage}
+                    </div>
+                    <div style={{ fontSize: "1rem", color: "#555" }}>
+                      {stageLabel(placementResult.stage)}
+                    </div>
+                    <div style={{
+                      fontSize: "0.8rem",
+                      color: "#888",
+                      marginTop: 4,
+                    }}>
+                      Confidence: {Math.round(placementResult.confidence * 100)}%
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <p className="subtitle" style={{ fontSize: "0.9rem", opacity: 0.7 }}>
+                  Your results are being calculated...
+                </p>
               )}
               <div className="spacer" />
               <Link className="btn" href="/home">
-                Continue to home
+                Continue
               </Link>
             </>
           )}

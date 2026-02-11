@@ -910,7 +910,7 @@ const generalOnlySchema = z.object({
   }),
 });
 
-async function evaluateLoOnly(
+export async function evaluateLoOnly(
   apiKey: string,
   model: string,
   input: EvaluationInput,
@@ -923,7 +923,10 @@ async function evaluateLoOnly(
     "You evaluate ONLY Learning Objectives (LO) for this child speaking attempt.",
     "Return one JSON object: { \"loChecks\": [ ... ] }. No markdown.",
     "Use only nodeIds from the provided options. Do not invent IDs.",
-    "Evidence gating: set pass=true ONLY if the transcript contains clear evidence for that LO. Include ALL target options (pass true/false).",
+    ...(input.taskMeta?.placementMode === "placement_extended"
+      ? ["PLACEMENT MODE: Be thorough. Find ALL communicative abilities the student demonstrated. Even simple LOs count. If the student performed the action at any point, set pass=true."]
+      : ["Evidence gating: set pass=true ONLY if the transcript contains clear evidence for that LO."]),
+    "Include ALL target options (pass true/false).",
     "For candidate (incidental) options: include a check ONLY when the transcript shows this LO was used or attempted. Omit if the LO did not appear in the speech.",
     "Include up to " + limits.SPLIT_LO_CHECKS_MAX + " loChecks when evidenced.",
     "Each item: { checkId (nodeId), label, pass, confidence (0..1), severity (low|medium|high), evidenceSpan (optional) }.",
@@ -952,7 +955,7 @@ async function evaluateLoOnly(
   return (parsed.data.loChecks || []).slice(0, limits.SPLIT_LO_CHECKS_MAX);
 }
 
-async function evaluateGrammarOnly(
+export async function evaluateGrammarOnly(
   apiKey: string,
   model: string,
   input: EvaluationInput,
@@ -966,7 +969,10 @@ async function evaluateGrammarOnly(
     "You evaluate ONLY Grammar for this child speaking attempt.",
     "Return one JSON object: { \"grammarChecks\": [ ... ] }. No markdown.",
     "Use only descriptorIds from the provided options. Do not invent IDs.",
-    "Evidence gating: set pass=true ONLY if the transcript contains clear evidence. Include ALL target options (pass true/false).",
+    ...(input.taskMeta?.placementMode === "placement_extended"
+      ? ["PLACEMENT MODE: Be thorough. Find ALL grammar constructs the student used, even those used incorrectly. If the student attempted the structure anywhere in the transcript, include it with pass=true."]
+      : ["Evidence gating: set pass=true ONLY if the transcript contains clear evidence."]),
+    "Include ALL target options (pass true/false).",
     "For candidate options: include a check ONLY when the construct appears in the transcript (correct or incorrect use). Omit if not used.",
     "opportunityType: explicit_target ONLY for descriptorIds in Target Grammar options; otherwise incidental or elicited_incidental.",
     "Include up to " + limits.SPLIT_GRAMMAR_CHECKS_MAX + " grammarChecks when evidenced.",
@@ -1010,7 +1016,7 @@ async function evaluateGrammarOnly(
   }));
 }
 
-async function evaluateVocabOnly(
+export async function evaluateVocabOnly(
   apiKey: string,
   model: string,
   input: EvaluationInput,
@@ -1024,7 +1030,10 @@ async function evaluateVocabOnly(
     "You evaluate ONLY Vocabulary for this child speaking attempt.",
     "Return one JSON object: { \"vocabChecks\": [ ... ] }. No markdown.",
     "Use only nodeIds from the provided options. Do not invent IDs.",
-    "Evidence gating: set pass=true ONLY if the transcript contains clear evidence. Include ALL target options (pass true/false).",
+    ...(input.taskMeta?.placementMode === "placement_extended"
+      ? ["PLACEMENT MODE: Be thorough. Confirm ALL vocabulary the student actually used. If the word or a close variant appears in the transcript, set pass=true."]
+      : ["Evidence gating: set pass=true ONLY if the transcript contains clear evidence."]),
+    "Include ALL target options (pass true/false).",
     "For candidate options: include a check ONLY when the word or phrase appears in the transcript (correct or incorrect use). Omit if not used.",
     "opportunityType: explicit_target ONLY for nodeIds in Target Vocabulary options; otherwise incidental.",
     "Include up to " + limits.SPLIT_VOCAB_CHECKS_MAX + " vocabChecks when evidenced.",
@@ -1135,8 +1144,10 @@ async function evaluateWithOpenAISplit(input: EvaluationInput): Promise<{
     };
   }
 
-  const stageRaw =
-    typeof input.taskMeta?.stage === "string" && input.taskMeta.stage.trim().length > 0
+  const isPlacementExtended = input.taskMeta?.placementMode === "placement_extended";
+  const stageRaw = isPlacementExtended
+    ? "B1" // B1 range [43,58] with ±30 padding = [13, 88] → covers A1 through C1
+    : typeof input.taskMeta?.stage === "string" && input.taskMeta.stage.trim().length > 0
       ? input.taskMeta.stage
       : "A2";
   const ageBandRaw =
@@ -1158,6 +1169,7 @@ async function evaluateWithOpenAISplit(input: EvaluationInput): Promise<{
       ageBand: ageBandRaw,
       taskType: input.taskType,
       runId: input.taskId,
+      allCatalogs: isPlacementExtended,
     }),
   ]);
 

@@ -1007,19 +1007,41 @@ function determineTargetStage(params: {
   highestObservedStage: string;
   projectedStage: CEFRStage;
   attemptNumber: number;
+  previousTaskStage?: string;
+  userFeedback?: "too_easy" | "just_right" | "too_hard";
 }): CEFRStage {
-  if (params.attemptNumber <= 2) return params.projectedStage;
+  const prevIdx = stageIndex(params.previousTaskStage || params.projectedStage);
+  const projIdx = stageIndex(params.projectedStage);
 
-  if (params.scaffoldingLevel === "targeted") {
-    const idx = Math.min(stageIndex(params.highestObservedStage) + 1, STAGES.length - 1);
+  // too_hard: step down 2 from previous task, but not below projectedStage
+  if (params.userFeedback === "too_hard") {
+    const idx = Math.max(prevIdx - 2, projIdx, 0);
     return STAGES[idx] as CEFRStage;
   }
 
-  if (params.scaffoldingLevel === "moderate") {
-    return params.highestObservedStage as CEFRStage;
+  // too_easy: step up 1 from previous task
+  if (params.userFeedback === "too_easy") {
+    const idx = Math.min(prevIdx + 1, STAGES.length - 1);
+    return STAGES[idx] as CEFRStage;
   }
 
-  return params.dominantStage as CEFRStage;
+  // First 2 attempts: use projected stage, allow +1 if observed evidence is higher
+  if (params.attemptNumber <= 2) {
+    const observedIdx = stageIndex(params.highestObservedStage);
+    const target = Math.min(Math.max(projIdx, observedIdx), projIdx + 1);
+    return STAGES[target] as CEFRStage;
+  }
+
+  // Later attempts: cap at +1 from previous task
+  const observedIdx = stageIndex(params.highestObservedStage);
+  const domIdx = stageIndex(params.dominantStage);
+  const candidateIdx = params.scaffoldingLevel === "targeted"
+    ? Math.max(domIdx, observedIdx) + 1
+    : params.scaffoldingLevel === "moderate"
+    ? Math.max(domIdx, observedIdx)
+    : domIdx;
+  const capped = Math.min(candidateIdx, prevIdx + 1);
+  return STAGES[Math.max(0, Math.min(capped, STAGES.length - 1))] as CEFRStage;
 }
 
 async function getScaffoldingVocab(stage: string, studentId: string): Promise<{
@@ -1055,40 +1077,50 @@ async function getScaffoldingVocab(stage: string, studentId: string): Promise<{
 
 async function generatePlacementExtendedTask(params: {
   studentId: string;
-  session: { transcriptHistory: string[]; stageHistory: string[] };
+  session: { transcriptHistory: string[] };
   attemptNumber: number;
-  scaffoldingLevel: ScaffoldingLevel;
   targetStage: CEFRStage;
+  observedStage?: string;
+  previousPrompt?: string;
 }) {
-  const scaffoldVocab = params.scaffoldingLevel !== "minimal"
-    ? await getScaffoldingVocab(params.targetStage, params.studentId)
-    : { nodeIds: [], labels: [], types: [] };
+  const lastTranscript = params.session.transcriptHistory[params.session.transcriptHistory.length - 1];
 
-  const previousTranscript = params.session.transcriptHistory[params.session.transcriptHistory.length - 1];
-  const previousContext = previousTranscript
-    ? `Continue the conversation. Previous response: "${previousTranscript.slice(0, 400)}".`
-    : "";
+  let plannerReason: string;
+  let primaryGoal: string;
+
+  if (params.attemptNumber === 1) {
+    plannerReason = "Placement test. Start a friendly conversation to assess the student's speaking level.";
+    primaryGoal = "Start a friendly open-ended conversation. Ask one question the student can answer at any level — from a few simple words to a detailed response.";
+  } else {
+    const snippet = lastTranscript
+      ? `The student just said: "${lastTranscript.slice(0, 500)}"`
+      : "";
+    plannerReason = [
+      `Placement test, turn ${params.attemptNumber}. Observed level: ${params.observedStage || "unknown"}.`,
+      snippet,
+      "Continue the conversation naturally — ask a follow-up that builds on what the student said.",
+    ].filter(Boolean).join(" ");
+    primaryGoal = "Continue the conversation naturally. Ask an open-ended follow-up question that encourages a long, detailed answer. Vary grammar elicitation — e.g. ask about future plans, past experiences, comparisons, or opinions depending on context.";
+  }
 
   const spec = await generateTaskSpec({
     taskType: "topic_talk",
     stage: params.targetStage,
     ageBand: "9-11",
     targetWords: [],
-    targetNodeIds: scaffoldVocab.nodeIds,
-    targetNodeLabels: scaffoldVocab.labels,
-    targetNodeTypes: scaffoldVocab.types,
+    targetNodeIds: [],
+    targetNodeLabels: [],
+    targetNodeTypes: [],
     focusSkills: ["fluency", "vocabulary", "grammar"],
-    plannerReason: `Placement extended attempt ${params.attemptNumber}/6. Scaffolding: ${params.scaffoldingLevel}. ${previousContext}`,
-    primaryGoal: params.scaffoldingLevel === "minimal"
-      ? "Ask one wide open-ended question that can be answered at any level. Let the student show their natural ability."
-      : `Ask a question that naturally uses ${params.targetStage}-level vocabulary. Model target words in your question.`,
-    recentPrompts: params.session.transcriptHistory.slice(-2),
+    plannerReason,
+    primaryGoal,
+    recentPrompts: params.previousPrompt ? [params.previousPrompt] : [],
   });
 
   spec.maxDurationSec = 300;
   spec.constraints = { minSeconds: 60, maxSeconds: 360 };
 
-  return { spec, scaffoldVocab };
+  return { spec };
 }
 
 async function shouldContinuePlacement(
@@ -1102,7 +1134,7 @@ async function shouldContinuePlacement(
     return { continue: false, reason: "maximum_6_attempts_reached" };
   }
 
-  const projection = await projectLearnerStageFromGse(session.studentId);
+  const projection = await projectLearnerStageFromGse(session.studentId, { placementMode: true });
   const uncertainty = projection.placementUncertainty;
 
   if (uncertainty <= 0.38) {
@@ -1158,14 +1190,13 @@ export async function startPlacementExtended(studentId: string) {
     },
   });
 
-  const projection = await projectLearnerStageFromGse(studentId);
+  const projection = await projectLearnerStageFromGse(studentId, { placementMode: true });
   const initialStage = (projection.placementStage as CEFRStage) || "A2";
 
-  const { spec, scaffoldVocab } = await generatePlacementExtendedTask({
+  const { spec } = await generatePlacementExtendedTask({
     studentId,
-    session: { transcriptHistory: [], stageHistory: [] },
+    session: { transcriptHistory: [] },
     attemptNumber: 1,
-    scaffoldingLevel: "minimal",
     targetStage: initialStage,
   });
 
@@ -1180,7 +1211,6 @@ export async function startPlacementExtended(studentId: string) {
         placementSessionId: session.id,
         placementAttemptNumber: 1,
         stage: initialStage,
-        scaffoldingLevel: "minimal",
         maxDurationSec: 300,
       } as unknown as Prisma.InputJsonValue,
     },
@@ -1192,7 +1222,6 @@ export async function startPlacementExtended(studentId: string) {
     taskType: spec.taskType,
     ageBand: "9-11",
     studentId,
-    preferredNodeIds: scaffoldVocab.nodeIds.length > 0 ? scaffoldVocab.nodeIds : undefined,
   });
 
   return { session, task };
@@ -1207,12 +1236,19 @@ export async function submitPlacementExtendedAnswer(
     where: { id: sessionId },
   });
 
+  const attempt = await prisma.attempt.findUnique({
+    where: { id: attemptId },
+    select: { transcript: true },
+  });
+  const transcript = attempt?.transcript || "";
+
   const nodeAnalysis = await analyzeLastAttemptNodes(attemptId);
 
   const updatedSession = await prisma.placementSession.update({
     where: { id: sessionId },
     data: {
       questionCount: session.questionCount + 1,
+      transcriptHistory: [...session.transcriptHistory, transcript],
       stageHistory: [...session.stageHistory, nodeAnalysis.dominantStage],
     },
   });
@@ -1227,8 +1263,16 @@ export async function submitPlacementExtendedAnswer(
     return { finished: true, reason };
   }
 
-  const projection = await projectLearnerStageFromGse(session.studentId);
+  const projection = await projectLearnerStageFromGse(session.studentId, { placementMode: true });
   const projectedStage = (projection.placementStage as CEFRStage) || "A2";
+
+  // Get previous task stage and prompt from the attempt's task
+  const attemptWithTask = await prisma.attempt.findUnique({
+    where: { id: attemptId },
+    select: { task: { select: { metaJson: true, prompt: true } } },
+  });
+  const prevMeta = (attemptWithTask?.task?.metaJson ?? {}) as Record<string, unknown>;
+  const previousTaskStage = typeof prevMeta.stage === "string" ? prevMeta.stage : undefined;
 
   const scaffoldingLevel = determineScaffoldingLevel({
     attemptNumber: updatedSession.questionCount + 1,
@@ -1244,17 +1288,17 @@ export async function submitPlacementExtendedAnswer(
     highestObservedStage: nodeAnalysis.highestObservedStage,
     projectedStage,
     attemptNumber: updatedSession.questionCount + 1,
+    previousTaskStage,
+    userFeedback,
   });
 
-  const { spec, scaffoldVocab } = await generatePlacementExtendedTask({
+  const { spec } = await generatePlacementExtendedTask({
     studentId: session.studentId,
-    session: {
-      transcriptHistory: updatedSession.transcriptHistory,
-      stageHistory: updatedSession.stageHistory,
-    },
+    session: { transcriptHistory: updatedSession.transcriptHistory },
     attemptNumber: updatedSession.questionCount + 1,
-    scaffoldingLevel,
     targetStage,
+    observedStage: nodeAnalysis.highestObservedStage,
+    previousPrompt: attemptWithTask?.task?.prompt || undefined,
   });
 
   const task = await prisma.task.create({
@@ -1280,7 +1324,6 @@ export async function submitPlacementExtendedAnswer(
     taskType: spec.taskType,
     ageBand: "9-11",
     studentId: session.studentId,
-    preferredNodeIds: scaffoldVocab.nodeIds.length > 0 ? scaffoldVocab.nodeIds : undefined,
   });
 
   return { finished: false, nextTask: task };

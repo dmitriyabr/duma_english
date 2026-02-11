@@ -83,6 +83,16 @@ function parseCsv(value: string | undefined) {
     .filter(Boolean);
 }
 
+const STOPWORDS = new Set([
+  "i", "me", "my", "we", "you", "your", "he", "she", "it", "they", "them",
+  "a", "an", "the", "is", "am", "are", "was", "were", "be", "been",
+  "do", "does", "did", "have", "has", "had", "will", "would", "can", "could",
+  "shall", "should", "may", "might", "must",
+  "and", "or", "but", "if", "so", "at", "in", "on", "to", "for", "of", "with", "by",
+  "not", "no", "yes", "this", "that", "what", "how", "who", "all", "very",
+  "just", "about", "up", "out", "there", "here", "then", "than", "too",
+]);
+
 function isHumanLexeme(value: string) {
   const normalized = normalizePhrase(value);
   return /^[a-z][a-z0-9' -]{1,48}$/.test(normalized) && !normalized.includes("ua8444");
@@ -168,10 +178,10 @@ function inferAudienceFromCatalog(catalog: string) {
   return "AL";
 }
 
-async function getStageIndex(params: { stage: string; ageBand?: string | null }) {
+async function getStageIndex(params: { stage: string; ageBand?: string | null; allCatalogs?: boolean }) {
   const stage = (params.stage || "A2").trim() || "A2";
   const audience = toAudience(params.ageBand);
-  const allowedCatalogs = parseCsv(process.env.GSE_VOCAB_CATALOGS);
+  const allowedCatalogs = params.allCatalogs ? [] : parseCsv(process.env.GSE_VOCAB_CATALOGS);
   const cacheKey = `${stage}:${audience}:${allowedCatalogs.sort().join(",")}`;
   const ttlMs = Number(process.env.GSE_VOCAB_INDEX_TTL_MS || 10 * 60 * 1000);
 
@@ -181,11 +191,15 @@ async function getStageIndex(params: { stage: string; ageBand?: string | null })
   const range = mapStageToGseRange(stage);
   const allowedAudiences =
     allowedCatalogs.length > 0 ? uniqueStrings(allowedCatalogs.map(inferAudienceFromCatalog)) : [audience];
+  // When searching all catalogs (placement), narrow padding and increase limit
+  // to avoid loading 38K+ nodes where take:3000 cuts off before the target range.
+  const gsePadding = params.allCatalogs ? 10 : 30;
+  const takeLimit = params.allCatalogs ? 12000 : 3000;
   const nodes = await prisma.gseNode.findMany({
     where: {
       type: "GSE_VOCAB",
       descriptor: { notIn: ["", "No descriptor available."] },
-      gseCenter: { gte: range.min - 30, lte: range.max + 30 },
+      gseCenter: { gte: range.min - gsePadding, lte: range.max + gsePadding },
       ...(allowedCatalogs.length > 0 ? { catalog: { in: allowedCatalogs } } : {}),
       OR: [{ audience: { in: allowedAudiences } }, { audience: null }],
     },
@@ -199,7 +213,7 @@ async function getStageIndex(params: { stage: string; ageBand?: string | null })
       metadataJson: true,
       aliases: { select: { alias: true } },
     },
-    take: 3000,
+    take: takeLimit,
   });
 
   const phraseToNodeIds = new Map<string, string[]>();
@@ -258,6 +272,7 @@ export async function buildVocabEvaluationContext(params: {
   ageBand?: string | null;
   taskType: string;
   runId?: string;
+  allCatalogs?: boolean;
 }): Promise<VocabRetrievalContext> {
   if ((process.env.GSE_VOCAB_ENABLED || "true") !== "true") {
     return {
@@ -294,21 +309,25 @@ export async function buildVocabEvaluationContext(params: {
     };
   }
 
-  const idx = await getStageIndex({ stage: params.stage, ageBand: params.ageBand });
+  const idx = await getStageIndex({ stage: params.stage, ageBand: params.ageBand, allCatalogs: params.allCatalogs });
   const lemma = await lemmatizeEnglish(text, { taskType: params.taskType, runId: params.runId });
 
+  // Placement transcripts can be 5 min (~300 words); normal tasks ~60s (~100 words).
+  const tokenLimit = params.allCatalogs ? 400 : 220;
+  const phraseLimit = params.allCatalogs ? 2000 : 1200;
   const lemmaTokens = lemma.tokens
     .map((t) => normalizeWord(t.lemma || t.text))
     .filter((w) => w.length >= 2)
-    .slice(0, 220);
-  const surfaceTokens = normalizePhrase(text).split(" ").map(normalizeWord).filter((w) => w.length >= 2).slice(0, 220);
+    .slice(0, tokenLimit);
+  const surfaceTokens = normalizePhrase(text).split(" ").map(normalizeWord).filter((w) => w.length >= 2).slice(0, tokenLimit);
 
   const phraseCandidates = uniqueStrings([
     ...buildNgrams(lemmaTokens, 4),
     ...buildNgrams(surfaceTokens, 4),
   ])
     .filter((p) => p.length >= 2 && p.length <= 80)
-    .slice(0, 1200);
+    .filter((p) => p.includes(" ") || !STOPWORDS.has(p))
+    .slice(0, phraseLimit);
 
   await appendPipelineDebugEvent({
     event: "vocab_retrieval_phrase_candidates",
@@ -335,12 +354,30 @@ export async function buildVocabEvaluationContext(params: {
   }
 
   const scored = Array.from(nodeAgg.entries())
-    .map(([nodeId, row]) => ({ nodeId, score: row.score, matchedPhrases: Array.from(row.matched).slice(0, 6) }))
-    .sort((a, b) => b.score - a.score)
-    .slice(0, Number(process.env.GSE_VOCAB_MAX_CANDIDATES || 24));
+    .map(([nodeId, row]) => {
+      let score = row.score;
+      const matched = Array.from(row.matched);
+      // Penalize multi-word descriptor nodes matched only by single-word aliases.
+      // "build on" matched via "build" alone, or "I don't know what you mean" via "mean" — false positives.
+      const node = idx.nodeById.get(nodeId);
+      if (node) {
+        const descriptorTokens = normalizePhrase(node.descriptor).split(" ").filter(Boolean).length;
+        const hasMultiWordMatch = matched.some((p) => p.includes(" "));
+        if (descriptorTokens >= 2 && !hasMultiWordMatch) {
+          score *= 0.15;
+        }
+        // Boost nodes where the descriptor itself was matched (not just an alias).
+        const normDesc = normalizePhrase(node.descriptor);
+        if (matched.some((p) => p === normDesc)) {
+          score *= 2;
+        }
+      }
+      return { nodeId, score, matchedPhrases: matched.slice(0, 6) };
+    })
+    .sort((a, b) => b.score - a.score);
 
-  const maxScore = scored.length > 0 ? scored[0].score : 1;
-  const candidates: VocabEvaluationCandidate[] = scored
+  // Build candidate objects from ALL scored nodes (before slicing).
+  const allCandidates: VocabEvaluationCandidate[] = scored
     .map((row) => {
       const node = idx.nodeById.get(row.nodeId);
       if (!node) return null;
@@ -350,22 +387,23 @@ export async function buildVocabEvaluationContext(params: {
         sourceKey: node.sourceKey,
         topicHints: node.topicHints,
         grammaticalCategories: node.grammaticalCategories,
-        retrievalScore: Number(Math.max(0, Math.min(1, row.score / maxScore)).toFixed(5)),
+        retrievalScore: row.score,
         matchedPhrases: row.matchedPhrases,
       };
     })
     .filter(Boolean) as VocabEvaluationCandidate[];
 
-  // Deduplicate exact-sense duplicates: vocab can repeat the same surface form with different TOPIC/CATEGORY.
-  // We want to keep distinct senses, but avoid sending multiple identical entries to the evaluator.
+  // Deduplicate BEFORE slicing so duplicates don't consume candidate slots.
+  // For placement mode: dedup by descriptor only (topic/category don't matter for level assessment).
+  // For normal mode: keep distinct senses (descriptor + topic + category).
   const bestBySense = new Map<string, VocabEvaluationCandidate>();
   const dist = (value: number | null) => (value === null ? 999 : Math.abs(value - idx.stageCenter));
-  for (const c of candidates) {
+  for (const c of allCandidates) {
     const descriptorKey = normalizeDescriptorKey(c.descriptor);
     if (!descriptorKey) continue;
-    const topicKey = (c.topicHints[0] || "").toLowerCase();
-    const catKey = (c.grammaticalCategories[0] || "").toLowerCase();
-    const key = `${descriptorKey}||${topicKey}||${catKey}`;
+    const key = params.allCatalogs
+      ? descriptorKey
+      : `${descriptorKey}||${(c.topicHints[0] || "").toLowerCase()}||${(c.grammaticalCategories[0] || "").toLowerCase()}`;
     const existing = bestBySense.get(key);
     if (!existing) {
       bestBySense.set(key, c);
@@ -383,7 +421,16 @@ export async function buildVocabEvaluationContext(params: {
       }
     }
   }
-  const deduped = Array.from(bestBySense.values());
+  const candidateLimit = params.allCatalogs ? 50 : Number(process.env.GSE_VOCAB_MAX_CANDIDATES || 24);
+  const deduped = Array.from(bestBySense.values())
+    .sort((a, b) => b.retrievalScore - a.retrievalScore)
+    .slice(0, candidateLimit);
+
+  // Normalize scores to 0-1
+  const maxScore = deduped.length > 0 ? deduped[0].retrievalScore : 1;
+  for (const c of deduped) {
+    c.retrievalScore = Number(Math.max(0, Math.min(1, c.retrievalScore / maxScore)).toFixed(5));
+  }
 
   await appendPipelineDebugEvent({
     event: "vocab_retrieval_candidates",

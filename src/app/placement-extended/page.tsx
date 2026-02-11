@@ -342,6 +342,20 @@ export default function PlacementExtendedPage() {
     }
   }
 
+  async function resetPlacement() {
+    if (!confirm("Start over? Current progress will be lost.")) return;
+    setError(null);
+    pollActiveRef.current = false;
+    cleanupAudioGraph();
+    try {
+      const res = await fetch("/api/placement/extended/reset", { method: "POST" });
+      if (!res.ok) throw new Error("Reset failed");
+    } catch {
+      // even if reset call fails, reload to retry
+    }
+    window.location.reload();
+  }
+
   // Cleanup poll on unmount
   useEffect(() => {
     return () => { pollActiveRef.current = false; };
@@ -489,6 +503,17 @@ export default function PlacementExtendedPage() {
 
           {/* Error display */}
           {error && <p style={{ color: "#c1121f", marginTop: 12 }}>{error}</p>}
+
+          {/* Reset button */}
+          {phase !== "starting" && phase !== "done" && (
+            <button
+              className="btn ghost"
+              style={{ marginTop: 24, fontSize: "0.85rem", opacity: 0.7 }}
+              onClick={resetPlacement}
+            >
+              Start over
+            </button>
+          )}
         </div>
       </section>
     </div>

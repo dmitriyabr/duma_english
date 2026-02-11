@@ -238,7 +238,7 @@ function projectPromotionStageFromBundles(stageRows: Array<{
   return stage;
 }
 
-function projectPlacementStage(rows: MasteryRow[]) {
+function projectPlacementStage(rows: MasteryRow[], placementMode?: boolean) {
   const usable = rows.filter((row) => row.evidenceCount > 0 && typeof row.node.gseCenter === "number");
   if (usable.length === 0) {
     return {
@@ -261,7 +261,25 @@ function projectPlacementStage(rows: MasteryRow[]) {
   });
 
   const sumWeight = weighted.reduce((sum, row) => sum + row.weight, 0) || 1;
-  const center = weighted.reduce((sum, row) => sum + row.center * row.weight, 0) / sumWeight;
+
+  let center: number;
+  if (placementMode) {
+    // Upper percentile: find GSE center at 65th percentile of weight
+    const sorted = [...weighted].sort((a, b) => a.center - b.center);
+    const targetWeight = sumWeight * 0.65;
+    let cumulative = 0;
+    center = sorted[sorted.length - 1].center; // fallback to max
+    for (const row of sorted) {
+      cumulative += row.weight;
+      if (cumulative >= targetWeight) {
+        center = row.center;
+        break;
+      }
+    }
+  } else {
+    center = weighted.reduce((sum, row) => sum + row.center * row.weight, 0) / sumWeight;
+  }
+
   const uncertainty = weighted.reduce((sum, row) => sum + row.uncertainty * row.weight, 0) / sumWeight;
   const stage = gseBandFromCenter(center);
   const confidence = Number(clamp(1 - uncertainty, 0.2, 0.98).toFixed(2));
@@ -273,7 +291,10 @@ function projectPlacementStage(rows: MasteryRow[]) {
   };
 }
 
-export async function projectLearnerStageFromGse(studentId: string): Promise<StageProjection> {
+export async function projectLearnerStageFromGse(
+  studentId: string,
+  opts?: { placementMode?: boolean }
+): Promise<StageProjection> {
   const rows = await prisma.studentGseMastery.findMany({
     where: { studentId },
     include: {
@@ -290,7 +311,7 @@ export async function projectLearnerStageFromGse(studentId: string): Promise<Sta
     take: 2500,
   });
 
-  const placement = projectPlacementStage(rows);
+  const placement = projectPlacementStage(rows, opts?.placementMode);
   const bundleReadiness = await computeStageBundleReadiness(studentId, placement.stage);
   const bundlePromotionStage = projectPromotionStageFromBundles(bundleReadiness.stageRows);
   // If placement is above bundle-based promotion, lift promotion: learner shows skills from higher

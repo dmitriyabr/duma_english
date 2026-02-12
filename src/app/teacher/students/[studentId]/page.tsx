@@ -123,11 +123,22 @@ type LevelNodeRow = {
 
 type BundleBlocker = { nodeId: string; descriptor: string; value: number };
 
+type DomainPathEntry = {
+  blockingStage: string;
+  title: string;
+  coveredCount: number;
+  totalRequired: number;
+  ready: boolean;
+  blockers: BundleBlocker[];
+  achieved: BundleBlocker[];
+};
+
 type StudentProfile = {
   catalogNodesByBand?: Record<string, number>;
   perStageCredited?: Record<string, number>;
   perStageBundleTotal?: Record<string, number>;
   domainBundleBlockers?: Record<string, BundleBlocker[]>;
+  domainPromotionPath?: Record<string, DomainPathEntry>;
   student: {
     id: string;
     displayName: string;
@@ -318,7 +329,8 @@ function DomainFocusCard({
   );
 }
 
-function BundlePill({ title, covered, total, ready }: { title: string; covered: number; total: number; ready: boolean }) {
+function BundlePill({ title, covered, total, ready, domainStage, targetStage }: { title: string; covered: number; total: number; ready: boolean; domainStage?: string; targetStage?: string }) {
+  const gap = domainStage && targetStage && domainStage !== targetStage;
   return (
     <span
       style={{
@@ -334,6 +346,7 @@ function BundlePill({ title, covered, total, ready }: { title: string; covered: 
       }}
     >
       {title} {covered}/{total} {ready && "✓"}
+      {gap && <span style={{ fontSize: "0.75rem", color: "var(--ink-3)" }}>(from {domainStage})</span>}
     </span>
   );
 }
@@ -566,150 +579,135 @@ export default function TeacherStudentProfilePage() {
                   : `Progress: ${Math.round(Math.max(pr.readinessScore ?? pr.coverageRatio ?? 0, (pr.valueProgress ?? 0) * 100))}% toward ${pr.targetStage}.`}
               </p>
 
-              {/* Bundle summary pills */}
-              {(pr.targetStageBundleProgress ?? []).length > 0 && (
-                <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
-                  {(pr.targetStageBundleProgress ?? []).map((b) => (
-                    <BundlePill
-                      key={b.bundleKey}
-                      title={b.title}
-                      covered={b.coveredCount}
-                      total={b.totalRequired}
-                      ready={b.ready}
-                    />
-                  ))}
-                </div>
-              )}
+              {/* Per-domain promotion path: show the actual blocking stage per domain */}
+              {(() => {
+                const path = data.domainPromotionPath;
+                const ds = progress.domainStages;
+                if (!path || Object.keys(path).length === 0) return null;
 
-              {/* Collapsible bundle node details */}
-              {(pr.targetStageBundleProgress ?? []).length > 0 && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => setShowBundleDetails(!showBundleDetails)}
-                    style={{
-                      background: "none",
-                      border: "none",
-                      color: "var(--accent-1)",
-                      cursor: "pointer",
-                      fontSize: "0.85rem",
-                      padding: 0,
-                      textDecoration: "underline",
-                    }}
-                  >
-                    {showBundleDetails ? "Hide node details" : "Show node details"}
-                  </button>
+                const DOMAIN_LABELS: Record<string, string> = { vocab: "Vocabulary", grammar: "Grammar", lo: "Communication" };
+                const domainStageMap: Record<string, string> = {
+                  vocab: ds?.vocab.stage ?? "—",
+                  grammar: ds?.grammar.stage ?? "—",
+                  lo: ds?.communication.stage ?? "—",
+                };
+                const entries = Object.entries(path).sort(
+                  (a, b) => (a[1].coveredCount / (a[1].totalRequired || 1)) - (b[1].coveredCount / (b[1].totalRequired || 1))
+                );
 
-                  {showBundleDetails && (
-                    <div style={{ borderTop: "1px solid rgba(16,22,47,0.08)", paddingTop: 12, marginTop: 12 }}>
-                      {(pr.targetStageBundleProgress ?? []).map((b) => {
-                        const blocked = (pr.blockedBundlesReadable ?? pr.blockedBundles ?? []).find(
-                          (x) => x.bundleKey === b.bundleKey
-                        );
-                        const blockers = blocked?.blockers ?? [];
-                        return (
-                          <div
-                            key={b.bundleKey}
-                            style={{
-                              marginBottom: 16,
-                              padding: 12,
-                              background: b.ready ? "rgba(45,212,160,0.06)" : "rgba(16,22,47,0.03)",
-                              borderRadius: "var(--radius-sm)",
-                            }}
-                          >
-                            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                              <span style={{ fontFamily: "var(--font-display)", fontWeight: 600, fontSize: "0.95rem" }}>
-                                {b.title}
-                              </span>
-                              <span style={{ fontSize: "0.9rem", color: "var(--ink-2)" }}>
-                                {b.coveredCount} / {b.totalRequired}
-                              </span>
-                              {b.ready && <span style={{ color: "#0d9668" }}>✓</span>}
-                            </div>
-                            <ul style={{ listStyle: "none", paddingLeft: 0, margin: 0 }}>
-                              {(b.achieved ?? []).map((node) => (
-                                <li
-                                  key={node.nodeId}
+                return (
+                  <>
+                    <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
+                      {entries.map(([domain, entry]) => (
+                        <BundlePill
+                          key={domain}
+                          title={entry.title}
+                          covered={entry.coveredCount}
+                          total={entry.totalRequired}
+                          ready={entry.ready}
+                          domainStage={domainStageMap[domain]}
+                          targetStage={entry.blockingStage}
+                        />
+                      ))}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setShowBundleDetails(!showBundleDetails)}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        color: "var(--accent-1)",
+                        cursor: "pointer",
+                        fontSize: "0.85rem",
+                        padding: 0,
+                        textDecoration: "underline",
+                      }}
+                    >
+                      {showBundleDetails ? "Hide node details" : "Show node details"}
+                    </button>
+
+                    {showBundleDetails && (
+                      <div style={{ borderTop: "1px solid rgba(16,22,47,0.08)", paddingTop: 12, marginTop: 12 }}>
+                        {entries.map(([domain, entry]) => {
+                          const domStage = domainStageMap[domain];
+                          return (
+                            <div
+                              key={domain}
+                              style={{
+                                marginBottom: 16,
+                                padding: 12,
+                                background: entry.ready ? "rgba(45,212,160,0.06)" : "rgba(16,22,47,0.03)",
+                                borderRadius: "var(--radius-sm)",
+                              }}
+                            >
+                              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                                <span style={{ fontFamily: "var(--font-display)", fontWeight: 600, fontSize: "0.95rem" }}>
+                                  {DOMAIN_LABELS[domain] ?? domain}
+                                </span>
+                                <span
                                   style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: 10,
-                                    marginBottom: 6,
-                                    fontSize: "0.9rem",
+                                    fontSize: "0.8rem",
+                                    fontWeight: 600,
+                                    padding: "1px 8px",
+                                    borderRadius: "var(--radius-sm)",
+                                    background: "rgba(99,102,241,0.12)",
+                                    color: "#4f46e5",
                                   }}
                                 >
-                                  <span style={{ color: "#0d9668", minWidth: 24 }}>✓</span>
-                                  <span style={{ minWidth: 100, flex: 1 }}>{node.descriptor}</span>
-                                  <div
-                                    style={{
-                                      width: 200,
-                                      height: 8,
-                                      borderRadius: 4,
-                                      background: "rgba(16,22,47,0.1)",
-                                      overflow: "hidden",
-                                    }}
-                                  >
-                                    <div
-                                      style={{
-                                        width: "100%",
-                                        height: "100%",
-                                        background: "#0d9668",
-                                        borderRadius: 4,
-                                      }}
-                                    />
-                                  </div>
-                                  <span style={{ minWidth: 40, color: "var(--ink-2)", fontWeight: 600 }}>
-                                    {Math.round(node.value)} / 70
-                                  </span>
-                                </li>
-                              ))}
-                              {blockers.map((node) => {
-                                const pct = Math.min(100, (node.value / 70) * 100);
-                                return (
+                                  {domStage} → {entry.blockingStage}
+                                </span>
+                                <span style={{ fontSize: "0.9rem", color: "var(--ink-2)" }}>
+                                  {entry.coveredCount} / {entry.totalRequired}
+                                </span>
+                                {entry.ready && <span style={{ color: "#0d9668" }}>✓</span>}
+                              </div>
+                              <ul style={{ listStyle: "none", paddingLeft: 0, margin: 0 }}>
+                                {entry.achieved.map((node) => (
                                   <li
                                     key={node.nodeId}
-                                    style={{
-                                      display: "flex",
-                                      alignItems: "center",
-                                      gap: 10,
-                                      marginBottom: 6,
-                                      fontSize: "0.9rem",
-                                    }}
+                                    style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6, fontSize: "0.9rem" }}
                                   >
-                                    <span style={{ minWidth: 24 }} />
+                                    <span style={{ color: "#0d9668", minWidth: 24 }}>✓</span>
                                     <span style={{ minWidth: 100, flex: 1 }}>{node.descriptor}</span>
-                                    <div
-                                      style={{
-                                        width: 200,
-                                        height: 8,
-                                        borderRadius: 4,
-                                        background: "rgba(16,22,47,0.1)",
-                                        overflow: "hidden",
-                                      }}
-                                    >
-                                      <div
-                                        style={{
-                                          width: `${pct}%`,
-                                          height: "100%",
-                                          background: node.value >= 70 ? "var(--accent-2)" : "var(--accent-3)",
-                                          borderRadius: 4,
-                                        } as React.CSSProperties}
-                                      />
+                                    <div style={{ width: 200, height: 8, borderRadius: 4, background: "rgba(16,22,47,0.1)", overflow: "hidden" }}>
+                                      <div style={{ width: "100%", height: "100%", background: "#0d9668", borderRadius: 4 }} />
                                     </div>
-                                    <span style={{ minWidth: 40, color: "var(--ink-2)", fontWeight: 600 }}>
-                                      {Math.round(node.value)} / 70
-                                    </span>
+                                    <span style={{ minWidth: 40, color: "var(--ink-2)", fontWeight: 600 }}>{Math.round(node.value)} / 70</span>
                                   </li>
-                                );
-                              })}
-                            </ul>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </>
-              )}
+                                ))}
+                                {entry.blockers.map((node) => {
+                                  const pct = Math.min(100, (node.value / 70) * 100);
+                                  return (
+                                    <li
+                                      key={node.nodeId}
+                                      style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6, fontSize: "0.9rem" }}
+                                    >
+                                      <span style={{ minWidth: 24 }} />
+                                      <span style={{ minWidth: 100, flex: 1 }}>{node.descriptor}</span>
+                                      <div style={{ width: 200, height: 8, borderRadius: 4, background: "rgba(16,22,47,0.1)", overflow: "hidden" }}>
+                                        <div
+                                          style={{
+                                            width: `${pct}%`,
+                                            height: "100%",
+                                            background: node.value >= 70 ? "var(--accent-2)" : "var(--accent-3)",
+                                            borderRadius: 4,
+                                          } as React.CSSProperties}
+                                        />
+                                      </div>
+                                      <span style={{ minWidth: 40, color: "var(--ink-2)", fontWeight: 600 }}>{Math.round(node.value)} / 70</span>
+                                    </li>
+                                  );
+                                })}
+                              </ul>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
             </div>
           )}
 

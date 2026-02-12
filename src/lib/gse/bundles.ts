@@ -184,7 +184,11 @@ export function isPlacementAboveStage(placementStage: CEFRStage | undefined, bun
   return pIdx >= 0 && bIdx >= 0 && pIdx > bIdx;
 }
 
-export async function computeStageBundleReadiness(studentId: string, placementStage?: CEFRStage) {
+export async function computeStageBundleReadiness(
+  studentId: string,
+  placementStage?: CEFRStage,
+  domainPlacementStages?: Partial<Record<BundleDomain, CEFRStage>>,
+) {
   await ensureDefaultGseBundles();
 
   const bundles = await prisma.gseBundle.findMany({
@@ -218,6 +222,7 @@ export async function computeStageBundleReadiness(studentId: string, placementSt
       directEvidenceCount: true,
       activationState: true,
       lastEvidenceAt: true,
+      calculationVersion: true,
     },
   });
   const byNode = new Map(masteryRows.map((row) => [row.nodeId, row]));
@@ -241,6 +246,7 @@ export async function computeStageBundleReadiness(studentId: string, placementSt
       const direct = mastery?.directEvidenceCount || 0;
       const verified = mastery?.activationState === "verified";
       const stable = Boolean(mastery?.lastEvidenceAt && mastery.lastEvidenceAt >= stableSince && uncertainty <= 0.32);
+      const placementInferred = mastery?.calculationVersion === "placement_inferred";
       return {
         nodeId: row.nodeId,
         descriptor: row.node.descriptor,
@@ -250,13 +256,18 @@ export async function computeStageBundleReadiness(studentId: string, placementSt
         direct,
         verified,
         stable,
+        placementInferred,
       };
     });
 
     // Fast credit: when placement is above this bundle's stage, count node as covered if value≥50 and ≥1 direct (no need to grind to verified+70)
-    const placementAbove = isPlacementAboveStage(placementStage, bundle.stage as CEFRStage);
+    // Also credit placement_inferred nodes for stages below placement (these are assumed known)
+    // Use per-domain placement stage when available (e.g. vocab at B1 credits A1/A2 vocab bundles)
+    const bundleDomain = bundle.domain as BundleDomain;
+    const effectivePlacement = domainPlacementStages?.[bundleDomain] ?? placementStage;
+    const placementAbove = isPlacementAboveStage(effectivePlacement, bundle.stage as CEFRStage);
     const isCredited = (row: (typeof scored)[0]) =>
-      (row.verified && row.value >= 70) || (placementAbove && row.value >= 50 && row.direct >= 1);
+      (row.verified && row.value >= 70) || (placementAbove && row.value >= 50 && row.direct >= 1) || (placementAbove && row.placementInferred);
     const achievedRows = scored.filter(isCredited).sort((a, b) => b.value - a.value);
     const coveredCount = achievedRows.length;
     const coverage = totalRequired > 0 ? coveredCount / totalRequired : 0;

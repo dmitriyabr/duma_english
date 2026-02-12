@@ -163,7 +163,14 @@ export async function GET(
   }
 
   const STAGES = ["A1", "A2", "B1", "B2", "C1", "C2"] as const;
+  type CEFRStageType = "A0" | "A1" | "A2" | "B1" | "B2" | "C1" | "C2";
   const placementStage = (progress as { placementStage?: string }).placementStage;
+  const ds = (progress as { domainStages?: { vocab: { stage: string }; grammar: { stage: string }; communication: { stage: string } } }).domainStages;
+  const domainPlacementStages = ds ? {
+    vocab: ds.vocab.stage as CEFRStageType,
+    grammar: ds.grammar.stage as CEFRStageType,
+    lo: ds.communication.stage as CEFRStageType,
+  } : undefined;
 
   const [catalogNodesByBand, bundleReadiness] = await Promise.all([
     Promise.all(
@@ -175,7 +182,7 @@ export async function GET(
         return [stage, count] as const;
       })
     ).then((pairs) => Object.fromEntries(pairs)),
-    computeStageBundleReadiness(studentId, placementStage as "A0" | "A1" | "A2" | "B1" | "B2" | "C1" | "C2" | undefined),
+    computeStageBundleReadiness(studentId, placementStage as CEFRStageType | undefined, domainPlacementStages),
   ]);
 
   const perStageCredited: Record<string, number> = {};
@@ -185,16 +192,42 @@ export async function GET(
     perStageBundleTotal[row.stage] = row.bundleRows.reduce((sum, b) => sum + b.totalRequired, 0);
   }
 
-  // Domain bundle blockers for target stage
+  // Per-domain promotion path: find the first incomplete bundle stage up to target
   const targetStage = (progress as { promotionReadiness?: { targetStage?: string } }).promotionReadiness?.targetStage;
+  const STAGE_SEQ = ["A1", "A2", "B1", "B2", "C1", "C2"] as const;
+  const targetIdx = targetStage ? STAGE_SEQ.indexOf(targetStage as typeof STAGE_SEQ[number]) : -1;
+
   const domainBundleBlockers: Record<string, Array<{ nodeId: string; descriptor: string; value: number }>> = {};
-  if (targetStage) {
-    const targetRows = bundleReadiness.rows.filter((r) => r.stage === targetStage);
-    for (const row of targetRows) {
-      const domain = row.domain;
-      const blockers = row.blockers.sort((a, b) => a.value - b.value).slice(0, 8);
-      if (blockers.length > 0) {
-        domainBundleBlockers[domain] = blockers;
+  const domainPromotionPath: Record<string, {
+    blockingStage: string;
+    title: string;
+    coveredCount: number;
+    totalRequired: number;
+    ready: boolean;
+    blockers: Array<{ nodeId: string; descriptor: string; value: number }>;
+    achieved: Array<{ nodeId: string; descriptor: string; value: number }>;
+  }> = {};
+
+  if (targetIdx >= 0) {
+    for (const domain of ["vocab", "grammar", "lo"]) {
+      // Walk stages A1..target, find first bundle that doesn't meet coverage threshold
+      for (let i = 0; i <= targetIdx; i++) {
+        const stage = STAGE_SEQ[i];
+        const row = bundleReadiness.rows.find((r) => r.stage === stage && r.domain === domain);
+        if (row && row.coverage < row.requiredCoverage) {
+          const blockers = row.blockers.sort((a, b) => a.value - b.value).slice(0, 8);
+          domainBundleBlockers[domain] = blockers;
+          domainPromotionPath[domain] = {
+            blockingStage: stage,
+            title: row.title,
+            coveredCount: row.coveredCount,
+            totalRequired: row.totalRequired,
+            ready: row.ready,
+            blockers,
+            achieved: row.achieved.slice(0, 8),
+          };
+          break;
+        }
       }
     }
   }
@@ -222,5 +255,6 @@ export async function GET(
     fullMastery,
     recentNodeOutcomes: recentNodeOutcomes.slice(0, 80),
     domainBundleBlockers,
+    domainPromotionPath,
   });
 }

@@ -25,6 +25,17 @@ type DerivedSkill = {
   source: "gse-derived";
 };
 
+export type DomainStageInfo = {
+  stage: CEFRStage;
+  confidence: number;
+};
+
+export type DomainStages = {
+  vocab: DomainStageInfo;
+  grammar: DomainStageInfo;
+  communication: DomainStageInfo;
+};
+
 export type StageProjection = {
   stage: CEFRStage;
   confidence: number;
@@ -61,6 +72,8 @@ export type StageProjection = {
   targetStageValueProgress: number;
   nodeCoverageByBand: Record<string, { mastered: number; total: number }>;
   derivedSkills: DerivedSkill[];
+  domainStages: DomainStages;
+  pronunciationScore: number | null;
 };
 
 type MasteryRow = {
@@ -291,6 +304,56 @@ function projectPlacementStage(rows: MasteryRow[], placementMode?: boolean) {
   };
 }
 
+async function computePronunciationScore(studentId: string): Promise<number | null> {
+  const recent = await prisma.attempt.findMany({
+    where: { studentId, status: "completed", speechMetricsJson: { not: Prisma.DbNull } },
+    orderBy: { createdAt: "desc" },
+    select: { speechMetricsJson: true },
+    take: 10,
+  });
+  if (recent.length === 0) return null;
+
+  const scores: number[] = [];
+  for (const row of recent) {
+    const m = row.speechMetricsJson as Record<string, unknown> | null;
+    if (!m) continue;
+    const accuracy =
+      typeof m.pronunciationTargetRef === "number" ? m.pronunciationTargetRef
+      : typeof m.accuracy === "number" ? m.accuracy
+      : typeof m.pronunciation === "number" ? m.pronunciation
+      : null;
+    const fluency = typeof m.fluency === "number" ? m.fluency : null;
+    const prosody = typeof m.prosody === "number" ? m.prosody : null;
+    const parts: number[] = [];
+    const weights: number[] = [];
+    if (accuracy !== null) { parts.push(accuracy * 0.4); weights.push(0.4); }
+    if (fluency !== null) { parts.push(fluency * 0.3); weights.push(0.3); }
+    if (prosody !== null) { parts.push(prosody * 0.3); weights.push(0.3); }
+    if (weights.length === 0) continue;
+    const totalWeight = weights.reduce((s, w) => s + w, 0);
+    scores.push(parts.reduce((s, p) => s + p, 0) / totalWeight);
+  }
+
+  if (scores.length === 0) return null;
+  return Number((scores.reduce((s, v) => s + v, 0) / scores.length).toFixed(1));
+}
+
+function computeDomainStages(rows: MasteryRow[], placementMode?: boolean): DomainStages {
+  const vocabRows = rows.filter(r => r.node.type === "GSE_VOCAB");
+  const grammarRows = rows.filter(r => r.node.type === "GSE_GRAMMAR");
+  const commRows = rows.filter(r => r.node.type === "GSE_LO" && r.node.skill === "speaking");
+
+  const vocabProjection = projectPlacementStage(vocabRows, placementMode);
+  const grammarProjection = projectPlacementStage(grammarRows, placementMode);
+  const commProjection = projectPlacementStage(commRows, placementMode);
+
+  return {
+    vocab: { stage: vocabProjection.stage, confidence: vocabProjection.confidence },
+    grammar: { stage: grammarProjection.stage, confidence: grammarProjection.confidence },
+    communication: { stage: commProjection.stage, confidence: commProjection.confidence },
+  };
+}
+
 export async function projectLearnerStageFromGse(
   studentId: string,
   opts?: { placementMode?: boolean }
@@ -312,7 +375,13 @@ export async function projectLearnerStageFromGse(
   });
 
   const placement = projectPlacementStage(rows, opts?.placementMode);
-  const bundleReadiness = await computeStageBundleReadiness(studentId, placement.stage);
+  const domainStages = computeDomainStages(rows, opts?.placementMode);
+  const domainPlacementStages = {
+    vocab: domainStages.vocab.stage,
+    grammar: domainStages.grammar.stage,
+    lo: domainStages.communication.stage,
+  };
+  const bundleReadiness = await computeStageBundleReadiness(studentId, placement.stage, domainPlacementStages);
   const bundlePromotionStage = projectPromotionStageFromBundles(bundleReadiness.stageRows);
   // If placement is above bundle-based promotion, lift promotion: learner shows skills from higher
   // nodes → treat as that level so we don't show "A0" while they're working on B1.
@@ -403,6 +472,8 @@ export async function projectLearnerStageFromGse(
         )
       : 0;
 
+  const pronunciationScore = await computePronunciationScore(studentId);
+
   return {
     stage: promotionStage,
     confidence,
@@ -423,6 +494,8 @@ export async function projectLearnerStageFromGse(
     targetStageValueProgress,
     nodeCoverageByBand: buildNodeCoverageByBand(rows),
     derivedSkills: buildDerivedSkills(rows),
+    domainStages,
+    pronunciationScore,
   };
 }
 
@@ -454,22 +527,26 @@ export async function refreshLearnerProfileFromGse(params: {
       })
     );
   }
+  const stageEvidence = {
+    reason: params.reason,
+    projectionScore: projection.score,
+    confidence: projection.confidence,
+    placementStage: projection.placementStage,
+    placementConfidence: projection.placementConfidence,
+    placementUncertainty: projection.placementUncertainty,
+    promotionStage: projection.promotionStage,
+    currentStageStats: projection.currentStageStats,
+    targetStageStats: projection.targetStageStats,
+    domainStages: projection.domainStages,
+    pronunciationScore: projection.pronunciationScore,
+  };
+
   await prisma.learnerProfile.upsert({
     where: { studentId: params.studentId },
     update: {
       stage: projection.promotionStage,
       stageSource: "gse_projection",
-      stageEvidenceJson: {
-        reason: params.reason,
-        projectionScore: projection.score,
-        confidence: projection.confidence,
-        placementStage: projection.placementStage,
-        placementConfidence: projection.placementConfidence,
-        placementUncertainty: projection.placementUncertainty,
-        promotionStage: projection.promotionStage,
-        currentStageStats: projection.currentStageStats,
-        targetStageStats: projection.targetStageStats,
-      },
+      stageEvidenceJson: stageEvidence,
       placementScore: projection.score,
       placementConfidence: projection.placementConfidence,
       placementFresh:
@@ -481,17 +558,7 @@ export async function refreshLearnerProfileFromGse(params: {
       studentId: params.studentId,
       stage: projection.promotionStage,
       stageSource: "gse_projection",
-      stageEvidenceJson: {
-        reason: params.reason,
-        projectionScore: projection.score,
-        confidence: projection.confidence,
-        placementStage: projection.placementStage,
-        placementConfidence: projection.placementConfidence,
-        placementUncertainty: projection.placementUncertainty,
-        promotionStage: projection.promotionStage,
-        currentStageStats: projection.currentStageStats,
-        targetStageStats: projection.targetStageStats,
-      },
+      stageEvidenceJson: stageEvidence,
       placementScore: projection.score,
       placementConfidence: projection.placementConfidence,
       placementFresh: Boolean(params.placementFresh),
@@ -520,6 +587,8 @@ export async function refreshLearnerProfileFromGse(params: {
         targetStageStats: projection.targetStageStats,
         blockedByNodes: projection.blockedByNodes,
         blockedBundles: projection.blockedBundles,
+        domainStages: projection.domainStages,
+        pronunciationScore: projection.pronunciationScore,
       },
     },
   });

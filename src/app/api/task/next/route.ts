@@ -108,6 +108,11 @@ export async function GET(req: Request) {
   const diagnosticMode =
     coldStartActive || Boolean(profile?.placementFresh) || projection.placementUncertainty > 0.38;
   const plannerStartedAt = Date.now();
+  const domainStages = {
+    vocab: projection.domainStages.vocab.stage,
+    grammar: projection.domainStages.grammar.stage,
+    communication: projection.domainStages.communication.stage,
+  };
   const decision = await planNextTaskDecision({
     studentId: student.studentId,
     stage: projection.promotionStage,
@@ -118,6 +123,7 @@ export async function GET(req: Request) {
     diagnosticMode: diagnosticMode || Boolean(qualityDiagnosticOverride),
     preferredNodeIds: profile?.placementFresh ? placementUncertainNodes : undefined,
     qualityDomainFocus: qualityDiagnosticOverride,
+    domainStages,
   });
 
   const recentTaskInstances = await prisma.taskInstance.findMany({
@@ -131,10 +137,13 @@ export async function GET(req: Request) {
     .filter((value) => value.length > 0);
 
   // For target_vocab, words in the prompt MUST match planner target nodes — otherwise we penalize for words we never asked for.
+  // Only use GSE_VOCAB descriptors as words; LO/grammar descriptors are sentences, not words.
   const targetWordsForPrompt =
     decision.chosenTaskType === "target_vocab"
       ? (() => {
+          const types = decision.targetNodeTypes ?? [];
           const fromNodes = decision.targetNodeDescriptors
+            .filter((_, i) => !types[i] || types[i] === "GSE_VOCAB")
             .map((d) => {
               const w = d.trim().toLowerCase().replace(/[^a-z0-9\s]/g, " ").trim();
               const first = w.split(/\s+/).filter((t) => t.length >= 2)[0];
@@ -158,6 +167,10 @@ export async function GET(req: Request) {
     plannerReason: decision.selectionReason,
     primaryGoal: decision.primaryGoal,
     recentPrompts,
+    domainStages: {
+      vocab: domainStages.vocab,
+      grammar: domainStages.grammar,
+    },
   });
 
   const selectedTaskType = decision.chosenTaskType;
@@ -232,6 +245,7 @@ export async function GET(req: Request) {
     ageBand: profile?.ageBand || "9-11",
     studentId: student.studentId,
     preferredNodeIds: decision.targetNodeIds,
+    domainStages,
   });
   if (gseSelection.targetNodeIds.length === 0) {
     return NextResponse.json(

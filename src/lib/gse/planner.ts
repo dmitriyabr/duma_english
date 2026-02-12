@@ -1,7 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import type { CEFRStage } from "@/lib/curriculum";
-import { getBundleNodeIdsForStage } from "./bundles";
+import { getBundleNodeIdsForStage, getBundleNodeIdsForStageAndDomain } from "./bundles";
 import { computeDecayedMastery } from "./mastery";
 import { mapStageToGseRange } from "./utils";
 
@@ -350,13 +350,30 @@ export async function nextTargetNodesForStudent(studentId: string, limit = 3) {
 
   const nodeSelect = { nodeId: true, descriptor: true, gseCenter: true, skill: true, audience: true } as const;
 
-  // Get student's target stage from LearnerProfile
+  // Get student's per-domain stages from latest projection
   const profile = await prisma.learnerProfile.findUnique({ where: { studentId }, select: { stage: true } });
   const currentStage = (profile?.stage as CEFRStage) || "A1";
-  const target = nextStage(currentStage);
+  const latestProjection = await prisma.gseStageProjection.findFirst({
+    where: { studentId },
+    orderBy: { createdAt: "desc" },
+    select: { evidenceJson: true },
+  });
+  const ds = (latestProjection?.evidenceJson as { domainStages?: { vocab?: { stage: string }; grammar?: { stage: string }; communication?: { stage: string } } })?.domainStages;
 
-  // Priority 1: Bundle nodes for target stage, weakest by decayedMastery, excluding verified+70
-  const bundleNodeIds = await getBundleNodeIdsForStage(target);
+  // Per-domain target stages
+  const domainTargets: Record<DomainKey, CEFRStage> = {
+    vocab: nextStage(ds?.vocab?.stage ?? currentStage),
+    grammar: nextStage(ds?.grammar?.stage ?? currentStage),
+    lo: nextStage(ds?.communication?.stage ?? currentStage),
+  };
+
+  // Priority 1: Bundle nodes for per-domain target stages, weakest by decayedMastery, excluding verified+70
+  const bundleIdArrays = await Promise.all([
+    getBundleNodeIdsForStageAndDomain(domainTargets.vocab, "vocab"),
+    getBundleNodeIdsForStageAndDomain(domainTargets.grammar, "grammar"),
+    getBundleNodeIdsForStageAndDomain(domainTargets.lo, "lo"),
+  ]);
+  const bundleNodeIds = [...new Set(bundleIdArrays.flat())];
   if (bundleNodeIds.length > 0) {
     const bundleRows = await prisma.studentGseMastery.findMany({
       where: {
@@ -572,14 +589,27 @@ async function loadPrevStageNotMastered(params: {
   stage: string;
   ageBand?: string | null;
   currentPoolSize: number;
+  domainStages?: { vocab?: string; grammar?: string; communication?: string };
 }): Promise<NodeState[]> {
-  const prev = prevStage(params.stage);
-  if (!prev) return [];
   const now = new Date();
   const maxAdd = Math.min(20, Math.max(0, params.currentPoolSize - 1));
   if (maxAdd <= 0) return [];
 
-  const prevBundleIds = await getBundleNodeIdsForStage(prev);
+  // Per-domain prev stages: for each domain, prev = domain's current stage - 1
+  const ds = params.domainStages;
+  const domainPrevs: Array<{ domain: "vocab" | "grammar" | "lo"; prev: CEFRStage }> = [];
+  const vocabPrev = prevStage(ds?.vocab ?? params.stage);
+  const grammarPrev = prevStage(ds?.grammar ?? params.stage);
+  const loPrev = prevStage(ds?.communication ?? params.stage);
+  if (vocabPrev) domainPrevs.push({ domain: "vocab", prev: vocabPrev });
+  if (grammarPrev) domainPrevs.push({ domain: "grammar", prev: grammarPrev });
+  if (loPrev) domainPrevs.push({ domain: "lo", prev: loPrev });
+  if (domainPrevs.length === 0) return [];
+
+  const prevBundleIdArrays = await Promise.all(
+    domainPrevs.map((d) => getBundleNodeIdsForStageAndDomain(d.prev, d.domain))
+  );
+  const prevBundleIds = [...new Set(prevBundleIdArrays.flat())];
   if (prevBundleIds.length === 0) return [];
 
   const [masteryForPrev, nodesForPrev] = await Promise.all([
@@ -857,8 +887,15 @@ export async function planNextTaskDecision(params: {
       ? candidateTaskTypes
       : ["read_aloud", "target_vocab", "qa_prompt", "role_play", "topic_talk", "filler_control", "speech_builder"];
 
-  const targetStage = nextStage(params.stage);
-  const [nodeStates, recentAttempts, recentInstances, targetStageBundleNodeIds] = await Promise.all([
+  // Per-domain target stages: each domain advances independently
+  const ds = params.domainStages;
+  const domainTargets: Record<DomainKey, CEFRStage> = {
+    vocab: nextStage(ds?.vocab ?? params.stage),
+    grammar: nextStage(ds?.grammar ?? params.stage),
+    lo: nextStage(ds?.communication ?? params.stage),
+  };
+
+  const [nodeStates, recentAttempts, recentInstances, vocabBundleIds, grammarBundleIds, loBundleIds] = await Promise.all([
     loadNodeState({
       studentId: params.studentId,
       stage: params.stage,
@@ -878,8 +915,11 @@ export async function planNextTaskDecision(params: {
       orderBy: { createdAt: "desc" },
       take: 6,
     }),
-    getBundleNodeIdsForStage(targetStage),
+    getBundleNodeIdsForStageAndDomain(domainTargets.vocab, "vocab"),
+    getBundleNodeIdsForStageAndDomain(domainTargets.grammar, "grammar"),
+    getBundleNodeIdsForStageAndDomain(domainTargets.lo, "lo"),
   ]);
+  const targetStageBundleNodeIds = [...new Set([...vocabBundleIds, ...grammarBundleIds, ...loBundleIds])];
 
   const inPool = new Set(nodeStates.map((n) => n.nodeId));
   const missingBundleIds = targetStageBundleNodeIds.filter((id) => !inPool.has(id));
@@ -921,6 +961,7 @@ export async function planNextTaskDecision(params: {
     stage: params.stage,
     ageBand: params.ageBand,
     currentPoolSize: nodeStates.length,
+    domainStages: params.domainStages,
   });
   for (const n of prevStageNodes) {
     if (!inPool.has(n.nodeId)) {

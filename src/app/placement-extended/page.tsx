@@ -37,6 +37,34 @@ type AttemptResult = {
   } | null;
 };
 
+type BusyPhase = "uploading" | "processing" | "submitting";
+type ProcessingGameTarget = {
+  id: number;
+  x: number;
+  y: number;
+  emoji: string;
+  points: number;
+};
+
+const PROCESSING_GAME_ICONS = [
+  { emoji: "⭐", points: 1 },
+  { emoji: "✨", points: 1 },
+  { emoji: "🎈", points: 1 },
+  { emoji: "🪄", points: 2 },
+  { emoji: "💎", points: 2 },
+] as const;
+
+function createProcessingGameTarget(seed: number): ProcessingGameTarget {
+  const pick = PROCESSING_GAME_ICONS[Math.floor(Math.random() * PROCESSING_GAME_ICONS.length)];
+  return {
+    id: Date.now() + seed,
+    x: 8 + Math.random() * 84,
+    y: 14 + Math.random() * 72,
+    emoji: pick.emoji,
+    points: pick.points,
+  };
+}
+
 function flattenChunks(chunks: Float32Array[]) {
   const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
   const result = new Float32Array(totalLength);
@@ -135,8 +163,11 @@ export default function PlacementExtendedPage() {
   const [attemptNumber, setAttemptNumber] = useState(1);
   const [error, setError] = useState<string | null>(null);
   const [seconds, setSeconds] = useState(0);
-  const [doneReason, setDoneReason] = useState<string | null>(null);
   const [placementResult, setPlacementResult] = useState<PlacementResult | null>(null);
+  const [busyHintIndex, setBusyHintIndex] = useState(0);
+  const [gameScore, setGameScore] = useState(0);
+  const [gameBest, setGameBest] = useState(0);
+  const [gameTarget, setGameTarget] = useState<ProcessingGameTarget | null>(null);
 
   const streamRef = useRef<MediaStream | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -180,6 +211,11 @@ export default function PlacementExtendedPage() {
     }
     return () => { if (timer) clearInterval(timer); };
   }, [phase]);
+
+  // Reset timer whenever a task screen is shown (including next attempt task).
+  useEffect(() => {
+    if (phase === "task") setSeconds(0);
+  }, [phase, task?.taskId]);
 
   // Cleanup audio on unmount
   useEffect(() => {
@@ -344,7 +380,6 @@ export default function PlacementExtendedPage() {
       const data = await res.json();
 
       if (data.finished) {
-        setDoneReason(data.reason || "Placement complete");
         if (data.result) setPlacementResult(data.result);
         setPhase("done");
       } else {
@@ -380,185 +415,260 @@ export default function PlacementExtendedPage() {
   }, []);
 
   const progressDots = Array.from({ length: MAX_ATTEMPTS }, (_, i) => i + 1);
+  const timerLabel = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+  const busyPhase: BusyPhase | null =
+    phase === "uploading" || phase === "processing" || phase === "submitting" ? phase : null;
+  const isBusy = Boolean(busyPhase);
+  const busyHints: Record<BusyPhase, string[]> = {
+    uploading: [
+      "Packing your brave voice into a magic file...",
+      "Sending your answer to the feedback castle...",
+      "Keeping every word safe and clear...",
+      "Adding sparkle so your audio sounds crisp...",
+      "Building your speaking snapshot...",
+      "Almost there, your quest upload is flying...",
+    ],
+    processing: [
+      "Listening for your best phrases...",
+      "Checking fluency, grammar, and vocabulary power...",
+      "Preparing your next quest challenge...",
+      "Matching your speech to level clues...",
+      "Spotting your strongest speaking superpowers...",
+      "Crafting helpful feedback for your next round...",
+    ],
+    submitting: [
+      "Saving your quest result...",
+      "Updating your level map...",
+      "Almost done. Final sparkle!",
+      "Writing your progress into the adventure log...",
+      "Finishing the score card...",
+      "Locking in your next mission...",
+    ],
+  };
+
+  useEffect(() => {
+    if (!busyPhase) {
+      setBusyHintIndex(0);
+      return;
+    }
+    const timer = setInterval(() => setBusyHintIndex((i) => i + 1), 3600);
+    return () => clearInterval(timer);
+  }, [busyPhase]);
+
+  useEffect(() => {
+    if (!isBusy) {
+      setGameTarget(null);
+      setGameScore(0);
+      return;
+    }
+    setGameScore(0);
+    setGameTarget(createProcessingGameTarget(0));
+    const gameTimer = window.setInterval(() => {
+      setGameTarget(createProcessingGameTarget(Math.floor(Math.random() * 10000)));
+    }, 2200);
+    return () => window.clearInterval(gameTimer);
+  }, [isBusy]);
+
+  function hitProcessingGameTarget() {
+    if (!isBusy || !gameTarget) return;
+    const gained = gameTarget.points;
+    setGameScore((prev) => {
+      const next = prev + gained;
+      setGameBest((best) => (next > best ? next : best));
+      return next;
+    });
+    setGameTarget(createProcessingGameTarget(gameTarget.id + 1));
+  }
 
   return (
-    <div className="page">
-      <nav className="nav">
-        <strong style={{ fontFamily: "var(--font-display)" }}>Duma Trainer</strong>
-        <div className="nav-links">
-          <Link href="/home">Home</Link>
-        </div>
-      </nav>
-      <section className="container">
-        <div className="card">
-          <h1 className="title">Placement Test</h1>
+    <div className="page task-page placement-page">
+      <section className="task-hero placement-hero">
+        <div className="task-mobile-frame placement-frame">
+          <div className="placement-floating-star" aria-hidden>
+            ✦
+          </div>
+          <div className="placement-floating-cloud" aria-hidden />
 
-          {/* Progress indicator */}
-          {phase !== "done" && phase !== "starting" && (
-            <>
-              <p className="subtitle">Attempt {attemptNumber} of {MAX_ATTEMPTS}</p>
-              <div style={{ display: "flex", gap: 8, margin: "8px 0 16px" }}>
-                {progressDots.map((n) => (
-                  <div
-                    key={n}
-                    style={{
-                      width: 12,
-                      height: 12,
-                      borderRadius: "50%",
-                      background: n < attemptNumber ? "#2d6a4f" : n === attemptNumber ? "#40916c" : "#ddd",
-                      border: n === attemptNumber ? "2px solid #1b4332" : "none",
-                    }}
-                  />
-                ))}
-              </div>
-            </>
-          )}
+          <div className="task-top-row">
+            <div className="task-nav-mini">
+              <Link href="/home">Home</Link>
+              <Link href="/task">Task</Link>
+            </div>
+          </div>
 
-          {/* Starting phase */}
-          {phase === "starting" && !error && (
-            <p className="subtitle">Starting placement test...</p>
-          )}
+          <p className="task-kicker placement-kicker">🧭 PLACEMENT QUEST</p>
+          <h1 className="task-title-main">Let&apos;s find your level!</h1>
+          <h2 className="task-title-accent placement-title-accent">Quick speaking adventure</h2>
 
-          {/* Task phase */}
-          {phase === "task" && task && (
-            <>
-              <p className="subtitle">{task.prompt}</p>
-              <p className="subtitle" style={{ fontSize: "0.85rem", opacity: 0.7 }}>
-                Speak freely for up to 5 minutes. There are no wrong answers.
-              </p>
-              <div className="spacer" />
-              <button className="btn" onClick={startRecording}>
-                Start recording
-              </button>
-            </>
-          )}
-
-          {/* Recording phase */}
-          {phase === "recording" && (
-            <>
-              <div className="status">
-                <span className="status-dot" />
-                Recording - {seconds}s
-              </div>
-              <div className="spacer" />
-              <button className="btn ghost" onClick={stopRecording}>
-                Stop recording
-              </button>
-            </>
-          )}
-
-          {/* Uploading phase */}
-          {phase === "uploading" && (
-            <p className="subtitle">Uploading your recording...</p>
-          )}
-
-          {/* Processing phase */}
-          {phase === "processing" && (
-            <p className="subtitle">Processing your recording...</p>
-          )}
-
-          {/* Feedback phase */}
-          {phase === "feedback" && attemptResult && (
-            <>
-              {attemptResult.status === "failed" && (
-                <p className="subtitle" style={{ color: "#c1121f" }}>
-                  Processing failed. Your response was still recorded.
+          <div className="placement-shell">
+            {phase !== "done" && phase !== "starting" && (
+              <div className="placement-progress">
+                <p className="placement-progress-label">
+                  Attempt {attemptNumber} of {MAX_ATTEMPTS}
                 </p>
-              )}
-              {attemptResult.results?.transcript && (
-                <div className="metric">
-                  <span>Transcript</span>
-                  <p className="subtitle">{attemptResult.results.transcript}</p>
+                <div className="placement-progress-dots">
+                  {progressDots.map((n) => {
+                    const dotState =
+                      n < attemptNumber ? "done" : n === attemptNumber ? "current" : "idle";
+                    return <span key={n} className={`placement-progress-dot ${dotState}`} />;
+                  })}
                 </div>
-              )}
-              {attemptResult.results?.scores?.overallScore != null && (
-                <div className="metric">
-                  <span>Score</span>
-                  <strong>{Math.round(attemptResult.results.scores.overallScore)}</strong>
-                </div>
-              )}
-              <div className="spacer" />
-              <p className="subtitle">How did that feel?</p>
-              <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                <button className="btn ghost" onClick={() => submitFeedback("too_easy")}>
-                  Too easy
-                </button>
-                <button className="btn" onClick={() => submitFeedback("just_right")}>
-                  Just right
-                </button>
-                <button className="btn ghost" onClick={() => submitFeedback("too_hard")}>
-                  Too hard
-                </button>
               </div>
-            </>
-          )}
+            )}
 
-          {/* Submitting phase */}
-          {phase === "submitting" && (
-            <p className="subtitle">Submitting...</p>
-          )}
+            {phase === "starting" && !error && (
+              <section className="placement-panel">
+                <p className="placement-loading-title">Starting placement test...</p>
+                <p className="placement-note">Preparing your first speaking quest.</p>
+              </section>
+            )}
 
-          {/* Done phase */}
-          {phase === "done" && (
-            <>
-              <p className="subtitle" style={{ marginBottom: 4 }}>Placement test complete!</p>
-              {placementResult ? (
-                <>
-                  <p className="subtitle" style={{ fontSize: "0.9rem", opacity: 0.7, marginBottom: 16 }}>
-                    Based on {attemptNumber} conversation{attemptNumber > 1 ? "s" : ""}, here is your speaking level:
+            {(phase === "task" || phase === "recording") && task && (
+              <section className={`placement-panel ${phase === "recording" ? "placement-task-live" : ""}`}>
+                <p className="placement-panel-kicker">YOUR SPEAKING MISSION</p>
+                <p className="placement-prompt">{task.prompt}</p>
+                <div className={`placement-live-controls ${phase === "recording" ? "is-recording" : ""}`}>
+                  <p className="placement-live-label">{phase === "recording" ? "RECORDING NOW" : "TIMER"}</p>
+                  <p className="placement-recording-timer">{timerLabel}</p>
+                  <p className="placement-note">
+                    {phase === "recording"
+                      ? "Keep speaking, then tap stop when you're done."
+                      : "Speak freely for up to 5 minutes. There are no wrong answers!"}
                   </p>
-                  <div style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    padding: "24px 0",
-                    gap: 8,
-                  }}>
-                    <div style={{
-                      fontSize: "3rem",
-                      fontWeight: 700,
-                      fontFamily: "var(--font-display)",
-                      color: "#2d6a4f",
-                    }}>
-                      {placementResult.stage}
-                    </div>
-                    <div style={{ fontSize: "1rem", color: "#555" }}>
-                      {stageLabel(placementResult.stage)}
-                    </div>
-                    <div style={{
-                      fontSize: "0.8rem",
-                      color: "#888",
-                      marginTop: 4,
-                    }}>
-                      Confidence: {Math.round(placementResult.confidence * 100)}%
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <p className="subtitle" style={{ fontSize: "0.9rem", opacity: 0.7 }}>
-                  Your results are being calculated...
+                  {phase === "recording" ? (
+                    <button className="btn record-stop-btn placement-stop-btn-live" onClick={stopRecording}>
+                      ⏹️ I&apos;m done!
+                    </button>
+                  ) : (
+                    <button className="btn task-start-btn placement-main-btn" onClick={startRecording}>
+                      🎙️ Start recording
+                    </button>
+                  )}
+                </div>
+              </section>
+            )}
+
+            {busyPhase && (
+              <section className="placement-panel placement-processing-panel">
+                <p className="placement-loading-title">
+                  {busyPhase === "uploading" && "Uploading your recording..."}
+                  {busyPhase === "processing" && "Doing some magic..."}
+                  {busyPhase === "submitting" && "Submitting..."}
                 </p>
-              )}
-              <div className="spacer" />
-              <Link className="btn" href="/home">
-                Continue
-              </Link>
-            </>
-          )}
+                <div className="placement-processing-playground" aria-hidden>
+                  <div className="placement-processing-orbit">
+                    <span className="placement-processing-core">✨</span>
+                    <span className="placement-processing-sat placement-processing-sat-a">🎤</span>
+                    <span className="placement-processing-sat placement-processing-sat-b">⭐</span>
+                    <span className="placement-processing-sat placement-processing-sat-c">🧠</span>
+                  </div>
+                  <div className="placement-processing-dots">
+                    <span />
+                    <span />
+                    <span />
+                  </div>
+                </div>
+                <p className="placement-processing-hint">
+                  {busyHints[busyPhase][busyHintIndex % busyHints[busyPhase].length]}
+                </p>
+                <div className="placement-mini-game">
+                  <div className="placement-mini-game-head">
+                    <p className="placement-mini-game-title">Mini-game: catch the sparkles</p>
+                    <p className="placement-mini-game-score">
+                      Score: {gameScore} | Best: {gameBest}
+                    </p>
+                  </div>
+                  <div className="placement-mini-game-board">
+                    {gameTarget && (
+                      <button
+                        type="button"
+                        className={`placement-mini-game-target points-${gameTarget.points}`}
+                        style={{ left: `${gameTarget.x}%`, top: `${gameTarget.y}%` }}
+                        onClick={hitProcessingGameTarget}
+                        aria-label="Catch sparkle"
+                      >
+                        {gameTarget.emoji}
+                      </button>
+                    )}
+                  </div>
+                  <p className="placement-mini-game-note">Tap moving icons while we process your answer.</p>
+                </div>
+              </section>
+            )}
 
-          {/* Error display */}
-          {error && <p style={{ color: "#c1121f", marginTop: 12 }}>{error}</p>}
+            {phase === "feedback" && attemptResult && (
+              <section className="placement-panel">
+                {attemptResult.status === "failed" && (
+                  <p className="placement-warning">
+                    Processing failed, but your response was still saved.
+                  </p>
+                )}
 
-          {/* Reset button */}
-          {phase !== "starting" && phase !== "done" && (
-            <button
-              className="btn ghost"
-              style={{ marginTop: 24, fontSize: "0.85rem", opacity: 0.7 }}
-              onClick={resetPlacement}
-            >
-              Start over
-            </button>
-          )}
+                {attemptResult.results?.transcript && (
+                  <article className="placement-mini-card">
+                    <p className="placement-mini-label">Transcript</p>
+                    <p className="placement-transcript">{attemptResult.results.transcript}</p>
+                  </article>
+                )}
+
+                {attemptResult.results?.scores?.overallScore != null && (
+                  <article className="placement-mini-card">
+                    <p className="placement-mini-label">Score</p>
+                    <p className="placement-score-value">
+                      {Math.round(attemptResult.results.scores.overallScore)}
+                    </p>
+                  </article>
+                )}
+
+                <p className="placement-feedback-title">How did that feel?</p>
+                <div className="placement-feedback-actions">
+                  <button className="btn ghost" onClick={() => submitFeedback("too_easy")}>
+                    Too easy
+                  </button>
+                  <button className="btn placement-feedback-primary" onClick={() => submitFeedback("just_right")}>
+                    Just right
+                  </button>
+                  <button className="btn ghost" onClick={() => submitFeedback("too_hard")}>
+                    Too hard
+                  </button>
+                </div>
+              </section>
+            )}
+
+            {phase === "done" && (
+              <section className="placement-panel placement-done-panel">
+                <p className="placement-done-title">Placement test complete!</p>
+                {placementResult ? (
+                  <>
+                    <p className="placement-note">
+                      Based on {attemptNumber} conversation{attemptNumber > 1 ? "s" : ""}, here is your
+                      speaking level:
+                    </p>
+                    <div className="placement-stage-wrap">
+                      <p className="placement-stage-value">{placementResult.stage}</p>
+                      <p className="placement-stage-label">{stageLabel(placementResult.stage)}</p>
+                      <p className="placement-stage-confidence">
+                        Confidence: {Math.round(placementResult.confidence * 100)}%
+                      </p>
+                    </div>
+                  </>
+                ) : (
+                  <p className="placement-note">Your results are being calculated...</p>
+                )}
+                <Link className="btn task-start-btn placement-continue-btn" href="/home">
+                  Continue
+                </Link>
+              </section>
+            )}
+
+            {error && <p className="placement-error">{error}</p>}
+
+            {phase !== "starting" && phase !== "done" && (
+              <button className="btn ghost placement-reset-btn" onClick={resetPlacement}>
+                Start over
+              </button>
+            )}
+          </div>
         </div>
       </section>
     </div>

@@ -159,9 +159,19 @@ function renderArtifactValue(value: unknown) {
   return "";
 }
 
+const PROCESSING_HINTS = [
+  "Listening for your best phrases...",
+  "Checking your brave voice power...",
+  "Finding your strongest ideas...",
+  "Building helpful feedback cards...",
+  "Packing your next speaking quest...",
+  "Polishing your result stars...",
+];
+
 export default function ResultsPage() {
   const [data, setData] = useState<AttemptResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [busyHintIndex, setBusyHintIndex] = useState(0);
 
   useEffect(() => {
     const idFromQuery =
@@ -217,267 +227,301 @@ export default function ResultsPage() {
   const uniqueNodes = Array.from(
     new Map(gseEvidence.map((item) => [item.nodeId, item])).values()
   ).slice(0, 6);
+  const isCompleted = data?.status === "completed";
+  const isFailed = data?.status === "failed";
+  const isBusy = !error && (!data || (!isCompleted && !isFailed));
+  const overallScore = data?.results?.scores?.overallScore;
+  const busyHint = PROCESSING_HINTS[busyHintIndex % PROCESSING_HINTS.length];
+  const statusLabel = data?.status
+    ? data.status.replace(/_/g, " ").replace(/^./, (char) => char.toUpperCase())
+    : "Starting";
+
+  useEffect(() => {
+    if (!isBusy) return;
+    const interval = window.setInterval(() => {
+      setBusyHintIndex((index) => index + 1);
+    }, 3200);
+    return () => window.clearInterval(interval);
+  }, [isBusy]);
 
   return (
-    <div className="page">
-      <nav className="nav">
-        <strong style={{ fontFamily: "var(--font-display)" }}>Duma Trainer</strong>
-        <div className="nav-links">
-          <Link href="/task">New task</Link>
-          <Link href="/progress">Progress</Link>
-        </div>
-      </nav>
-      <section className="container">
-        <div className="card">
-          <h1 className="title">Results</h1>
-          {error && <p style={{ color: "#c1121f" }}>{error}</p>}
-          {!data && <p className="subtitle">Waiting for results...</p>}
-          {data?.status === "failed" && (
-            <p className="subtitle">
-              Processing failed: {data.error?.message || "Unknown error"}{" "}
-              {data.error?.code ? `(${data.error.code})` : ""}
-            </p>
-          )}
-          {data?.status !== "completed" && data?.status !== "failed" && (
-            <p className="subtitle">Processing your recording...</p>
-          )}
+    <div className="page task-page results-page">
+      <section className="task-hero results-hero">
+        <div className="task-mobile-frame results-frame">
+          <div className="results-floating-star" aria-hidden>
+            ✦
+          </div>
+          <div className="results-floating-cloud" aria-hidden />
 
-          {data?.status === "completed" && (
-            <>
-              {metricCards.length > 0 && (
-                <>
-                  <div className="grid three">
-                    {metricCards.map((metric) => (
-                      <div className="metric" key={metric.key}>
-                        <span>{metric.label}</span>
-                        <strong>{Math.round(metric.value)}</strong>
-                      </div>
-                    ))}
+          <div className="task-top-row">
+            <div className="task-nav-mini">
+              <Link href="/home">Home</Link>
+              <Link href="/task">Task</Link>
+            </div>
+          </div>
+
+          <p className="task-kicker results-kicker">🏁 QUEST RESULTS</p>
+          <h1 className="task-title-main">Great speaking work!</h1>
+          <h2 className="task-title-accent results-title-accent">Let&apos;s see your magic</h2>
+
+          {error && <p className="results-error">{error}</p>}
+
+          <div className="results-shell">
+            {isBusy && (
+              <section className="results-panel results-processing-panel">
+                <p className="results-status-chip">{statusLabel}</p>
+                <p className="placement-loading-title">Doing some magic...</p>
+                <div className="placement-processing-playground" aria-hidden>
+                  <div className="placement-processing-orbit">
+                    <span className="placement-processing-core">✨</span>
+                    <span className="placement-processing-sat placement-processing-sat-a">🎤</span>
+                    <span className="placement-processing-sat placement-processing-sat-b">⭐</span>
+                    <span className="placement-processing-sat placement-processing-sat-c">🧠</span>
                   </div>
-                  <div className="spacer" />
-                </>
-              )}
-
-              {transcript && (
-                <>
-                  <div className="metric">
-                    <span>Transcript</span>
-                    <p className="subtitle">{transcript}</p>
+                  <div className="placement-processing-dots">
+                    <span />
+                    <span />
+                    <span />
                   </div>
-                  <div className="spacer" />
-                </>
-              )}
+                </div>
+                <p className="results-processing-hint">{busyHint}</p>
+              </section>
+            )}
 
-              {feedback?.summary && (
-                <>
-                  <p className="subtitle">{feedback.summary}</p>
-                  <div className="spacer" />
-                </>
-              )}
+            {isFailed && (
+              <section className="results-panel results-failed-panel">
+                <p className="results-failed-title">Oops! We couldn&apos;t process this recording.</p>
+                <p className="results-failed-text">
+                  {data?.error?.message || "Unknown error"} {data?.error?.code ? `(${data.error.code})` : ""}
+                </p>
+                <div className="results-actions">
+                  <Link className="btn task-start-btn results-main-btn" href="/record">
+                    🎙️ Try again
+                  </Link>
+                  <Link className="btn ghost results-secondary-btn" href="/task">
+                    Back to tasks
+                  </Link>
+                </div>
+              </section>
+            )}
 
-              {(feedback?.whatWentWell?.length || feedback?.whatToFixNow?.length) && (
-                <>
-                  <div className="grid two">
-                    {(feedback.whatWentWell || []).length > 0 && (
-                      <div className="metric">
-                        <span>What went well</span>
-                        <ul style={{ paddingLeft: 16 }}>
-                          {(feedback.whatWentWell || []).map((item) => (
-                            <li key={item}>{item}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                    {(feedback.whatToFixNow || []).length > 0 && (
-                      <div className="metric">
-                        <span>Improve next</span>
-                        <ul style={{ paddingLeft: 16 }}>
-                          {(feedback.whatToFixNow || []).map((item) => (
-                            <li key={item}>{item}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
+            {isCompleted && (
+              <>
+                <section className="results-panel results-celebrate-panel">
+                  <p className="results-status-chip">
+                    {data?.flow?.isPlacement ? "Placement quest complete" : "Quest complete"}
+                  </p>
+                  <div className="results-score-row">
+                    <div className="results-score-bubble">{overallScore != null ? Math.round(overallScore) : "⭐"}</div>
+                    <div className="results-score-copy">
+                      <p className="results-panel-title">You did awesome!</p>
+                      {feedback?.summary ? (
+                        <p className="results-summary-text">{feedback.summary}</p>
+                      ) : (
+                        <p className="results-summary-text">
+                          Your answer is ready, and we prepared ideas for your next speaking quest.
+                        </p>
+                      )}
+                    </div>
                   </div>
-                  <div className="spacer" />
-                </>
-              )}
+                </section>
 
-              {artifactEntries.length > 0 && (
-                <>
-                  <div className="metric">
-                    <span>Task facts</span>
-                    <ul style={{ paddingLeft: 16 }}>
-                      {artifactEntries.map(([key, value]) => (
-                        <li key={key}>
-                          {displayArtifactLabel(key)}: {renderArtifactValue(value)}
-                        </li>
+                {metricCards.length > 0 && (
+                  <section className="results-panel">
+                    <p className="results-panel-title">Score board</p>
+                    <div className="results-metric-grid">
+                      {metricCards.map((metric) => (
+                        <article className="results-metric-card" key={metric.key}>
+                          <p className="results-metric-label">{metric.label}</p>
+                          <p className="results-metric-value">{Math.round(metric.value)}</p>
+                        </article>
                       ))}
-                    </ul>
-                  </div>
-                  <div className="spacer" />
-                </>
-              )}
+                    </div>
+                  </section>
+                )}
 
-              {uniqueNodes.length > 0 && (
-                <>
-                  <div className="metric">
-                    <span>I can nodes (GSE)</span>
-                    <ul style={{ paddingLeft: 16 }}>
-                      {uniqueNodes.map((node) => (
-                        <li key={node.nodeId}>
-                          {node.descriptor}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                  <div className="spacer" />
-                </>
-              )}
+                {transcript && (
+                  <section className="results-panel">
+                    <p className="results-panel-title">What you said</p>
+                    <p className="results-transcript">{transcript}</p>
+                  </section>
+                )}
 
-              {nodeOutcomes.length > 0 && (
-                <>
-                  <div className="spacer" />
-                  <div className="metric">
-                    <span>Node mastery updates</span>
-                    <ul style={{ paddingLeft: 16 }}>
-                      {nodeOutcomes.slice(0, 8).map((item) => (
-                        <li key={`${item.nodeId}-${item.evidenceCount}`}>
-                          {nodeLabelById.get(item.nodeId) || "Learning node"}: {item.deltaMastery >= 0 ? "+" : ""}
-                          {item.deltaMastery.toFixed(1)} (decay impact {item.decayImpact.toFixed(1)})
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </>
-              )}
+                {(feedback?.whatWentWell?.length || feedback?.whatToFixNow?.length) && (
+                  <section className="results-panel">
+                    <div className="results-grid-two">
+                      {(feedback?.whatWentWell || []).length > 0 && (
+                        <article className="results-mini-card">
+                          <p className="results-mini-title">What went well</p>
+                          <ul className="results-list">
+                            {(feedback?.whatWentWell || []).map((item) => (
+                              <li key={item}>{item}</li>
+                            ))}
+                          </ul>
+                        </article>
+                      )}
+                      {(feedback?.whatToFixNow || []).length > 0 && (
+                        <article className="results-mini-card">
+                          <p className="results-mini-title">Improve next</p>
+                          <ul className="results-list">
+                            {(feedback?.whatToFixNow || []).map((item) => (
+                              <li key={item}>{item}</li>
+                            ))}
+                          </ul>
+                        </article>
+                      )}
+                    </div>
+                  </section>
+                )}
 
-              {(incidentalFindings.length > 0 || activationTransitions.length > 0) && (
-                <>
-                  <div className="spacer" />
-                  <div className="metric">
-                    <span>Detected new advanced usage</span>
-                    {incidentalFindings.length > 0 && (
-                      <ul style={{ paddingLeft: 16 }}>
-                        {incidentalFindings.slice(0, 8).map((item) => (
-                          <li key={`inc-${item.nodeId}-${item.signal}`}>
-                            {item.nodeLabel} ({item.domain}) - confidence {(item.confidence * 100).toFixed(0)}%
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                    {activationTransitions.length > 0 && (
-                      <>
-                        <p className="subtitle">Need verification:</p>
-                        <ul style={{ paddingLeft: 16 }}>
-                          {activationTransitions.slice(0, 8).map((item) => (
-                            <li key={`tr-${item.nodeId}`}>
-                              {nodeLabelById.get(item.nodeId) || item.nodeId}: {item.activationStateBefore || "n/a"}{" -> "}
-                              {item.activationStateAfter || "n/a"} ({item.activationImpact})
+                {(feedback?.exampleBetterAnswer || feedback?.nextMicroTask) && (
+                  <section className="results-panel">
+                    <div className="results-mini-stack">
+                      {feedback?.exampleBetterAnswer && (
+                        <article className="results-mini-card">
+                          <p className="results-mini-title">Coach example</p>
+                          <p className="results-summary-text">{feedback.exampleBetterAnswer}</p>
+                        </article>
+                      )}
+                      {feedback?.nextMicroTask && (
+                        <article className="results-mini-card">
+                          <p className="results-mini-title">Next mini quest</p>
+                          <p className="results-summary-text">{feedback.nextMicroTask}</p>
+                        </article>
+                      )}
+                    </div>
+                  </section>
+                )}
+
+                <details className="results-extra">
+                  <summary>More details</summary>
+                  <div className="results-extra-body">
+                    {artifactEntries.length > 0 && (
+                      <article className="results-mini-card">
+                        <p className="results-mini-title">Task facts</p>
+                        <ul className="results-list">
+                          {artifactEntries.map(([key, value]) => (
+                            <li key={key}>
+                              {displayArtifactLabel(key)}: {renderArtifactValue(value)}
                             </li>
                           ))}
                         </ul>
-                      </>
+                      </article>
+                    )}
+
+                    {uniqueNodes.length > 0 && (
+                      <article className="results-mini-card">
+                        <p className="results-mini-title">I can nodes (GSE)</p>
+                        <ul className="results-list">
+                          {uniqueNodes.map((node) => (
+                            <li key={node.nodeId}>{node.descriptor}</li>
+                          ))}
+                        </ul>
+                      </article>
+                    )}
+
+                    {nodeOutcomes.length > 0 && (
+                      <article className="results-mini-card">
+                        <p className="results-mini-title">Node mastery updates</p>
+                        <ul className="results-list">
+                          {nodeOutcomes.slice(0, 8).map((item) => (
+                            <li key={`${item.nodeId}-${item.evidenceCount}`}>
+                              {nodeLabelById.get(item.nodeId) || "Learning node"}:{" "}
+                              {item.deltaMastery >= 0 ? "+" : ""}
+                              {item.deltaMastery.toFixed(1)} (decay impact {item.decayImpact.toFixed(1)})
+                            </li>
+                          ))}
+                        </ul>
+                      </article>
+                    )}
+
+                    {(incidentalFindings.length > 0 || activationTransitions.length > 0) && (
+                      <article className="results-mini-card">
+                        <p className="results-mini-title">Detected new advanced usage</p>
+                        {incidentalFindings.length > 0 && (
+                          <ul className="results-list">
+                            {incidentalFindings.slice(0, 8).map((item) => (
+                              <li key={`inc-${item.nodeId}-${item.signal}`}>
+                                {item.nodeLabel} ({item.domain}) - confidence{" "}
+                                {(item.confidence * 100).toFixed(0)}%
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                        {activationTransitions.length > 0 && (
+                          <>
+                            <p className="results-summary-text">Need verification:</p>
+                            <ul className="results-list">
+                              {activationTransitions.slice(0, 8).map((item) => (
+                                <li key={`tr-${item.nodeId}`}>
+                                  {nodeLabelById.get(item.nodeId) || item.nodeId}:{" "}
+                                  {item.activationStateBefore || "n/a"} {" -> "}
+                                  {item.activationStateAfter || "n/a"} ({item.activationImpact})
+                                </li>
+                              ))}
+                            </ul>
+                          </>
+                        )}
+                      </article>
+                    )}
+
+                    {data?.results?.planner && (
+                      <article className="results-mini-card">
+                        <p className="results-mini-title">Why this task now</p>
+                        {data.results.planner.selectionReason && (
+                          <p className="results-summary-text">{data.results.planner.selectionReason}</p>
+                        )}
+                        <p className="results-summary-text">
+                          Goal: {data.results.planner.primaryGoal || "n/a"} | Expected gain:{" "}
+                          {typeof data.results.planner.expectedGain === "number"
+                            ? data.results.planner.expectedGain.toFixed(2)
+                            : "n/a"}
+                        </p>
+                      </article>
+                    )}
+
+                    {data?.results?.recoveryTriggered && (
+                      <article className="results-mini-card">
+                        <p className="results-mini-title">Recovery mode</p>
+                        <p className="results-summary-text">
+                          Activated temporary recovery path. Next tasks will be shorter and more guided.
+                        </p>
+                      </article>
+                    )}
+
+                    {checks.length > 0 && (
+                      <article className="results-mini-card">
+                        <p className="results-mini-title">Rubric checks</p>
+                        <ul className="results-list">
+                          {checks.map((check) => (
+                            <li key={check.name}>
+                              {check.pass ? "Pass" : "Fix"}: {check.reason}
+                            </li>
+                          ))}
+                        </ul>
+                      </article>
+                    )}
+
+                    {data?.results?.debug && (
+                      <article className="results-mini-card">
+                        <p className="results-mini-title">AI debug (temporary)</p>
+                        <pre className="results-debug">{JSON.stringify(data.results.debug, null, 2)}</pre>
+                      </article>
                     )}
                   </div>
-                </>
-              )}
+                </details>
 
-              {data.results?.planner && (
-                <>
-                  <div className="spacer" />
-                  <div className="metric">
-                    <span>Why this task now</span>
-                    {data.results.planner.selectionReason && (
-                      <p className="subtitle">{data.results.planner.selectionReason}</p>
-                    )}
-                    <p className="subtitle">
-                      Goal: {data.results.planner.primaryGoal || "n/a"} | Expected gain:{" "}
-                      {typeof data.results.planner.expectedGain === "number"
-                        ? data.results.planner.expectedGain.toFixed(2)
-                        : "n/a"}
-                    </p>
-                  </div>
-                </>
-              )}
-
-              {data.results?.recoveryTriggered && (
-                <>
-                  <div className="spacer" />
-                  <div className="metric">
-                    <span>Recovery mode</span>
-                    <p className="subtitle">
-                      Activated temporary recovery path. Next tasks will be shorter and more guided.
-                    </p>
-                  </div>
-                </>
-              )}
-
-              {checks.length > 0 && (
-                <>
-                  <div className="metric">
-                    <span>Rubric checks</span>
-                    <ul style={{ paddingLeft: 16 }}>
-                      {checks.map((check) => (
-                        <li key={check.name}>
-                          {check.pass ? "Pass" : "Fix"}: {check.reason}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                  <div className="spacer" />
-                </>
-              )}
-
-              {feedback?.exampleBetterAnswer && (
-                <>
-                  <div className="metric">
-                    <span>Example better answer</span>
-                    <p className="subtitle">{feedback.exampleBetterAnswer}</p>
-                  </div>
-                  <div className="spacer" />
-                </>
-              )}
-
-              {feedback?.nextMicroTask && (
-                <>
-                  <div className="metric">
-                    <span>Next micro task</span>
-                    <p className="subtitle">{feedback.nextMicroTask}</p>
-                  </div>
-                  <div className="spacer" />
-                </>
-              )}
-
-              {data.results?.debug && (
-                <>
-                  <div className="metric">
-                    <span>AI debug (temporary)</span>
-                    <pre
-                      style={{
-                        margin: 0,
-                        whiteSpace: "pre-wrap",
-                        wordBreak: "break-word",
-                        fontSize: "0.85rem",
-                      }}
-                    >
-                      {JSON.stringify(data.results.debug, null, 2)}
-                    </pre>
-                  </div>
-                  <div className="spacer" />
-                </>
-              )}
-
-              <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                <Link className="btn" href="/task">
-                  Next task
-                </Link>
-                <Link className="btn ghost" href="/record">
-                  Retry
-                </Link>
-              </div>
-            </>
-          )}
+                <div className="results-actions">
+                  <Link className="btn task-start-btn results-main-btn" href="/task">
+                    🚀 Next quest
+                  </Link>
+                  <Link className="btn ghost results-secondary-btn" href="/record">
+                    🎙️ Retry this one
+                  </Link>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </section>
     </div>

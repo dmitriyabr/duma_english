@@ -192,14 +192,18 @@ export async function GET(
     perStageBundleTotal[row.stage] = row.bundleRows.reduce((sum, b) => sum + b.totalRequired, 0);
   }
 
-  // Per-domain promotion path: find the first incomplete bundle stage up to target
-  const targetStage = (progress as { promotionReadiness?: { targetStage?: string } }).promotionReadiness?.targetStage;
-  const STAGE_SEQ = ["A1", "A2", "B1", "B2", "C1", "C2"] as const;
-  const targetIdx = targetStage ? STAGE_SEQ.indexOf(targetStage as typeof STAGE_SEQ[number]) : -1;
+  // Per-domain promotion path: each domain targets domainStage + 1
+  const STAGE_SEQ = ["A0", "A1", "A2", "B1", "B2", "C1", "C2"] as const;
+  const domainStageMap: Record<string, string> = {
+    vocab: ds?.vocab.stage ?? "A1",
+    grammar: ds?.grammar.stage ?? "A1",
+    lo: ds?.communication.stage ?? "A1",
+  };
 
   const domainBundleBlockers: Record<string, Array<{ nodeId: string; descriptor: string; value: number }>> = {};
   const domainPromotionPath: Record<string, {
-    blockingStage: string;
+    currentStage: string;
+    targetStage: string;
     title: string;
     coveredCount: number;
     totalRequired: number;
@@ -208,28 +212,25 @@ export async function GET(
     achieved: Array<{ nodeId: string; descriptor: string; value: number }>;
   }> = {};
 
-  if (targetIdx >= 0) {
-    for (const domain of ["vocab", "grammar", "lo"]) {
-      // Walk stages A1..target, find first bundle that doesn't meet coverage threshold
-      for (let i = 0; i <= targetIdx; i++) {
-        const stage = STAGE_SEQ[i];
-        const row = bundleReadiness.rows.find((r) => r.stage === stage && r.domain === domain);
-        if (row && row.coverage < row.requiredCoverage) {
-          const blockers = row.blockers.sort((a, b) => a.value - b.value).slice(0, 8);
-          domainBundleBlockers[domain] = blockers;
-          domainPromotionPath[domain] = {
-            blockingStage: stage,
-            title: row.title,
-            coveredCount: row.coveredCount,
-            totalRequired: row.totalRequired,
-            ready: row.ready,
-            blockers,
-            achieved: row.achieved.slice(0, 8),
-          };
-          break;
-        }
-      }
-    }
+  for (const domain of ["vocab", "grammar", "lo"]) {
+    const current = domainStageMap[domain];
+    const idx = STAGE_SEQ.indexOf(current as typeof STAGE_SEQ[number]);
+    if (idx < 0 || idx >= STAGE_SEQ.length - 1) continue;
+    const target = STAGE_SEQ[idx + 1];
+    const row = bundleReadiness.rows.find((r) => r.stage === target && r.domain === domain);
+    if (!row) continue;
+    const blockers = row.blockers.sort((a, b) => a.value - b.value).slice(0, 8);
+    domainBundleBlockers[domain] = blockers;
+    domainPromotionPath[domain] = {
+      currentStage: current,
+      targetStage: target,
+      title: row.title,
+      coveredCount: row.coveredCount,
+      totalRequired: row.totalRequired,
+      ready: row.ready,
+      blockers,
+      achieved: row.achieved.slice(0, 8),
+    };
   }
 
   return NextResponse.json({

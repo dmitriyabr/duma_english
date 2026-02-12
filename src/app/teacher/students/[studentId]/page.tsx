@@ -124,7 +124,8 @@ type LevelNodeRow = {
 type BundleBlocker = { nodeId: string; descriptor: string; value: number };
 
 type DomainPathEntry = {
-  blockingStage: string;
+  currentStage: string;
+  targetStage: string;
   title: string;
   coveredCount: number;
   totalRequired: number;
@@ -579,18 +580,12 @@ export default function TeacherStudentProfilePage() {
                   : `Progress: ${Math.round(Math.max(pr.readinessScore ?? pr.coverageRatio ?? 0, (pr.valueProgress ?? 0) * 100))}% toward ${pr.targetStage}.`}
               </p>
 
-              {/* Per-domain promotion path: show the actual blocking stage per domain */}
+              {/* Per-domain promotion path: each domain targets domainStage + 1 */}
               {(() => {
                 const path = data.domainPromotionPath;
-                const ds = progress.domainStages;
                 if (!path || Object.keys(path).length === 0) return null;
 
                 const DOMAIN_LABELS: Record<string, string> = { vocab: "Vocabulary", grammar: "Grammar", lo: "Communication" };
-                const domainStageMap: Record<string, string> = {
-                  vocab: ds?.vocab.stage ?? "—",
-                  grammar: ds?.grammar.stage ?? "—",
-                  lo: ds?.communication.stage ?? "—",
-                };
                 const entries = Object.entries(path).sort(
                   (a, b) => (a[1].coveredCount / (a[1].totalRequired || 1)) - (b[1].coveredCount / (b[1].totalRequired || 1))
                 );
@@ -605,8 +600,8 @@ export default function TeacherStudentProfilePage() {
                           covered={entry.coveredCount}
                           total={entry.totalRequired}
                           ready={entry.ready}
-                          domainStage={domainStageMap[domain]}
-                          targetStage={entry.blockingStage}
+                          domainStage={entry.currentStage}
+                          targetStage={entry.targetStage}
                         />
                       ))}
                     </div>
@@ -629,9 +624,7 @@ export default function TeacherStudentProfilePage() {
 
                     {showBundleDetails && (
                       <div style={{ borderTop: "1px solid rgba(16,22,47,0.08)", paddingTop: 12, marginTop: 12 }}>
-                        {entries.map(([domain, entry]) => {
-                          const domStage = domainStageMap[domain];
-                          return (
+                        {entries.map(([domain, entry]) => (
                             <div
                               key={domain}
                               style={{
@@ -655,7 +648,7 @@ export default function TeacherStudentProfilePage() {
                                     color: "#4f46e5",
                                   }}
                                 >
-                                  {domStage} → {entry.blockingStage}
+                                  {entry.currentStage} → {entry.targetStage}
                                 </span>
                                 <span style={{ fontSize: "0.9rem", color: "var(--ink-2)" }}>
                                   {entry.coveredCount} / {entry.totalRequired}
@@ -701,8 +694,7 @@ export default function TeacherStudentProfilePage() {
                                 })}
                               </ul>
                             </div>
-                          );
-                        })}
+                        ))}
                       </div>
                     )}
                   </>

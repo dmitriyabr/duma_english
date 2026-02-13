@@ -9,7 +9,7 @@ import {
   getSkillMatrix,
 } from "./curriculum";
 import { nextTargetNodesForStudent } from "./gse/planner";
-import { projectLearnerStageFromGse, refreshLearnerProfileFromGse } from "./gse/stageProjection";
+import { projectLearnerStageFromGse, refreshLearnerProfileFromGse, DomainStages } from "./gse/stageProjection";
 
 const STAGE_ORDER: CEFRStage[] = ["A0", "A1", "A2", "B1", "B2", "C1", "C2"];
 const COLD_START_TARGET_ATTEMPTS = 8;
@@ -52,6 +52,8 @@ export type LearningPlan = {
   recommendedTaskTypes: string[];
   nextTaskReason: string;
   skillMatrix: ReturnType<typeof getSkillMatrix>;
+  domainStages: DomainStages;
+  pronunciationScore: number | null;
 };
 
 type VocabularyItem = {
@@ -390,7 +392,10 @@ export async function buildLearningPlan(params: {
     ...tasksForBlueprints(curriculumWeek.taskBlueprints),
   ]).filter(Boolean);
   const fatigue = await recentFatigue(params.studentId);
-  const allowed = allowedTasksForStage(stage);
+  // Gate productive tasks by weakest productive domain
+  const gateStage = [projection.domainStages.grammar.stage, projection.domainStages.communication.stage]
+    .reduce<CEFRStage>((min, s) => stageIndex(s) < stageIndex(min) ? s : min, stage);
+  const allowed = allowedTasksForStage(gateStage);
   const selectedType = pickTaskType({
     candidateTypes,
     allowed,
@@ -412,6 +417,8 @@ export async function buildLearningPlan(params: {
     recommendedTaskTypes: dedupe([selectedType, ...candidateTypes]).filter((type) => allowed.includes(type)),
     nextTaskReason: reason,
     skillMatrix: getSkillMatrix(stage, ageBand),
+    domainStages: projection.domainStages,
+    pronunciationScore: projection.pronunciationScore,
   };
 }
 

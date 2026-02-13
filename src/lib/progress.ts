@@ -232,6 +232,8 @@ export async function getStudentProgress(studentId: string) {
     placementStage: projection.placementStage,
     promotionStage: projection.promotionStage,
     placementUncertainty: projection.placementUncertainty,
+    domainStages: projection.domainStages,
+    pronunciationScore: projection.pronunciationScore,
     whyDifferent,
     ageBand: profile?.ageBand || "9-11",
     cycleWeek: profile?.cycleWeek || 1,

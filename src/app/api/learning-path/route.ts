@@ -44,6 +44,8 @@ export async function GET() {
     promotionStage: projection.promotionStage,
     placementConfidence: projection.placementConfidence,
     placementUncertainty: projection.placementUncertainty,
+    domainStages: projection.domainStages,
+    pronunciationScore: projection.pronunciationScore,
     placement: {
       diagnosticMode: true,
       provisionalStage: projection.placementStage,

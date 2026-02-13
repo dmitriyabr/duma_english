@@ -31,6 +31,10 @@ type GenerateTaskSpecInput = {
   plannerReason: string;
   primaryGoal: string;
   recentPrompts?: string[];
+  domainStages?: {
+    vocab?: string;
+    grammar?: string;
+  };
 };
 
 export type GeneratedTaskSpec = {
@@ -328,6 +332,12 @@ export async function generateTaskSpec(input: GenerateTaskSpecInput): Promise<Ge
         ].join("\n")
       : null;
 
+  const domainLevelLines: string[] = [];
+  if (input.domainStages) {
+    if (input.domainStages.vocab) domainLevelLines.push(`Vocabulary level: ${input.domainStages.vocab} (use vocabulary appropriate for this level)`);
+    if (input.domainStages.grammar) domainLevelLines.push(`Grammar level: ${input.domainStages.grammar} (use sentence structures appropriate for this level)`);
+  }
+
   const prompt = [
     "Generate one speaking task for a child learner.",
     "Output JSON only with keys: task_type,instruction,constraints,maxDurationSec,assessmentMode,expected_artifacts,scoring_hooks,estimated_difficulty.",
@@ -337,6 +347,7 @@ export async function generateTaskSpec(input: GenerateTaskSpecInput): Promise<Ge
     `Age band: ${input.ageBand}`,
     `Task type required: ${input.taskType}`,
     `Primary goal: ${input.primaryGoal}`,
+    ...domainLevelLines,
     ...(wordsLine ? [wordsLine] : []),
     ...(objectivesBlock ? [objectivesBlock] : []),
     `Focus skills: ${input.focusSkills.join(", ") || "speaking"}`,

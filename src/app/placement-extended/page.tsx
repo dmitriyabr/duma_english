@@ -13,9 +13,20 @@ type Phase =
   | "submitting"
   | "done";
 
+type DomainStageInfo = {
+  stage: string;
+  confidence: number;
+};
+
 type PlacementResult = {
   stage: string;
   confidence: number;
+  domainStages?: {
+    vocab: DomainStageInfo;
+    grammar: DomainStageInfo;
+    communication: DomainStageInfo;
+  };
+  pronunciationScore?: number | null;
 };
 
 type TaskInfo = {
@@ -114,6 +125,34 @@ function encodeWav(pcm16: Int16Array, sampleRate: number) {
 }
 
 const MAX_ATTEMPTS = 6;
+
+const STAGE_PROGRESS: Record<string, number> = {
+  A0: 5, A1: 20, A2: 35, B1: 50, B2: 65, C1: 80, C2: 95,
+};
+
+function DomainBar({ label, stage }: { label: string; stage: string }) {
+  const pct = STAGE_PROGRESS[stage] ?? 50;
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 12, fontSize: "0.9rem" }}>
+      <span style={{ width: 120, color: "#555", textAlign: "right" }}>{label}</span>
+      <div style={{
+        flex: 1,
+        height: 10,
+        background: "#eee",
+        borderRadius: 5,
+        overflow: "hidden",
+      }}>
+        <div style={{
+          width: `${pct}%`,
+          height: "100%",
+          background: "#40916c",
+          borderRadius: 5,
+        }} />
+      </div>
+      <span style={{ width: 28, fontWeight: 600, color: "#2d6a4f" }}>{stage}</span>
+    </div>
+  );
+}
 
 function stageLabel(stage: string) {
   if (stage === "A0") return "Beginner";
@@ -533,6 +572,43 @@ export default function PlacementExtendedPage() {
                       Confidence: {Math.round(placementResult.confidence * 100)}%
                     </div>
                   </div>
+
+                  {placementResult.domainStages && (
+                    <div style={{
+                      width: "100%",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 8,
+                      padding: "16px 0",
+                      borderTop: "1px solid #eee",
+                    }}>
+                      <DomainBar label="Vocabulary" stage={placementResult.domainStages.vocab.stage} />
+                      <DomainBar label="Grammar" stage={placementResult.domainStages.grammar.stage} />
+                      <DomainBar label="Communication" stage={placementResult.domainStages.communication.stage} />
+                      {placementResult.pronunciationScore != null && (
+                        <div style={{ display: "flex", alignItems: "center", gap: 12, fontSize: "0.9rem" }}>
+                          <span style={{ width: 120, color: "#555", textAlign: "right" }}>Pronunciation</span>
+                          <div style={{
+                            flex: 1,
+                            height: 10,
+                            background: "#eee",
+                            borderRadius: 5,
+                            overflow: "hidden",
+                          }}>
+                            <div style={{
+                              width: `${placementResult.pronunciationScore}%`,
+                              height: "100%",
+                              background: "#40916c",
+                              borderRadius: 5,
+                            }} />
+                          </div>
+                          <span style={{ width: 48, fontWeight: 600, color: "#2d6a4f" }}>
+                            {Math.round(placementResult.pronunciationScore)}/100
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </>
               ) : (
                 <p className="subtitle" style={{ fontSize: "0.9rem", opacity: 0.7 }}>

@@ -1,6 +1,6 @@
 # TASKS (Single Source Of Truth)
 
-Last updated: 2026-02-09
+Last updated: 2026-02-14
 Owner: product brain track (GSE-only)
 
 ## 1) Product Goal
@@ -62,6 +62,18 @@ Build an autonomous speaking trainer where every learning decision is based on G
 - `npm test` pass
 - `npm run lint` pass
 - `npm run build` pass
+15. Worker pipeline race hardening:
+- claim of next uploaded attempt is now conditional (`updateMany` guard), preventing double-claim by concurrent workers.
+- attempt finalization writes are guarded by status transitions, and per-attempt metrics are rewritten idempotently.
+16. Placement modularization:
+- API and worker now use dedicated entry points:
+  - IRT: `src/lib/placement/irt.ts`
+  - Extended: `src/lib/placement/extended.ts`
+  - Shared state-machine helpers: `src/lib/placement/shared.ts`
+- Existing `src/lib/placement.ts` remains compatible as legacy facade.
+17. Teacher API scalability:
+- class/student heavy endpoints now support additive `limit/offset` and bounded list limits.
+- class roster stage loading no longer calls full progress computation per student.
 6. Semantic LO/Grammar hardening (current iteration):
 - parser prompt upgraded for exhaustive, atomic extraction (recall-first).
 - embedding queries made topic-robust for grammar (query = pattern label only).

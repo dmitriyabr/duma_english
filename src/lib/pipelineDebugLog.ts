@@ -1,5 +1,6 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
+import { config } from "./config";
 
 type DebugEvent = {
   event: string;
@@ -8,11 +9,11 @@ type DebugEvent = {
 };
 
 function isEnabled() {
-  return process.env.PIPELINE_DEBUG_LOG_ENABLED === "true";
+  return config.pipelineDebug.enabled;
 }
 
 function resolveLogPath() {
-  const configured = process.env.PIPELINE_DEBUG_LOG_PATH;
+  const configured = config.pipelineDebug.path;
   if (configured && configured.trim().length > 0) return configured.trim();
   return path.join(process.cwd(), "tmp", "pipeline-debug.ndjson");
 }

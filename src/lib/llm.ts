@@ -4,27 +4,28 @@
  *
  * @see https://docs.smith.langchain.com/observability/how_to_guides/trace_with_langchain
  */
+import { config } from "./config";
 
 function applyLangSmithEnvCompatibility() {
-  const project = process.env.LANGSMITH_PROJECT || process.env.LANGCHAIN_PROJECT;
+  const project = config.langsmith.project;
   if (project) {
     process.env.LANGSMITH_PROJECT = project;
     process.env.LANGCHAIN_PROJECT = project;
   }
 
-  const apiKey = process.env.LANGSMITH_API_KEY || process.env.LANGCHAIN_API_KEY;
+  const apiKey = config.langsmith.apiKey;
   if (apiKey) {
     process.env.LANGSMITH_API_KEY = apiKey;
     process.env.LANGCHAIN_API_KEY = apiKey;
   }
 
-  const tracing = process.env.LANGSMITH_TRACING || process.env.LANGCHAIN_TRACING_V2;
+  const tracing = config.langsmith.tracing;
   if (tracing) {
     process.env.LANGSMITH_TRACING = tracing;
     process.env.LANGCHAIN_TRACING_V2 = tracing;
   }
 
-  const endpoint = process.env.LANGSMITH_ENDPOINT || process.env.LANGCHAIN_ENDPOINT;
+  const endpoint = config.langsmith.endpoint;
   if (endpoint) {
     process.env.LANGSMITH_ENDPOINT = endpoint;
     process.env.LANGCHAIN_ENDPOINT = endpoint;
@@ -56,7 +57,7 @@ export async function chatJson(
     import("@langchain/core/messages"),
   ]);
   const model = new ChatOpenAI({
-    modelName: options.model || process.env.OPENAI_MODEL || "gpt-4o-mini",
+    modelName: options.model || config.openai.model,
     temperature: options.temperature ?? 0,
     maxTokens: options.maxTokens ?? 700,
     openAIApiKey: options.openaiApiKey,
@@ -73,7 +74,7 @@ export async function chatJson(
     tags: options.tags,
     metadata: {
       ...options.metadata,
-      langsmithProject: process.env.LANGSMITH_PROJECT || process.env.LANGCHAIN_PROJECT || null,
+      langsmithProject: config.langsmith.project || null,
     },
   });
 
@@ -95,7 +96,7 @@ export async function embedTexts(
   const { OpenAIEmbeddings } = await import("@langchain/openai");
   const embeddings = new OpenAIEmbeddings({
     apiKey: options.openaiApiKey,
-    model: options.model || process.env.GSE_EMBEDDING_MODEL || "text-embedding-3-small",
+    model: options.model || config.gse.embeddingModel,
     dimensions: options.dimensions,
   });
   const vectors = await embeddings.embedDocuments(texts);

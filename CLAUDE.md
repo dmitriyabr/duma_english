@@ -67,6 +67,7 @@ npx tsx src/scripts/inspect_last_attempt_pipeline.ts            # Full pipeline 
    - Semantic LO/Grammar matching (parser LLM → embedding retrieval → evaluation LLM)
    - Vocabulary retrieval (lemmatization → stage-windowed index → evaluation LLM)
    - Task quality evaluation (`src/lib/evaluator.ts`)
+   - Atomic claim of uploaded attempts (conditional status transition) to prevent double-processing races
 
 4. **Evidence Pipeline** (`src/lib/gse/evidence.ts`) persists evidence rows (`AttemptGseEvidence`) with domain, kind, opportunity type, confidence, and reliability.
 
@@ -124,6 +125,8 @@ npx tsx src/scripts/inspect_last_attempt_pipeline.ts            # Full pipeline 
 
 ## Environment Variables
 
+Runtime env defaults and parsing are centralized in `src/lib/config.ts`.
+
 ### Required
 - `DATABASE_URL`: PostgreSQL connection string
 - `SESSION_SECRET`: Session encryption key
@@ -135,7 +138,7 @@ npx tsx src/scripts/inspect_last_attempt_pipeline.ts            # Full pipeline 
 
 ### Semantic Pipeline (optional)
 - `OPENAI_API_KEY`: Required for semantic LO/Grammar/Vocab evaluation
-- `OPENAI_MODEL`: Default `gpt-4o-mini`
+- `OPENAI_MODEL`: Default `gpt-4.1-mini`
 - `GSE_SEMANTIC_ENABLED`: Default `true`
 - `GSE_SEMANTIC_CONF_THRESHOLD`: Default `0.68`
 - `GSE_SEMANTIC_MAX_CANDIDATES`: Default `24`

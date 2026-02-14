@@ -4,6 +4,11 @@
 
 Implemented `placement_extended` mode - a new deep placement test that generates 3-6 adaptive dialogue tasks with 5-minute speech samples, achieving confident level estimates faster through dense evidence collection and dialogue continuity.
 
+Current runtime note (2026-02-14): placement entry points are split into:
+- `src/lib/placement/irt.ts`
+- `src/lib/placement/extended.ts`
+- `src/lib/placement/shared.ts`
+
 ## Changes Made
 
 ### 1. Database Schema (`prisma/schema.prisma`)
@@ -79,7 +84,7 @@ if (activationStateBefore !== "verified" &&
 
 **Result**: Placement evidence needs only 1 direct success in a row (vs 2 for regular tasks) to verify a node.
 
-### 5. Task Generation (`src/lib/placement.ts`)
+### 5. Task Generation (`src/lib/placement.ts`, `src/lib/placement/extended.ts`)
 
 **Added helper functions**:
 - `determineNextStage()`: Adjust stage based on previous score (≥80 increase, <50 decrease, 50-79 maintain)
@@ -98,7 +103,7 @@ if (activationStateBefore !== "verified" &&
 - **Stage adaptation**: Adjusts difficulty based on performance
 - **A0-A1 special case**: Alternates dialogue and read_aloud tasks
 
-### 6. Placement Orchestration (`src/lib/placement.ts`)
+### 6. Placement Orchestration (`src/lib/placement.ts`, `src/lib/placement/extended.ts`)
 
 **`startPlacementExtended(studentId)`**:
 1. Creates PlacementSession with `placementMode: "placement_extended"`
@@ -107,7 +112,7 @@ if (activationStateBefore !== "verified" &&
 4. Creates Task record
 5. Returns session and task
 
-**`submitPlacementExtendedAnswer(sessionId, attemptId, transcript, taskScore)`**:
+**`submitPlacementExtendedAnswer(sessionId, attemptId, userFeedback?)`**:
 1. Updates session with transcript and score history
 2. Detects/updates conversation theme
 3. Checks `shouldContinuePlacement()`:
@@ -131,7 +136,7 @@ if (activationStateBefore !== "verified" &&
 - Returns: `{ sessionId, task: { taskId, type, prompt, metaJson } }`
 
 **`POST /api/placement/extended/[sessionId]/submit`**:
-- Body: `{ attemptId, transcript, taskScore }`
+- Body: `{ attemptId, userFeedback? }` where `userFeedback` is `too_easy | just_right | too_hard`
 - Returns (finished): `{ finished: true, reason }`
 - Returns (continue): `{ finished: false, nextTask: { taskId, type, prompt, metaJson } }`
 
@@ -208,7 +213,7 @@ npx tsx src/scripts/inspect_profile_evidence.ts [studentId]
 **Phase 1**: Schema + evaluation limits (✅ completed)
 **Phase 2**: Placement orchestration (✅ completed)
 **Phase 3**: API endpoints (✅ completed)
-**Phase 4**: Frontend integration (TODO)
+**Phase 4**: Frontend integration (in progress)
 **Phase 5**: A/B test vs current cold start (TODO)
 
 ## Rollback Plan

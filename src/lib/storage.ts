@@ -5,12 +5,13 @@ import {
   GetObjectCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { config } from "./config";
 
 function getS3Client() {
-  const endpoint = process.env.S3_ENDPOINT;
-  const region = process.env.S3_REGION || "auto";
-  const accessKeyId = process.env.S3_ACCESS_KEY_ID;
-  const secretAccessKey = process.env.S3_SECRET_ACCESS_KEY;
+  const endpoint = config.storage.endpoint;
+  const region = config.storage.region;
+  const accessKeyId = config.storage.accessKeyId;
+  const secretAccessKey = config.storage.secretAccessKey;
 
   if (!endpoint || !accessKeyId || !secretAccessKey) {
     throw new Error("S3 configuration is missing");
@@ -25,7 +26,7 @@ function getS3Client() {
 }
 
 export async function createPresignedUpload(objectKey: string, contentType: string) {
-  const bucket = process.env.S3_BUCKET;
+  const bucket = config.storage.bucket;
   if (!bucket) throw new Error("S3_BUCKET is not set");
 
   const client = getS3Client();
@@ -44,7 +45,7 @@ export async function uploadObject(
   contentType: string,
   body: Buffer | Uint8Array
 ) {
-  const bucket = process.env.S3_BUCKET;
+  const bucket = config.storage.bucket;
   if (!bucket) throw new Error("S3_BUCKET is not set");
 
   const client = getS3Client();
@@ -58,7 +59,7 @@ export async function uploadObject(
 }
 
 export async function deleteObject(objectKey: string) {
-  const bucket = process.env.S3_BUCKET;
+  const bucket = config.storage.bucket;
   if (!bucket) throw new Error("S3_BUCKET is not set");
 
   const client = getS3Client();
@@ -71,15 +72,15 @@ export async function deleteObject(objectKey: string) {
 }
 
 export async function buildObjectUrl(objectKey: string) {
-  const bucket = process.env.S3_BUCKET;
-  const publicBase = process.env.S3_PUBLIC_BASE_URL;
+  const bucket = config.storage.bucket;
+  const publicBase = config.storage.publicBaseUrl;
   if (publicBase) return `${publicBase}/${objectKey}`;
   if (!bucket) throw new Error("S3_BUCKET is not set");
   return `https://${bucket}.s3.amazonaws.com/${objectKey}`;
 }
 
 export async function getObjectBuffer(objectKey: string) {
-  const bucket = process.env.S3_BUCKET;
+  const bucket = config.storage.bucket;
   if (!bucket) throw new Error("S3_BUCKET is not set");
 
   const client = getS3Client();

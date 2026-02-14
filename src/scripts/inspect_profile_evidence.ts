@@ -45,7 +45,7 @@ async function main() {
     },
   });
 
-  const nodeIds = [...new Set(attempts.flatMap((a) => a.gseEvidence.map((e: any) => e.nodeId)))];
+  const nodeIds = [...new Set(attempts.flatMap((a) => a.gseEvidence.map((e) => e.nodeId)))];
   const nodes =
     nodeIds.length > 0
       ? await prisma.gseNode.findMany({
@@ -67,7 +67,7 @@ async function main() {
   const byKind: Record<string, number> = {};
   const byKindOpportunity: Record<string, number> = {};
   for (const a of attempts) {
-    for (const e of (a as any).gseEvidence) {
+    for (const e of a.gseEvidence) {
       byKind[e.evidenceKind] = (byKind[e.evidenceKind] || 0) + 1;
       const key = `${e.evidenceKind}:${e.opportunityType}`;
       byKindOpportunity[key] = (byKindOpportunity[key] || 0) + 1;

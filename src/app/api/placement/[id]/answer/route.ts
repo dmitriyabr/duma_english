@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getStudentFromRequest } from "@/lib/auth";
-import { submitPlacementAnswer } from "@/lib/placement";
+import { submitPlacementAnswer } from "@/lib/placement/irt";
+import { isPlacementSessionActive } from "@/lib/placement/shared";
+import type { PlacementSessionStatus } from "@/lib/placement/types";
 import { prisma } from "@/lib/db";
 
 type PlacementAnswerContext = {
@@ -40,6 +42,9 @@ export async function POST(req: NextRequest, context: PlacementAnswerContext) {
   const session = await prisma.placementSession.findUnique({ where: { id } });
   if (!session || session.studentId !== student.studentId) {
     return NextResponse.json({ error: "Placement session not found" }, { status: 404 });
+  }
+  if (!isPlacementSessionActive(session.status as PlacementSessionStatus)) {
+    return NextResponse.json({ error: "Placement session is not active" }, { status: 409 });
   }
 
   try {

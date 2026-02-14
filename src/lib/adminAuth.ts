@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { config } from "./config";
 
 function decodeBasicHeader(encoded: string) {
   if (typeof atob === "function") {
@@ -13,7 +14,7 @@ export function checkBasicAuth(req: NextRequest) {
   const encoded = authHeader.slice("Basic ".length);
   const decoded = decodeBasicHeader(encoded);
   const [user, pass] = decoded.split(":");
-  const expectedUser = process.env.ADMIN_USER || "admin";
-  const expectedPass = process.env.ADMIN_PASS || "changeme";
+  const expectedUser = config.admin.user;
+  const expectedPass = config.admin.pass;
   return user === expectedUser && pass === expectedPass;
 }

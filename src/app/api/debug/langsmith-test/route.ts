@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { chatJson } from "@/lib/llm";
+import { config } from "@/lib/config";
 
 /**
  * GET /api/debug/langsmith-test
@@ -7,12 +8,12 @@ import { chatJson } from "@/lib/llm";
  * этот run появится в LangSmith за несколько секунд.
  */
 export async function GET() {
-  const apiKey = process.env.OPENAI_API_KEY;
-  const tracingFlag = process.env.LANGSMITH_TRACING || process.env.LANGCHAIN_TRACING_V2;
+  const apiKey = config.openai.apiKey;
+  const tracingFlag = config.langsmith.tracing;
   const tracingEnabled = tracingFlag === "true";
-  const langsmithApiKey = process.env.LANGSMITH_API_KEY || process.env.LANGCHAIN_API_KEY;
+  const langsmithApiKey = config.langsmith.apiKey;
   const hasLangSmithKey = Boolean(langsmithApiKey);
-  const project = process.env.LANGSMITH_PROJECT || process.env.LANGCHAIN_PROJECT || "default";
+  const project = config.langsmith.project || "default";
 
   if (!apiKey) {
     return NextResponse.json(
@@ -27,7 +28,7 @@ export async function GET() {
       "Reply with exactly: {\"ok\": true, \"source\": \"langsmith-test\"}",
       {
         openaiApiKey: apiKey,
-        model: process.env.OPENAI_MODEL || "gpt-4o-mini",
+        model: config.openai.model,
         temperature: 0,
         maxTokens: 50,
       }

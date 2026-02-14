@@ -4,7 +4,7 @@ import { extractReferenceText, extractRequiredWords } from "./taskText";
 import { chatJson } from "./llm";
 import { buildSemanticEvaluationContext } from "./gse/semanticAssessor";
 import { buildVocabEvaluationContext } from "./gse/vocabRetrieval";
-import { appendPipelineDebugEvent, previewText } from "./pipelineDebugLog";
+import { config } from "./config";
 
 export type RubricCheck = {
   name: string;
@@ -1127,8 +1127,8 @@ async function evaluateWithOpenAISplit(input: EvaluationInput): Promise<{
   parsed: { taskEvaluation: TaskEvaluation; feedback: FeedbackResult } | null;
   debug: Pick<EvaluationDebugInfo, "openai">;
 }> {
-  const apiKey = process.env.OPENAI_API_KEY;
-  const model = process.env.OPENAI_MODEL || "gpt-4.1-mini";
+  const apiKey = config.openai.apiKey;
+  const model = config.openai.model;
   if (!apiKey) {
     return {
       parsed: null,

@@ -6,6 +6,7 @@ import { promisify } from "node:util";
 import { parseGithubScraperRows } from "./importers";
 import { GithubCatalogSource, GithubDerivedVocabRow } from "./types";
 import { normalizeToken } from "./utils";
+import { config } from "@/lib/config";
 
 const execFile = promisify(execFileCb);
 
@@ -127,8 +128,8 @@ function githubHeaders() {
     Accept: "application/vnd.github+json",
     "User-Agent": "duma-english-gse-importer",
   };
-  if (process.env.GITHUB_TOKEN) {
-    headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
+  if (config.github.token) {
+    headers.Authorization = `Bearer ${config.github.token}`;
   }
   return headers;
 }

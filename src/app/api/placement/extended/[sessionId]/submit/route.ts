@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { getStudentFromRequest } from "@/lib/auth";
-import { submitPlacementExtendedAnswer } from "@/lib/placement";
+import { submitPlacementExtendedAnswer } from "@/lib/placement/extended";
+import { isPlacementSessionActive } from "@/lib/placement/shared";
+import type { PlacementSessionStatus } from "@/lib/placement/types";
+import { prisma } from "@/lib/db";
 
 type PlacementExtendedSubmitContext = {
   params: Promise<{ sessionId: string }>;
@@ -16,6 +19,18 @@ export async function POST(
   }
 
   const { sessionId } = await context.params;
+  const session = await prisma.placementSession.findUnique({ where: { id: sessionId } });
+  if (
+    !session ||
+    session.studentId !== student.studentId ||
+    session.placementMode !== "placement_extended"
+  ) {
+    return NextResponse.json({ error: "Placement session not found" }, { status: 404 });
+  }
+  if (!isPlacementSessionActive(session.status as PlacementSessionStatus)) {
+    return NextResponse.json({ error: "Placement session is not active" }, { status: 409 });
+  }
+
   const body = await request.json();
   const { attemptId, userFeedback } = body;
 

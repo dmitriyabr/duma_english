@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { getStudentFromRequest } from "@/lib/auth";
-import { getPlacementSession } from "@/lib/placement";
+import { getPlacementSession } from "@/lib/placement/irt";
 import { prisma } from "@/lib/db";
 import { generateTaskSpec } from "@/lib/taskGenerator";
 import { buildTaskTemplate } from "@/lib/taskTemplates";

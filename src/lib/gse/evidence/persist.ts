@@ -1,0 +1,1 @@
+export { persistAttemptGseEvidence } from "../evidence";

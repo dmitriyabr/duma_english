@@ -2,6 +2,7 @@ import { z } from "zod";
 import { buildTaskTemplate } from "./taskTemplates";
 import { extractReferenceText, extractRequiredWords } from "./taskText";
 import { chatJson } from "./llm";
+import { config } from "./config";
 
 const generatedTaskSchema = z.object({
   task_type: z.string().min(2),
@@ -298,8 +299,8 @@ function normalizeGeneratedPayload(
 }
 
 export async function generateTaskSpec(input: GenerateTaskSpecInput): Promise<GeneratedTaskSpec> {
-  const apiKey = process.env.OPENAI_API_KEY;
-  const model = process.env.OPENAI_MODEL || "gpt-4.1-mini";
+  const apiKey = config.openai.apiKey;
+  const model = config.openai.model;
   const fallback = fallbackTaskSpec(input);
   if (!apiKey) {
     console.warn(JSON.stringify({ event: "task_gen_fallback", reason: "no_openai_api_key", taskType: input.taskType }));

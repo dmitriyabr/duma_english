@@ -5,6 +5,13 @@ import { getBundleNodeIdsForStage, isPlacementAboveStage } from "@/lib/gse/bundl
 import { mapStageToGseRange } from "@/lib/gse/utils";
 import { getStudentProgress } from "@/lib/progress";
 
+function parseBoundedInt(value: string | null, fallback: number, min: number, max: number) {
+  if (!value) return fallback;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(max, Math.max(min, Math.floor(parsed)));
+}
+
 async function ensureTeacherCanAccessStudent(
   teacherId: string,
   studentId: string
@@ -42,14 +49,21 @@ export async function GET(
   if (!validStages.includes(stage)) {
     return NextResponse.json({ error: "Invalid stage" }, { status: 400 });
   }
+  const limit = parseBoundedInt(req.nextUrl.searchParams.get("limit"), 250, 1, 1000);
+  const offset = parseBoundedInt(req.nextUrl.searchParams.get("offset"), 0, 0, 5000);
 
   const range = mapStageToGseRange(stage);
   const stageCEFR = stage as "A1" | "A2" | "B1" | "B2" | "C1" | "C2";
-  const [nodes, bundleNodeIds, progress] = await Promise.all([
+  const [nodes, totalNodes, bundleNodeIds, progress] = await Promise.all([
     prisma.gseNode.findMany({
       where: { gseCenter: { gte: range.min, lte: range.max } },
       select: { nodeId: true, descriptor: true, gseCenter: true },
       orderBy: [{ gseCenter: "asc" }, { nodeId: "asc" }],
+      take: limit,
+      skip: offset,
+    }),
+    prisma.gseNode.count({
+      where: { gseCenter: { gte: range.min, lte: range.max } },
     }),
     getBundleNodeIdsForStage(stageCEFR),
     getStudentProgress(studentId),
@@ -104,5 +118,14 @@ export async function GET(
     };
   });
 
-  return NextResponse.json({ stage, nodes: list });
+  return NextResponse.json({
+    stage,
+    nodes: list,
+    pagination: {
+      limit,
+      offset,
+      totalNodes,
+      hasMore: offset + list.length < totalNodes,
+    },
+  });
 }

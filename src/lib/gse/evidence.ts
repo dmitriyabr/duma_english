@@ -1057,7 +1057,7 @@ export async function persistAttemptGseEvidence(input: BuildAttemptEvidenceInput
     usedForPromotion: row.usedForPromotion,
     taskType: input.taskType,
     targeted: row.targeted,
-    placementMode: (row.metadataJson as any)?.placementMode || null,
+    placementMode: typeof row.metadataJson?.placementMode === "string" ? row.metadataJson.placementMode : null,
   }));
 
   const nodeOutcomes = await applyEvidenceToStudentMastery({

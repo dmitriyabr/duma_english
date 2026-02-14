@@ -1,12 +1,13 @@
 import { SignJWT, jwtVerify } from "jose";
 import { cookies, headers } from "next/headers";
+import { config } from "./config";
 
 const SESSION_COOKIE = "session";
 const TEACHER_SESSION_COOKIE = "teacher_session";
-const SESSION_TTL_DAYS = Number(process.env.SESSION_TTL_DAYS || 120);
+const SESSION_TTL_DAYS = config.auth.sessionTtlDays;
 
 function getJwtSecret() {
-  const secret = process.env.SESSION_SECRET;
+  const secret = config.auth.sessionSecret;
   if (!secret) {
     throw new Error("SESSION_SECRET is not set");
   }
@@ -35,7 +36,7 @@ export async function setSessionCookie(token: string) {
   cookieStore.set(SESSION_COOKIE, token, {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: config.isProduction,
     path: "/",
     maxAge: SESSION_TTL_DAYS * 24 * 60 * 60,
   });
@@ -81,7 +82,7 @@ export async function setTeacherSessionCookie(token: string) {
   cookieStore.set(TEACHER_SESSION_COOKIE, token, {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: config.isProduction,
     path: "/",
     maxAge: SESSION_TTL_DAYS * 24 * 60 * 60,
   });

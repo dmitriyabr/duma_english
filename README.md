@@ -60,6 +60,27 @@ If `LEMMA_SERVICE_URL` is not set (or the service is down), the app falls back t
   - `AZURE_SPEECH_ENDPOINT`
   - `AZURE_SPEECH_REGION`
 
+## Quality Gate Status
+
+As of 2026-02-14:
+- `npm test` passes (includes placement IRT/extended integration scenarios).
+- `npm run lint` passes with zero errors/warnings.
+- `npm run build` passes.
+
+## Placement Architecture (Current)
+
+- IRT entry points: `src/lib/placement/irt.ts`
+- Extended entry points: `src/lib/placement/extended.ts`
+- Shared state machine helpers: `src/lib/placement/shared.ts`
+- Legacy compatibility layer remains in `src/lib/placement.ts` (existing imports continue to work).
+
+## Teacher API Pagination
+
+For larger classes, teacher endpoints now support additive pagination/limits:
+- `GET /api/teacher/classes/[classId]?limit=50&offset=0`
+- `GET /api/teacher/students/[studentId]/level-nodes?stage=A2&limit=250&offset=0`
+- `GET /api/teacher/students/[studentId]?recentAttemptsLimit=20&masteryLimit=400&outcomesLimit=15`
+
 ## Semantic LO/Grammar (Incidental Evidence)
 
 The worker can detect and score incidental `GSE_LO` and `GSE_GRAMMAR` nodes from a student's transcript using:

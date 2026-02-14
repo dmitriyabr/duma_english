@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { mapStageToGseRange } from "./utils";
 import { appendPipelineDebugEvent, previewText } from "@/lib/pipelineDebugLog";
 import { lemmatizeEnglish } from "@/lib/nlp/lemmaService";
+import { config } from "@/lib/config";
 
 export type VocabEvaluationCandidate = {
   nodeId: string;
@@ -73,14 +74,6 @@ function buildNgrams(words: string[], maxN = 4) {
 
 function toAudience(ageBand?: string | null) {
   return ageBand === "6-8" || ageBand === "9-11" || ageBand === "12-14" ? "YL" : "AL";
-}
-
-function parseCsv(value: string | undefined) {
-  if (!value) return [];
-  return value
-    .split(",")
-    .map((v) => v.trim())
-    .filter(Boolean);
 }
 
 const STOPWORDS = new Set([
@@ -181,9 +174,9 @@ function inferAudienceFromCatalog(catalog: string) {
 async function getStageIndex(params: { stage: string; ageBand?: string | null; allCatalogs?: boolean }) {
   const stage = (params.stage || "A2").trim() || "A2";
   const audience = toAudience(params.ageBand);
-  const allowedCatalogs = params.allCatalogs ? [] : parseCsv(process.env.GSE_VOCAB_CATALOGS);
+  const allowedCatalogs = params.allCatalogs ? [] : config.gse.vocabCatalogs;
   const cacheKey = `${stage}:${audience}:${allowedCatalogs.sort().join(",")}`;
-  const ttlMs = Number(process.env.GSE_VOCAB_INDEX_TTL_MS || 10 * 60 * 1000);
+  const ttlMs = config.gse.vocabIndexTtlMs;
 
   const cached = indexCache.get(cacheKey);
   if (cached && Date.now() - cached.createdAt < ttlMs) return cached;
@@ -274,7 +267,7 @@ export async function buildVocabEvaluationContext(params: {
   runId?: string;
   allCatalogs?: boolean;
 }): Promise<VocabRetrievalContext> {
-  if ((process.env.GSE_VOCAB_ENABLED || "true") !== "true") {
+  if (!config.gse.vocabEnabled) {
     return {
       disabledReason: "GSE_VOCAB_ENABLED=false",
       candidateCount: 0,
@@ -283,7 +276,7 @@ export async function buildVocabEvaluationContext(params: {
         stage: params.stage,
         ageBand: params.ageBand || null,
         audience: toAudience(params.ageBand),
-        catalogs: parseCsv(process.env.GSE_VOCAB_CATALOGS),
+        catalogs: config.gse.vocabCatalogs,
         tokenCount: 0,
         phraseCandidateCount: 0,
         matchedNodeCount: 0,
@@ -301,7 +294,7 @@ export async function buildVocabEvaluationContext(params: {
         stage: params.stage,
         ageBand: params.ageBand || null,
         audience: toAudience(params.ageBand),
-        catalogs: parseCsv(process.env.GSE_VOCAB_CATALOGS),
+        catalogs: config.gse.vocabCatalogs,
         tokenCount: 0,
         phraseCandidateCount: 0,
         matchedNodeCount: 0,
@@ -421,7 +414,7 @@ export async function buildVocabEvaluationContext(params: {
       }
     }
   }
-  const candidateLimit = params.allCatalogs ? 50 : Number(process.env.GSE_VOCAB_MAX_CANDIDATES || 24);
+  const candidateLimit = params.allCatalogs ? 50 : config.gse.vocabMaxCandidates;
   const deduped = Array.from(bestBySense.values())
     .sort((a, b) => b.retrievalScore - a.retrievalScore)
     .slice(0, candidateLimit);

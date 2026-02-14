@@ -1,5 +1,6 @@
 import { createHash } from "crypto";
 import { appendPipelineDebugEvent, previewText } from "@/lib/pipelineDebugLog";
+import { config } from "@/lib/config";
 
 export type LemmaToken = {
   text: string;
@@ -60,7 +61,7 @@ export async function lemmatizeEnglish(text: string, opts?: { taskType?: string;
   const cached = cache.get(key);
   if (cached) return cached;
 
-  const baseUrl = (process.env.LEMMA_SERVICE_URL || "").trim().replace(/\/+$/, "");
+  const baseUrl = (config.lemma.serviceUrl || "").trim().replace(/\/+$/, "");
   if (!baseUrl) {
     const fallback = lemmatizeFallback(input);
     cache.set(key, fallback);
@@ -68,7 +69,7 @@ export async function lemmatizeEnglish(text: string, opts?: { taskType?: string;
   }
 
   const url = `${baseUrl}/lemmatize`;
-  const timeoutMs = Number(process.env.LEMMA_SERVICE_TIMEOUT_MS || 1200);
+  const timeoutMs = config.lemma.timeoutMs;
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), Math.max(1, timeoutMs));
 

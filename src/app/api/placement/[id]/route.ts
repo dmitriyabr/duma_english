@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getStudentFromRequest } from "@/lib/auth";
-import { getPlacementSession } from "@/lib/placement";
+import { getPlacementSession } from "@/lib/placement/irt";
 
 type PlacementRouteContext = {
   params: Promise<{ id: string }>;

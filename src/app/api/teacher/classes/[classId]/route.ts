@@ -1,18 +1,35 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getTeacherFromRequest } from "@/lib/auth";
-import { getStudentProgress } from "@/lib/progress";
 
-async function ensureTeacherClass(teacherId: string, classId: string) {
+function parseBoundedInt(value: string | null, fallback: number, min: number, max: number) {
+  if (!value) return fallback;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(max, Math.max(min, Math.floor(parsed)));
+}
+
+async function ensureTeacherClass(
+  teacherId: string,
+  classId: string,
+  pagination: { limit: number; offset: number }
+) {
   const cls = await prisma.class.findFirst({
     where: { id: classId, teacherId },
     include: {
+      _count: {
+        select: {
+          students: true,
+        },
+      },
       codes: {
         where: { status: "active" },
         orderBy: { createdAt: "desc" },
       },
       students: {
         orderBy: { createdAt: "desc" },
+        take: pagination.limit,
+        skip: pagination.offset,
         select: {
           id: true,
           displayName: true,
@@ -34,17 +51,30 @@ export async function GET(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const limit = parseBoundedInt(_req.nextUrl.searchParams.get("limit"), 50, 1, 200);
+  const offset = parseBoundedInt(_req.nextUrl.searchParams.get("offset"), 0, 0, 10000);
   const { classId } = await params;
-  const cls = await ensureTeacherClass(teacher.teacherId, classId);
+  const cls = await ensureTeacherClass(teacher.teacherId, classId, { limit, offset });
   if (!cls) {
     return NextResponse.json({ error: "Class not found" }, { status: 404 });
   }
 
-  const lastAttempts = await prisma.attempt.findMany({
-    where: { studentId: { in: cls.students.map((s) => s.id) }, status: "completed" },
-    select: { studentId: true, createdAt: true, scoresJson: true },
-    orderBy: { createdAt: "desc" },
-  });
+  const studentIds = cls.students.map((student) => student.id);
+  const [lastAttempts, learnerProfiles] = await Promise.all([
+    studentIds.length > 0
+      ? prisma.attempt.findMany({
+          where: { studentId: { in: studentIds }, status: "completed" },
+          select: { studentId: true, createdAt: true, scoresJson: true },
+          orderBy: { createdAt: "desc" },
+        })
+      : Promise.resolve([]),
+    studentIds.length > 0
+      ? prisma.learnerProfile.findMany({
+          where: { studentId: { in: studentIds } },
+          select: { studentId: true, stage: true },
+        })
+      : Promise.resolve([]),
+  ]);
 
   const byStudent = new Map<
     string,
@@ -60,15 +90,7 @@ export async function GET(
     }
   }
 
-  const stageByStudent = new Map<string, string>();
-  for (const s of cls.students) {
-    try {
-      const progress = await getStudentProgress(s.id);
-      stageByStudent.set(s.id, progress.stage ?? "—");
-    } catch {
-      stageByStudent.set(s.id, "—");
-    }
-  }
+  const stageByStudent = new Map(learnerProfiles.map((profile) => [profile.studentId, profile.stage]));
 
   const students = cls.students.map((s) => {
     const last = byStudent.get(s.id);
@@ -98,5 +120,11 @@ export async function GET(
     createdAt: cls.createdAt,
     students,
     codes,
+    pagination: {
+      limit,
+      offset,
+      totalStudents: cls._count.students,
+      hasMore: offset + students.length < cls._count.students,
+    },
   });
 }

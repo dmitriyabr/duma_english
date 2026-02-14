@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getStudentFromRequest } from "@/lib/auth";
-import { getPlacementSession, startPlacement } from "@/lib/placement";
+import { getPlacementSession, startPlacement } from "@/lib/placement/irt";
 
 export async function POST() {
   const student = await getStudentFromRequest();

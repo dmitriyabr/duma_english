@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getStudentFromRequest } from "@/lib/auth";
 import { SpeechMetrics } from "@/lib/scoring";
+import { config } from "@/lib/config";
 
 type AttemptRouteContext = {
   params: Promise<{ id: string }>;
@@ -243,7 +244,7 @@ export async function GET(_: Request, context: AttemptRouteContext) {
     pauseCount: metrics.pauseCount,
     durationSec: metrics.durationSec ?? attempt.durationSec ?? undefined,
     wordCount: metrics.wordCount,
-    provider: process.env.SPEECH_PROVIDER || "mock",
+    provider: config.speech.provider,
   };
   const gseEvidence = attempt.gseEvidence.map((row) => {
     const meta = row.node.metadataJson as Record<string, unknown> | null;
@@ -386,7 +387,7 @@ export async function GET(_: Request, context: AttemptRouteContext) {
                 }
               : null,
             visibleMetrics,
-            debug: process.env.SHOW_AI_DEBUG === "true" ? attempt.aiDebugJson : null,
+            debug: config.worker.showAiDebug ? attempt.aiDebugJson : null,
           }
         : null,
   });

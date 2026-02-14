@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getStudentFromRequest } from "@/lib/auth";
-import { finishPlacement } from "@/lib/placement";
+import { finishPlacement } from "@/lib/placement/irt";
+import { canTransitionPlacementStatus } from "@/lib/placement/shared";
+import type { PlacementSessionStatus } from "@/lib/placement/types";
 import { prisma } from "@/lib/db";
 
 type PlacementFinishContext = {
@@ -17,6 +19,15 @@ export async function POST(_: Request, context: PlacementFinishContext) {
   const session = await prisma.placementSession.findUnique({ where: { id } });
   if (!session || session.studentId !== student.studentId) {
     return NextResponse.json({ error: "Placement session not found" }, { status: 404 });
+  }
+  if (
+    !canTransitionPlacementStatus(
+      "irt",
+      session.status as PlacementSessionStatus,
+      "completed"
+    )
+  ) {
+    return NextResponse.json({ error: "Placement session can not be finished" }, { status: 409 });
   }
 
   try {

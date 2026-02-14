@@ -1,4 +1,5 @@
 import { SpeechMetrics } from "./scoring";
+import { config } from "./config";
 
 type SpeechAnalyzeOptions = {
   taskPrompt: string;
@@ -155,9 +156,9 @@ async function callAzureRecognition(
   buffer: Buffer,
   options: SpeechAnalyzeOptions
 ): Promise<{ response: AzureRecognitionResponse; status: number }> {
-  const key = process.env.AZURE_SPEECH_KEY;
-  const endpoint = process.env.AZURE_SPEECH_ENDPOINT;
-  const region = process.env.AZURE_SPEECH_REGION || "southafricanorth";
+  const key = config.speech.azureKey;
+  const endpoint = config.speech.azureEndpoint;
+  const region = config.speech.azureRegion;
 
   if (!key) {
     throw new Error("Azure Speech credentials are missing");
@@ -272,7 +273,7 @@ export async function analyzeSpeechFromBuffer(
   buffer: Buffer,
   options: SpeechAnalyzeOptions
 ): Promise<SpeechAnalysisResult> {
-  const provider = process.env.SPEECH_PROVIDER || "mock";
+  const provider = config.speech.provider;
   const fallbackDurationSec = options.durationSec || estimateWavDurationSec(buffer) || 0;
 
   if (provider === "mock") {
@@ -312,7 +313,7 @@ export async function analyzeSpeechFromBuffer(
     const merged = mergeChunkResults(chunkResults);
 
     // Self-ref PA on the first chunk using the merged transcript
-    const enableSelfRefPa = process.env.ENABLE_SELF_REF_PA === "true";
+    const enableSelfRefPa = config.speech.enableSelfRefPa;
     if (enableSelfRefPa) {
       const pseudoReference = normalizeTranscriptForReference(merged.transcript);
       if (pseudoReference.split(/\s+/).filter(Boolean).length >= 3) {
@@ -362,7 +363,7 @@ export async function analyzeSpeechFromBuffer(
         })
       );
 
-      const enableSelfRefPa = process.env.ENABLE_SELF_REF_PA === "true";
+      const enableSelfRefPa = config.speech.enableSelfRefPa;
       if (!hasTargetReference && enableSelfRefPa) {
         const pseudoReference = normalizeTranscriptForReference(parsed.transcript);
         if (pseudoReference.split(/\s+/).filter(Boolean).length >= 3) {

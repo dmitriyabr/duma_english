@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { mapStageToGseRange } from "./utils";
 import { chatJson, embedTexts } from "@/lib/llm";
 import { appendPipelineDebugEvent, previewText } from "@/lib/pipelineDebugLog";
+import { config } from "@/lib/config";
 
 type CandidateNode = {
   nodeId: string;
@@ -67,9 +68,9 @@ const PARSER_SCHEMA = z.object({
     .default([]),
 });
 
-const DEFAULT_EMBED_MODEL = process.env.GSE_EMBEDDING_MODEL || "text-embedding-3-small";
-const DEFAULT_PARSER_MODEL = process.env.GSE_PARSER_MODEL || process.env.OPENAI_MODEL || "gpt-4.1-mini";
-const MAX_CANDIDATES_PER_DOMAIN = Number(process.env.GSE_SEMANTIC_MAX_CANDIDATES || 24);
+const DEFAULT_EMBED_MODEL = config.gse.embeddingModel;
+const DEFAULT_PARSER_MODEL = config.gse.parserModel;
+const MAX_CANDIDATES_PER_DOMAIN = config.gse.semanticMaxCandidates;
 
 function compactText(value: string, max = 220) {
   return value.replace(/\s+/g, " ").trim().slice(0, max);
@@ -544,11 +545,11 @@ export async function buildSemanticEvaluationContext(params: {
   stage: string;
   ageBand?: string | null;
 }): Promise<SemanticRetrievalContext> {
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = config.openai.apiKey;
   if (!apiKey) {
     return { loCandidates: [], grammarCandidates: [], disabledReason: "OPENAI_API_KEY missing" };
   }
-  if ((process.env.GSE_SEMANTIC_ENABLED || "true") !== "true") {
+  if (!config.gse.semanticEnabled) {
     return { loCandidates: [], grammarCandidates: [], disabledReason: "GSE_SEMANTIC_ENABLED=false" };
   }
 
@@ -731,7 +732,7 @@ export async function backfillSemanticEmbeddings(params?: {
   ageBand?: string | null;
   includeAll?: boolean;
 }) {
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = config.openai.apiKey;
   if (!apiKey) {
     throw new Error("OPENAI_API_KEY is required for embedding backfill");
   }

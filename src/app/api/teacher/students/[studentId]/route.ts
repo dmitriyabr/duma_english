@@ -6,6 +6,13 @@ import { getStudentProgress } from "@/lib/progress";
 import { computeStageBundleReadiness } from "@/lib/gse/bundles";
 import { mapStageToGseRange } from "@/lib/gse/utils";
 
+function parseBoundedInt(value: string | null, fallback: number, min: number, max: number) {
+  if (!value) return fallback;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(max, Math.max(min, Math.floor(parsed)));
+}
+
 async function ensureTeacherCanAccessStudent(
   teacherId: string,
   studentId: string
@@ -21,7 +28,7 @@ async function ensureTeacherCanAccessStudent(
 }
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ studentId: string }> }
 ) {
   const teacher = await getTeacherFromRequest();
@@ -40,12 +47,30 @@ export async function GET(
 
   await ensureLearnerProfile(studentId);
   const progress = await getStudentProgress(studentId);
+  const recentAttemptsLimit = parseBoundedInt(
+    req.nextUrl.searchParams.get("recentAttemptsLimit"),
+    20,
+    1,
+    100
+  );
+  const masteryLimit = parseBoundedInt(
+    req.nextUrl.searchParams.get("masteryLimit"),
+    400,
+    50,
+    1000
+  );
+  const outcomesLimit = parseBoundedInt(
+    req.nextUrl.searchParams.get("outcomesLimit"),
+    15,
+    1,
+    100
+  );
 
   const [recentAttempts, fullMasteryRows, attemptsWithOutcomes] = await Promise.all([
     prisma.attempt.findMany({
       where: { studentId, status: "completed" },
       orderBy: { createdAt: "desc" },
-      take: 20,
+      take: recentAttemptsLimit,
       select: {
         id: true,
         createdAt: true,
@@ -69,12 +94,12 @@ export async function GET(
         },
       },
       orderBy: { updatedAt: "desc" },
-      take: 400,
+      take: masteryLimit,
     }),
     prisma.attempt.findMany({
       where: { studentId, status: "completed" },
       orderBy: { createdAt: "desc" },
-      take: 15,
+      take: outcomesLimit,
       select: { id: true, createdAt: true, nodeOutcomesJson: true },
     }),
   ]);
@@ -257,5 +282,10 @@ export async function GET(
     recentNodeOutcomes: recentNodeOutcomes.slice(0, 80),
     domainBundleBlockers,
     domainPromotionPath,
+    limits: {
+      recentAttemptsLimit,
+      masteryLimit,
+      outcomesLimit,
+    },
   });
 }

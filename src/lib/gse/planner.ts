@@ -1,7 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import type { CEFRStage } from "@/lib/curriculum";
-import { getBundleNodeIdsForStage, getBundleNodeIdsForStageAndDomain } from "./bundles";
+import { getBundleNodeIdsForStageAndDomain } from "./bundles";
 import { computeDecayedMastery } from "./mastery";
 import { mapStageToGseRange } from "./utils";
 
@@ -69,7 +69,7 @@ function weightedSampleWithoutReplacement<T>(
 ): T[] {
   if (items.length <= k) return [...items];
   const result: T[] = [];
-  let remaining = items.map((item) => ({ item, weight: Math.max(1e-6, weightFn(item)) }));
+  const remaining = items.map((item) => ({ item, weight: Math.max(1e-6, weightFn(item)) }));
   for (let s = 0; s < k && remaining.length > 0; s++) {
     const total = remaining.reduce((sum, x) => sum + x.weight, 0);
     let r = Math.random() * total;

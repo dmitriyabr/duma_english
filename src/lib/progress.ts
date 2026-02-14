@@ -1,5 +1,5 @@
 import { prisma } from "./db";
-import { nextTargetNodesForStudent } from "./gse/planner";
+import { nextTargetNodesForStudent } from "./gse/planner/pool";
 import { projectLearnerStageFromGse } from "./gse/stageProjection";
 
 type SkillTrend = {

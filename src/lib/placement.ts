@@ -1045,37 +1045,6 @@ function determineTargetStage(params: {
   return STAGES[Math.max(0, Math.min(capped, STAGES.length - 1))] as CEFRStage;
 }
 
-async function getScaffoldingVocab(stage: string, studentId: string): Promise<{
-  nodeIds: string[];
-  labels: string[];
-  types: string[];
-}> {
-  const range = mapStageToGseRange(stage);
-  const masteredIds = await prisma.studentGseMastery.findMany({
-    where: { studentId, masteryScore: { gte: 70 } },
-    select: { nodeId: true },
-  });
-  const masteredSet = new Set(masteredIds.map((r) => r.nodeId));
-
-  const candidates = await prisma.gseNode.findMany({
-    where: {
-      type: "GSE_VOCAB",
-      gseCenter: { gte: range.min, lte: range.max },
-      audience: { in: ["YL", "AL", "AE"] },
-    },
-    select: { nodeId: true, descriptor: true, type: true },
-    orderBy: { gseCenter: "asc" },
-    take: 20,
-  });
-
-  const unmastered = candidates.filter((c) => !masteredSet.has(c.nodeId)).slice(0, 6);
-  return {
-    nodeIds: unmastered.map((n) => n.nodeId),
-    labels: unmastered.map((n) => n.descriptor),
-    types: unmastered.map((n) => n.type),
-  };
-}
-
 async function generatePlacementExtendedTask(params: {
   studentId: string;
   session: { transcriptHistory: string[] };

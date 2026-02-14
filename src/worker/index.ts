@@ -6,10 +6,11 @@ import { analyzeSpeechFromBuffer } from "../lib/speech";
 import { calculateDerivedSpeechMetrics, composeScores } from "../lib/scoring";
 import { computeLanguageScoreFromTaskEvaluation, evaluateTaskQuality, type EvaluationInput } from "../lib/evaluator";
 import { recomputeMastery } from "../lib/adaptive";
-import { finishPlacement, submitPlacementAnswer } from "../lib/placement";
-import { persistAttemptGseEvidence } from "../lib/gse/evidence";
+import { finishPlacement, submitPlacementAnswer } from "../lib/placement/irt";
+import { persistAttemptGseEvidence } from "../lib/gse/evidence/persist";
+import { config } from "../lib/config";
 
-const POLL_INTERVAL_MS = Number(process.env.WORKER_POLL_INTERVAL_MS || 3000);
+const POLL_INTERVAL_MS = config.worker.pollIntervalMs;
 const SCORE_VERSION = "score-v3";
 
 type MetricSource = "azure" | "rules" | "openai";
@@ -283,7 +284,7 @@ async function processAttempt(attemptId: string) {
     include: { task: true },
   });
 
-  if (!attempt || !attempt.audioObjectKey) return;
+  if (!attempt || !attempt.audioObjectKey || attempt.status !== "processing") return;
 
   console.log(
     JSON.stringify({
@@ -327,29 +328,29 @@ async function processAttempt(attemptId: string) {
 
     if (!analysis) throw lastError || new Error("Speech analysis failed");
 
-	    const taskMeta = (attempt.task.metaJson || {}) as Record<string, unknown>;
-	    const taskTargets = await prisma.taskGseTarget.findMany({
-	      where: { taskId: attempt.taskId },
-	      include: {
-	        node: {
-	          select: {
-	            nodeId: true,
-	            type: true,
-	            sourceKey: true,
-	            descriptor: true,
-	          },
-	        },
-	      },
-	    });
-	    const evaluated = await evaluateTaskQuality({
-	      taskId: attempt.taskId,
-	      taskType: attempt.task.type,
-	      taskPrompt: attempt.task.prompt,
-	      transcript: analysis.transcript,
-	      speechMetrics: calculateDerivedSpeechMetrics(analysis.metrics),
-	      taskMeta,
-	      taskTargets: taskTargets as unknown as EvaluationInput["taskTargets"],
-	    });
+    const taskMeta = (attempt.task.metaJson || {}) as Record<string, unknown>;
+    const taskTargets = await prisma.taskGseTarget.findMany({
+      where: { taskId: attempt.taskId },
+      include: {
+        node: {
+          select: {
+            nodeId: true,
+            type: true,
+            sourceKey: true,
+            descriptor: true,
+          },
+        },
+      },
+    });
+    const evaluated = await evaluateTaskQuality({
+      taskId: attempt.taskId,
+      taskType: attempt.task.type,
+      taskPrompt: attempt.task.prompt,
+      transcript: analysis.transcript,
+      speechMetrics: calculateDerivedSpeechMetrics(analysis.metrics),
+      taskMeta,
+      taskTargets: taskTargets as unknown as EvaluationInput["taskTargets"],
+    });
     const derivedMetrics = calculateDerivedSpeechMetrics(analysis.metrics);
     const languageScore = computeLanguageScoreFromTaskEvaluation(evaluated.taskEvaluation);
     const scores = composeScores({
@@ -357,7 +358,7 @@ async function processAttempt(attemptId: string) {
       taskScore: evaluated.taskEvaluation.taskScore,
       languageScore,
       attemptCount: attemptCount + 1,
-      strictReliabilityGating: process.env.STRICT_RELIABILITY_GATING === "true",
+      strictReliabilityGating: config.worker.strictReliabilityGating,
     });
     const canonicalMetrics = buildCanonicalMetrics({
       derivedMetrics,
@@ -380,8 +381,8 @@ async function processAttempt(attemptId: string) {
       evaluation: evaluated.debug,
     };
 
-    await prisma.attempt.update({
-      where: { id: attempt.id },
+    await prisma.attempt.updateMany({
+      where: { id: attempt.id, status: "processing" },
       data: {
         status: "completed",
         transcript: analysis.transcript,
@@ -389,7 +390,7 @@ async function processAttempt(attemptId: string) {
         rawRecognitionJson: analysis.raw as object,
         taskEvaluationJson: evaluated.taskEvaluation as object,
         aiDebugJson:
-          process.env.SHOW_AI_DEBUG === "true"
+          config.worker.showAiDebug
             ? (aiDebug as Prisma.InputJsonValue)
             : Prisma.DbNull,
         scoresJson: scores,
@@ -400,6 +401,9 @@ async function processAttempt(attemptId: string) {
       },
     });
 
+    await prisma.attemptMetric.deleteMany({
+      where: { attemptId: attempt.id },
+    });
     if (canonicalMetrics.length > 0) {
       await prisma.attemptMetric.createMany({
         data: canonicalMetrics.map((metric) => ({
@@ -436,8 +440,8 @@ async function processAttempt(attemptId: string) {
       console.log(JSON.stringify({ event: "gse_evidence_written", attemptId: attempt.id, count: gseEvidence.evidenceCount }));
     }
     const recoveryTriggered = await computeRecoveryTrigger(attempt.studentId);
-    await prisma.attempt.update({
-      where: { id: attempt.id },
+    await prisma.attempt.updateMany({
+      where: { id: attempt.id, status: "completed" },
       data: {
         nodeOutcomesJson: gseEvidence.nodeOutcomes as unknown as Prisma.InputJsonValue,
         recoveryTriggered,
@@ -464,7 +468,7 @@ async function processAttempt(attemptId: string) {
       });
       if (profile) {
         const nextAttempts = (profile.coldStartAttempts || 0) + 1;
-        await prisma.learnerProfile.update({
+          await prisma.learnerProfile.update({
           where: { studentId: attempt.studentId },
           data: {
             coldStartAttempts: nextAttempts,
@@ -515,8 +519,8 @@ async function processAttempt(attemptId: string) {
       })
     );
 
-    await prisma.attempt.update({
-      where: { id: attemptId },
+    await prisma.attempt.updateMany({
+      where: { id: attemptId, status: { in: ["uploaded", "processing"] } },
       data: {
         status: "failed",
         errorCode: mapped.code,
@@ -533,23 +537,34 @@ async function processAttempt(attemptId: string) {
   }
 }
 
-async function loop() {
-  for (;;) {
+async function claimNextUploadedAttempt() {
+  for (let i = 0; i < 4; i += 1) {
     const nextAttempt = await prisma.attempt.findFirst({
       where: { status: "uploaded" },
       orderBy: { createdAt: "asc" },
+      select: { id: true },
     });
+    if (!nextAttempt) return null;
 
-    if (!nextAttempt) {
+    const claimed = await prisma.attempt.updateMany({
+      where: { id: nextAttempt.id, status: "uploaded" },
+      data: { status: "processing" },
+    });
+    if (claimed.count === 1) return nextAttempt.id;
+  }
+  return null;
+}
+
+async function loop() {
+  for (;;) {
+    const nextAttemptId = await claimNextUploadedAttempt();
+
+    if (!nextAttemptId) {
       await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
       continue;
     }
 
-    await prisma.attempt.update({
-      where: { id: nextAttempt.id },
-      data: { status: "processing" },
-    });
-    await processAttempt(nextAttempt.id);
+    await processAttempt(nextAttemptId);
   }
 }
 

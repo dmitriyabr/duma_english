@@ -259,45 +259,101 @@ export default function RecordPage() {
     }
   }
 
+  const isRecording = status === "Recording";
+  const isUploading = status === "Uploading";
+  const modeLabel = task?.assessmentMode === "pa" ? "Read Aloud" : "Free Talk";
+  const elapsedLabel = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+  const actionLabel = isUploading
+    ? "Sending your voice..."
+    : isRecording
+      ? "I'm done!"
+      : "Start my voice quest!";
+  const actionIcon = isUploading ? "📤" : isRecording ? "⏹️" : "📣";
+  const actionClass = isRecording
+    ? "btn record-stop-btn record-stop-btn-live record-action-btn"
+    : "btn task-start-btn record-start-btn record-action-btn";
+
   return (
-    <div className="page">
-      <nav className="nav">
-        <strong style={{ fontFamily: "var(--font-display)" }}>Duma Trainer</strong>
-        <div className="nav-links">
-          <Link href="/task">Task</Link>
-          <Link href="/home">Home</Link>
-        </div>
-      </nav>
-      <section className="container">
-        <div className="card">
-          <h1 className="title">Record your answer</h1>
+    <div className="page task-page record-page">
+      <section className="task-hero record-hero">
+        <div className="task-mobile-frame record-frame">
+          <div className="record-floating-star" aria-hidden>
+            ✦
+          </div>
+          <div className="record-floating-cloud" aria-hidden />
+
+          <div className="task-top-row">
+            <div className="task-nav-mini">
+              <Link href="/task">Task</Link>
+              <Link href="/home">Home</Link>
+            </div>
+          </div>
+
+          <p className="task-kicker record-kicker">🎙️ VOICE QUEST</p>
+          <h1 className="task-title-main">Ready to talk?</h1>
+          <h2 className="task-title-accent record-title-accent">Let&apos;s record your magic!</h2>
+
           {task ? (
-            <>
-              <p className="subtitle">{task.prompt}</p>
-              <p className="subtitle">
-                Mode: {task.assessmentMode.toUpperCase()} | Max {task.maxDurationSec}s
-              </p>
-            </>
+            <div className="record-main-grid">
+              <div className="record-main-left">
+                <article className="record-mission-card">
+                  <div className="record-mission-top">
+                    <div className="record-icon-circle" aria-hidden>
+                      🗺️
+                    </div>
+                    <div>
+                      <p className="record-mission-label">YOUR SPEAKING MISSION:</p>
+                      <p className="record-prompt-text">{task.prompt}</p>
+                    </div>
+                  </div>
+                  <div className="record-tip-bubble">
+                    <p>Tip: Smile while speaking. Your voice sounds brighter!</p>
+                  </div>
+                </article>
+              </div>
+
+              <div className="record-main-right">
+                <div className="record-meta-row">
+                  <div className="record-meta-pill">
+                    <span>MODE</span>
+                    <strong>{modeLabel}</strong>
+                  </div>
+                  <div className="record-meta-pill">
+                    <span>MAX TIME</span>
+                    <strong>{task.maxDurationSec}s</strong>
+                  </div>
+                </div>
+
+                <div className={`record-timer-card record-timer-${status.toLowerCase()}`}>
+                  <div className="record-timer-icon" aria-hidden>
+                    {isRecording ? "🎙️" : "⏱️"}
+                  </div>
+                  <p className="record-timer-label">TIMER</p>
+                  <p className="record-timer-value">{elapsedLabel}</p>
+                </div>
+
+                <div className="record-actions">
+                  <button
+                    className={actionClass}
+                    onClick={isRecording ? stopRecording : startRecording}
+                    disabled={!task || isUploading}
+                  >
+                    <span className="task-cta-icon">{actionIcon}</span>
+                    {actionLabel}
+                  </button>
+                </div>
+
+                {error && <p className="record-error">{error}</p>}
+              </div>
+            </div>
           ) : (
-            <p className="subtitle">
-              No task loaded. Go back to <Link href="/task">Task</Link>.
-            </p>
+            <div className="record-empty">
+              <p className="record-empty-title">No task loaded yet.</p>
+              <p className="subtitle">
+                Go to <Link href="/task">Task</Link> and open a quest first.
+              </p>
+            </div>
           )}
-          <div className="spacer" />
-          <div className="status">
-            <span className="status-dot" />
-            {status} - {seconds}s
-          </div>
-          <div className="spacer" />
-          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-            <button className="btn" onClick={startRecording} disabled={status === "Recording"}>
-              Start
-            </button>
-            <button className="btn ghost" onClick={stopRecording} disabled={status !== "Recording"}>
-              Stop
-            </button>
-          </div>
-          {error && <p style={{ color: "#c1121f", marginTop: 12 }}>{error}</p>}
         </div>
       </section>
     </div>

@@ -12,6 +12,7 @@ import { config } from "../lib/config";
 import { ATTEMPT_STATUS } from "../lib/attemptStatus";
 import { evaluateSpeechRetryGate } from "../lib/speechRetryGate";
 import { evaluateTopicRetryGate } from "../lib/topicRetryGate";
+import { inferCausalDiagnosis } from "../lib/causal/inference";
 
 const POLL_INTERVAL_MS = config.worker.pollIntervalMs;
 const SCORE_VERSION = "score-v3";
@@ -442,6 +443,15 @@ async function processAttempt(attemptId: string) {
       taskEvaluation: evaluated.taskEvaluation,
       languageScore,
     });
+    const causalDiagnosis = inferCausalDiagnosis({
+      attemptId: attempt.id,
+      studentId: attempt.studentId,
+      taskType: attempt.task.type,
+      transcript: analysis.transcript,
+      speechMetrics: derivedMetrics,
+      taskEvaluation: evaluated.taskEvaluation,
+      scores,
+    });
     const aiDebug = {
       speech: {
         provider: analysis.provider,
@@ -494,6 +504,46 @@ async function processAttempt(attemptId: string) {
         })),
       });
     }
+    await prisma.causalDiagnosis.upsert({
+      where: { attemptId: attempt.id },
+      update: {
+        studentId: attempt.studentId,
+        taxonomyVersion: causalDiagnosis.taxonomyVersion,
+        modelVersion: causalDiagnosis.modelVersion,
+        topLabel: causalDiagnosis.topLabel,
+        topProbability: causalDiagnosis.topProbability,
+        entropy: causalDiagnosis.entropy ?? null,
+        topMargin: causalDiagnosis.topMargin ?? null,
+        distributionJson: causalDiagnosis.distribution as unknown as Prisma.InputJsonValue,
+        confidenceIntervalJson:
+          causalDiagnosis.confidenceInterval === undefined
+            ? Prisma.DbNull
+            : (causalDiagnosis.confidenceInterval as unknown as Prisma.InputJsonValue),
+        counterfactualJson:
+          causalDiagnosis.counterfactual === undefined
+            ? Prisma.DbNull
+            : (causalDiagnosis.counterfactual as unknown as Prisma.InputJsonValue),
+      },
+      create: {
+        attemptId: attempt.id,
+        studentId: attempt.studentId,
+        taxonomyVersion: causalDiagnosis.taxonomyVersion,
+        modelVersion: causalDiagnosis.modelVersion,
+        topLabel: causalDiagnosis.topLabel,
+        topProbability: causalDiagnosis.topProbability,
+        entropy: causalDiagnosis.entropy ?? null,
+        topMargin: causalDiagnosis.topMargin ?? null,
+        distributionJson: causalDiagnosis.distribution as unknown as Prisma.InputJsonValue,
+        confidenceIntervalJson:
+          causalDiagnosis.confidenceInterval === undefined
+            ? Prisma.DbNull
+            : (causalDiagnosis.confidenceInterval as unknown as Prisma.InputJsonValue),
+        counterfactualJson:
+          causalDiagnosis.counterfactual === undefined
+            ? Prisma.DbNull
+            : (causalDiagnosis.counterfactual as unknown as Prisma.InputJsonValue),
+      },
+    });
 
     await updateStudentVocabularyFromAttempt(attempt.studentId, evaluated.taskEvaluation);
     const learnerProfile = await prisma.learnerProfile.findUnique({

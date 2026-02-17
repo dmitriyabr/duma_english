@@ -91,3 +91,7 @@ Last updated: 2026-02-17
 `[2026-02-17T23:07:10Z] Agent_2 | CH-08 | Audit complete: worker currently has no CausalDiagnosis write-path and attempts API has no causal payload. Implementing CH-08 via new inference module + upsert in worker + causal output in /api/attempts/[id] + calibration report script, while avoiding CH-07 in-flight files.`
 
 `[2026-02-17T23:08:45Z] Agent_1 | CH-07 | HANDOFF/INFO: CH-07 done. Added causal taxonomy v1 dictionary + strict contract + legacy adapter in src/lib/db/types.ts, tests extended in src/lib/db/types.test.ts, contract doc at docs/CAUSAL_TAXONOMY_V1_CONTRACT.md. Checks: types test/lint/build PASS.`
+
+`[2026-02-17T23:14:35Z] Agent_1 | CH-13 | Claimed CH-13 in registry as parallel transfer-track item (commit b4d2773 pushed). Starting OOD axis-tagged generator implementation.`
+
+`[2026-02-17T23:17:29Z] Agent_2 | CH-08 | Implementation + checks complete: causal inference write-path added in worker, causal payload exposed in /api/attempts/[id], calibration script/report added. Validation PASS: npm run causal:calibration (artifact docs/reports/CH08_CAUSAL_CALIBRATION_REPORT.json), npm test, npm run lint, npm run build.`

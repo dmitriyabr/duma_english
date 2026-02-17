@@ -82,6 +82,20 @@ export const attemptDetailsResponseSchema = z
         scores: anyRecordSchema,
         taskEvaluation: anyRecordSchema.nullable(),
         feedback: z.unknown().nullable(),
+        causal: z
+          .object({
+            taxonomyVersion: z.string(),
+            modelVersion: z.string(),
+            topLabel: z.string(),
+            topProbability: z.number(),
+            entropy: z.number().nullable(),
+            topMargin: z.number().nullable(),
+            distribution: z.array(z.unknown()),
+            confidenceInterval: z.unknown().nullable(),
+            counterfactual: z.unknown().nullable(),
+            createdAt: z.coerce.date(),
+          })
+          .nullable(),
         gseEvidence: z.array(z.unknown()),
         evidenceMatrix: z.array(z.unknown()),
         consistencyFlag: z.string().nullable(),

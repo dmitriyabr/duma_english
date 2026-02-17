@@ -76,6 +76,7 @@ As of 2026-02-14:
 - `npm run lint` passes with zero errors/warnings.
 - `npm run build` passes.
 - `npm run graph:quality` provides release-blocking graph governance checks + drift report output.
+- `GET /api/attempts/[id]` now includes causal diagnosis payload (`results.causal`) for completed attempts.
 
 ## Placement Architecture (Current)
 

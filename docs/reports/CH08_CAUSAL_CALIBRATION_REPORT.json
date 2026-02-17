@@ -1,0 +1,42 @@
+{
+  "generatedAt": "2026-02-17T23:16:10.317Z",
+  "window": {
+    "days": 30,
+    "from": "2026-01-18T23:16:10.198Z"
+  },
+  "sampleSize": 0,
+  "taxonomyVersions": [],
+  "modelVersions": [],
+  "summary": {
+    "avgTopProbability": null,
+    "avgEntropy": null,
+    "avgTopMargin": null,
+    "avgConfidenceIntervalWidth": null,
+    "wideConfidenceIntervalRate": null,
+    "unknownTopRate": 0,
+    "mixedTopRate": 0
+  },
+  "distribution": {
+    "topLabelCounts": {
+      "rule_confusion": 0,
+      "l1_interference": 0,
+      "retrieval_failure": 0,
+      "instruction_misread": 0,
+      "attention_loss": 0,
+      "production_constraint": 0,
+      "mixed": 0,
+      "unknown": 0
+    },
+    "topLabelRates": {
+      "rule_confusion": 0,
+      "l1_interference": 0,
+      "retrieval_failure": 0,
+      "instruction_misread": 0,
+      "attention_loss": 0,
+      "production_constraint": 0,
+      "mixed": 0,
+      "unknown": 0
+    }
+  },
+  "recentSamples": []
+}

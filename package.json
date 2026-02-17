@@ -17,7 +17,8 @@
     "graph:quality:db": "tsx src/scripts/gse_graph_quality_report.ts --db",
     "gse:embeddings:backfill": "tsx src/scripts/gse_backfill_semantic_embeddings.ts",
     "kpi:dashboard": "tsx src/scripts/ch05_kpi_baseline_report.ts",
-    "kpi:baseline:freeze": "tsx src/scripts/ch05_kpi_baseline_report.ts --freeze"
+    "kpi:baseline:freeze": "tsx src/scripts/ch05_kpi_baseline_report.ts --freeze",
+    "causal:calibration": "tsx src/scripts/ch08_causal_calibration_report.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.887.0",

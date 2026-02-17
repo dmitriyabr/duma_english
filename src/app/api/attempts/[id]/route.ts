@@ -19,6 +19,7 @@ export async function GET(_: Request, context: AttemptRouteContext) {
   const attempt = await prisma.attempt.findFirst({
     where: { id, studentId: student.studentId },
     include: {
+      causalDiagnosis: true,
       task: {
         include: {
           taskInstance: {
@@ -350,6 +351,32 @@ export async function GET(_: Request, context: AttemptRouteContext) {
 
   const isFailed = attempt.status === ATTEMPT_STATUS.FAILED;
   const isRetry = isAttemptRetryStatus(attempt.status);
+  const causal = attempt.causalDiagnosis
+    ? {
+        taxonomyVersion: attempt.causalDiagnosis.taxonomyVersion,
+        modelVersion: attempt.causalDiagnosis.modelVersion,
+        topLabel: attempt.causalDiagnosis.topLabel,
+        topProbability: attempt.causalDiagnosis.topProbability,
+        entropy: attempt.causalDiagnosis.entropy,
+        topMargin: attempt.causalDiagnosis.topMargin,
+        distribution:
+          Array.isArray(attempt.causalDiagnosis.distributionJson) &&
+          attempt.causalDiagnosis.distributionJson.length > 0
+            ? attempt.causalDiagnosis.distributionJson
+            : [],
+        confidenceInterval:
+          attempt.causalDiagnosis.confidenceIntervalJson &&
+          typeof attempt.causalDiagnosis.confidenceIntervalJson === "object"
+            ? attempt.causalDiagnosis.confidenceIntervalJson
+            : null,
+        counterfactual:
+          attempt.causalDiagnosis.counterfactualJson &&
+          typeof attempt.causalDiagnosis.counterfactualJson === "object"
+            ? attempt.causalDiagnosis.counterfactualJson
+            : null,
+        createdAt: attempt.causalDiagnosis.createdAt,
+      }
+    : null;
 
   return NextResponse.json({
     status: attempt.status,
@@ -381,6 +408,7 @@ export async function GET(_: Request, context: AttemptRouteContext) {
             scores,
             taskEvaluation,
             feedback,
+            causal,
             gseEvidence,
             evidenceMatrix,
             consistencyFlag,

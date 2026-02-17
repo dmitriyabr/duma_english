@@ -2,6 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import {
+  ATTEMPT_STATUS,
+  isAttemptRetryStatus,
+  isAttemptTerminalStatus,
+} from "@/lib/attemptStatus";
 
 type Phase =
   | "starting"
@@ -38,6 +43,15 @@ type TaskInfo = {
 
 type AttemptResult = {
   status: string;
+  retry?: {
+    required: true;
+    reasonCode?: string | null;
+    message?: string | null;
+  } | null;
+  error?: {
+    code?: string | null;
+    message?: string | null;
+  } | null;
   results?: {
     transcript?: string | null;
     scores?: {
@@ -180,6 +194,13 @@ function stageLabel(stage: string) {
   if (stage === "C1") return "Advanced";
   if (stage === "C2") return "Proficient";
   return "";
+}
+
+function retryHeadline(reasonCode?: string | null) {
+  if (reasonCode === "RETRY_OFF_TOPIC") {
+    return "🧭 I'm sorry, this sounds like another topic. Let's read the task and try again.";
+  }
+  return "🎤 I'm sorry, I didn't hear you well. Can you try again?";
 }
 
 export default function PlacementExtendedPage() {
@@ -376,7 +397,7 @@ export default function PlacementExtendedPage() {
         if (!res.ok) throw new Error("Unable to fetch results");
         const json: AttemptResult = await res.json();
         if (!pollActiveRef.current) return;
-        if (json.status === "completed" || json.status === "failed") {
+        if (isAttemptTerminalStatus(json.status)) {
           setAttemptResult(json);
           setPhase("feedback");
         } else {
@@ -388,6 +409,14 @@ export default function PlacementExtendedPage() {
       }
     }
     poll();
+  }
+
+  function retryCurrentAttempt() {
+    pollActiveRef.current = false;
+    setAttemptId(null);
+    setAttemptResult(null);
+    setError(null);
+    setPhase("task");
   }
 
   async function submitFeedback(feedback: "too_easy" | "just_right" | "too_hard") {
@@ -447,6 +476,8 @@ export default function PlacementExtendedPage() {
   const busyPhase: BusyPhase | null =
     phase === "uploading" || phase === "processing" || phase === "submitting" ? phase : null;
   const isBusy = Boolean(busyPhase);
+  const canSubmitFeedback = attemptResult?.status === ATTEMPT_STATUS.COMPLETED;
+  const isRetryAttempt = Boolean(attemptResult?.status && isAttemptRetryStatus(attemptResult.status));
   const busyHints: Record<BusyPhase, string[]> = {
     uploading: [
       "Packing your brave voice into a magic file...",
@@ -626,20 +657,31 @@ export default function PlacementExtendedPage() {
 
             {phase === "feedback" && attemptResult && (
               <section className="placement-panel">
-                {attemptResult.status === "failed" && (
+                {attemptResult.status === ATTEMPT_STATUS.FAILED && (
                   <p className="placement-warning">
-                    Processing failed, but your response was still saved.
+                    We couldn&apos;t process this recording. Please try again.
                   </p>
                 )}
 
-                {attemptResult.results?.transcript && (
+                {isRetryAttempt && (
+                  <article className="placement-mini-card placement-retry-card">
+                    <div className="placement-retry-icon" aria-hidden>
+                      Oops!
+                    </div>
+                    <p className="placement-retry-big">
+                      {retryHeadline(attemptResult.retry?.reasonCode || attemptResult.error?.code)}
+                    </p>
+                  </article>
+                )}
+
+                {canSubmitFeedback && attemptResult.results?.transcript && (
                   <article className="placement-mini-card">
                     <p className="placement-mini-label">Transcript</p>
                     <p className="placement-transcript">{attemptResult.results.transcript}</p>
                   </article>
                 )}
 
-                {attemptResult.results?.scores?.overallScore != null && (
+                {canSubmitFeedback && attemptResult.results?.scores?.overallScore != null && (
                   <article className="placement-mini-card">
                     <p className="placement-mini-label">Score</p>
                     <p className="placement-score-value">
@@ -648,18 +690,31 @@ export default function PlacementExtendedPage() {
                   </article>
                 )}
 
-                <p className="placement-feedback-title">How did that feel?</p>
-                <div className="placement-feedback-actions">
-                  <button className="btn ghost" onClick={() => submitFeedback("too_easy")}>
-                    Too easy
-                  </button>
-                  <button className="btn placement-feedback-primary" onClick={() => submitFeedback("just_right")}>
-                    Just right
-                  </button>
-                  <button className="btn ghost" onClick={() => submitFeedback("too_hard")}>
-                    Too hard
-                  </button>
-                </div>
+                {canSubmitFeedback ? (
+                  <>
+                    <p className="placement-feedback-title">How did that feel?</p>
+                    <div className="placement-feedback-actions">
+                      <button className="btn ghost" onClick={() => submitFeedback("too_easy")}>
+                        Too easy
+                      </button>
+                      <button className="btn placement-feedback-primary" onClick={() => submitFeedback("just_right")}>
+                        Just right
+                      </button>
+                      <button className="btn ghost" onClick={() => submitFeedback("too_hard")}>
+                        Too hard
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="placement-feedback-actions">
+                    <button className="btn placement-feedback-primary" onClick={retryCurrentAttempt}>
+                      🎙️ Try again
+                    </button>
+                    <button className="btn ghost" onClick={retryCurrentAttempt}>
+                      Back to task
+                    </button>
+                  </div>
+                )}
               </section>
             )}
 

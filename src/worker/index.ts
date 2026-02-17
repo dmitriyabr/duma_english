@@ -9,6 +9,9 @@ import { recomputeMastery } from "../lib/adaptive";
 import { finishPlacement, submitPlacementAnswer } from "../lib/placement/irt";
 import { persistAttemptGseEvidence } from "../lib/gse/evidence/persist";
 import { config } from "../lib/config";
+import { ATTEMPT_STATUS } from "../lib/attemptStatus";
+import { evaluateSpeechRetryGate } from "../lib/speechRetryGate";
+import { evaluateTopicRetryGate } from "../lib/topicRetryGate";
 
 const POLL_INTERVAL_MS = config.worker.pollIntervalMs;
 const SCORE_VERSION = "score-v3";
@@ -284,7 +287,7 @@ async function processAttempt(attemptId: string) {
     include: { task: true },
   });
 
-  if (!attempt || !attempt.audioObjectKey || attempt.status !== "processing") return;
+  if (!attempt || !attempt.audioObjectKey || attempt.status !== ATTEMPT_STATUS.PROCESSING) return;
 
   console.log(
     JSON.stringify({
@@ -328,6 +331,81 @@ async function processAttempt(attemptId: string) {
 
     if (!analysis) throw lastError || new Error("Speech analysis failed");
 
+    const derivedMetrics = calculateDerivedSpeechMetrics(analysis.metrics);
+    const retryDecision = evaluateSpeechRetryGate({
+      transcript: analysis.transcript,
+      metrics: derivedMetrics,
+      durationSec: attempt.durationSec,
+    });
+    if (retryDecision.shouldRetry) {
+      await prisma.attempt.updateMany({
+        where: { id: attempt.id, status: ATTEMPT_STATUS.PROCESSING },
+        data: {
+          status: ATTEMPT_STATUS.NEEDS_RETRY,
+          transcript: analysis.transcript,
+          speechMetricsJson: derivedMetrics,
+          rawRecognitionJson:
+            analysis.raw !== null && analysis.raw !== undefined
+              ? (analysis.raw as Prisma.InputJsonValue)
+              : Prisma.DbNull,
+          taskEvaluationJson: Prisma.DbNull,
+          feedbackJson: Prisma.DbNull,
+          scoresJson: Prisma.DbNull,
+          aiDebugJson: Prisma.DbNull,
+          nodeOutcomesJson: Prisma.DbNull,
+          errorCode: retryDecision.reasonCode,
+          errorMessage: retryDecision.message,
+          completedAt: new Date(),
+        },
+      });
+      console.log(
+        JSON.stringify({
+          event: "attempt_needs_retry",
+          attemptId: attempt.id,
+          reasonCode: retryDecision.reasonCode,
+        })
+      );
+      return;
+    }
+    const topicRetryDecision = await evaluateTopicRetryGate({
+      taskType: attempt.task.type,
+      taskPrompt: attempt.task.prompt,
+      transcript: analysis.transcript,
+      taskMeta: (attempt.task.metaJson || {}) as Record<string, unknown>,
+    });
+    if (topicRetryDecision.shouldRetry) {
+      await prisma.attempt.updateMany({
+        where: { id: attempt.id, status: ATTEMPT_STATUS.PROCESSING },
+        data: {
+          status: ATTEMPT_STATUS.NEEDS_RETRY,
+          transcript: analysis.transcript,
+          speechMetricsJson: derivedMetrics,
+          rawRecognitionJson:
+            analysis.raw !== null && analysis.raw !== undefined
+              ? (analysis.raw as Prisma.InputJsonValue)
+              : Prisma.DbNull,
+          taskEvaluationJson: Prisma.DbNull,
+          feedbackJson: Prisma.DbNull,
+          scoresJson: Prisma.DbNull,
+          aiDebugJson: Prisma.DbNull,
+          nodeOutcomesJson: Prisma.DbNull,
+          errorCode: topicRetryDecision.reasonCode,
+          errorMessage: topicRetryDecision.message,
+          completedAt: new Date(),
+        },
+      });
+      console.log(
+        JSON.stringify({
+          event: "attempt_needs_retry",
+          attemptId: attempt.id,
+          reasonCode: topicRetryDecision.reasonCode,
+          source: topicRetryDecision.source,
+          confidence: topicRetryDecision.confidence,
+        })
+      );
+      return;
+    }
+
     const taskMeta = (attempt.task.metaJson || {}) as Record<string, unknown>;
     const taskTargets = await prisma.taskGseTarget.findMany({
       where: { taskId: attempt.taskId },
@@ -347,11 +425,10 @@ async function processAttempt(attemptId: string) {
       taskType: attempt.task.type,
       taskPrompt: attempt.task.prompt,
       transcript: analysis.transcript,
-      speechMetrics: calculateDerivedSpeechMetrics(analysis.metrics),
+      speechMetrics: derivedMetrics,
       taskMeta,
       taskTargets: taskTargets as unknown as EvaluationInput["taskTargets"],
     });
-    const derivedMetrics = calculateDerivedSpeechMetrics(analysis.metrics);
     const languageScore = computeLanguageScoreFromTaskEvaluation(evaluated.taskEvaluation);
     const scores = composeScores({
       metrics: derivedMetrics,
@@ -382,9 +459,9 @@ async function processAttempt(attemptId: string) {
     };
 
     await prisma.attempt.updateMany({
-      where: { id: attempt.id, status: "processing" },
+      where: { id: attempt.id, status: ATTEMPT_STATUS.PROCESSING },
       data: {
-        status: "completed",
+        status: ATTEMPT_STATUS.COMPLETED,
         transcript: analysis.transcript,
         speechMetricsJson: derivedMetrics,
         rawRecognitionJson: analysis.raw as object,
@@ -441,7 +518,7 @@ async function processAttempt(attemptId: string) {
     }
     const recoveryTriggered = await computeRecoveryTrigger(attempt.studentId);
     await prisma.attempt.updateMany({
-      where: { id: attempt.id, status: "completed" },
+      where: { id: attempt.id, status: ATTEMPT_STATUS.COMPLETED },
       data: {
         nodeOutcomesJson: gseEvidence.nodeOutcomes as unknown as Prisma.InputJsonValue,
         recoveryTriggered,
@@ -520,9 +597,12 @@ async function processAttempt(attemptId: string) {
     );
 
     await prisma.attempt.updateMany({
-      where: { id: attemptId, status: { in: ["uploaded", "processing"] } },
+      where: {
+        id: attemptId,
+        status: { in: [ATTEMPT_STATUS.UPLOADED, ATTEMPT_STATUS.PROCESSING] },
+      },
       data: {
-        status: "failed",
+        status: ATTEMPT_STATUS.FAILED,
         errorCode: mapped.code,
         errorMessage: mapped.message,
         completedAt: new Date(),
@@ -540,15 +620,15 @@ async function processAttempt(attemptId: string) {
 async function claimNextUploadedAttempt() {
   for (let i = 0; i < 4; i += 1) {
     const nextAttempt = await prisma.attempt.findFirst({
-      where: { status: "uploaded" },
+      where: { status: ATTEMPT_STATUS.UPLOADED },
       orderBy: { createdAt: "asc" },
       select: { id: true },
     });
     if (!nextAttempt) return null;
 
     const claimed = await prisma.attempt.updateMany({
-      where: { id: nextAttempt.id, status: "uploaded" },
-      data: { status: "processing" },
+      where: { id: nextAttempt.id, status: ATTEMPT_STATUS.UPLOADED },
+      data: { status: ATTEMPT_STATUS.PROCESSING },
     });
     if (claimed.count === 1) return nextAttempt.id;
   }

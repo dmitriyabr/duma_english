@@ -6,6 +6,7 @@ import { projectLearnerStageFromGse, refreshLearnerProfileFromGse, gseBandFromCe
 import { generateTaskSpec } from "./taskGenerator";
 import { assignTaskTargetsFromCatalog } from "./gse/planner";
 import { getBundleNodeIdsForStageAndDomain } from "./gse/bundles";
+import { ATTEMPT_STATUS, isAttemptRetryStatus } from "./attemptStatus";
 
 export type PlacementItemView = {
   id: string;
@@ -1303,14 +1304,54 @@ export async function submitPlacementExtendedAnswer(
   attemptId: string,
   userFeedback?: "too_easy" | "just_right" | "too_hard"
 ) {
+  function createPlacementExtendedError(message: string, code: string) {
+    const error = new Error(message) as Error & { code?: string };
+    error.code = code;
+    return error;
+  }
+
   const session = await prisma.placementSession.findUniqueOrThrow({
     where: { id: sessionId },
   });
 
   const attempt = await prisma.attempt.findUnique({
     where: { id: attemptId },
-    select: { transcript: true },
+    select: {
+      studentId: true,
+      status: true,
+      transcript: true,
+      task: {
+        select: {
+          metaJson: true,
+        },
+      },
+    },
   });
+  if (!attempt || attempt.studentId !== session.studentId) {
+    throw createPlacementExtendedError("Attempt not found for this student", "ATTEMPT_NOT_FOUND");
+  }
+  const attemptMeta = (attempt.task?.metaJson || {}) as Record<string, unknown>;
+  const attemptSessionId =
+    typeof attemptMeta.placementSessionId === "string" ? attemptMeta.placementSessionId : null;
+  const attemptMode = typeof attemptMeta.placementMode === "string" ? attemptMeta.placementMode : null;
+  if (attemptSessionId !== sessionId || attemptMode !== "placement_extended") {
+    throw createPlacementExtendedError(
+      "Attempt does not belong to this placement extended session",
+      "ATTEMPT_SESSION_MISMATCH"
+    );
+  }
+  if (isAttemptRetryStatus(attempt.status)) {
+    throw createPlacementExtendedError(
+      "Attempt requires a retry before placement can continue",
+      "RETRY_REQUIRED"
+    );
+  }
+  if (attempt.status !== ATTEMPT_STATUS.COMPLETED) {
+    throw createPlacementExtendedError(
+      "Attempt is not completed yet",
+      "ATTEMPT_NOT_COMPLETED"
+    );
+  }
   const transcript = attempt?.transcript || "";
 
   const nodeAnalysis = await analyzeLastAttemptNodes(attemptId);
@@ -1371,11 +1412,7 @@ export async function submitPlacementExtendedAnswer(
   const projectedStage = (projection.placementStage as CEFRStage) || "A2";
 
   // Get previous task stage from the attempt's task metadata
-  const attemptWithTask = await prisma.attempt.findUnique({
-    where: { id: attemptId },
-    select: { task: { select: { metaJson: true } } },
-  });
-  const prevMeta = (attemptWithTask?.task?.metaJson ?? {}) as Record<string, unknown>;
+  const prevMeta = (attemptMeta ?? {}) as Record<string, unknown>;
   const previousTaskStage = typeof prevMeta.stage === "string" ? prevMeta.stage : undefined;
 
   const scaffoldingLevel = determineScaffoldingLevel({

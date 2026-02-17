@@ -139,6 +139,23 @@ if (activationStateBefore !== "verified" &&
 - Body: `{ attemptId, userFeedback? }` where `userFeedback` is `too_easy | just_right | too_hard`
 - Returns (finished): `{ finished: true, reason }`
 - Returns (continue): `{ finished: false, nextTask: { taskId, type, prompt, metaJson } }`
+- Guard behavior:
+  - `attempt.status === "completed"` is required.
+  - `attempt.status === "needs_retry"` returns `409` + `{ code: "RETRY_REQUIRED" }`.
+  - Any other non-completed attempt returns `409` + `{ code: "ATTEMPT_NOT_COMPLETED" }`.
+  - Attempt/session mismatch returns `409` + `{ code: "ATTEMPT_SESSION_MISMATCH" }`.
+
+## Retry-on-unclear Speech (Current)
+
+Worker applies a pre-evaluation speech gate for placement and regular tasks.  
+If response is silent/too short/too quiet/unintelligible, attempt is finalized as `needs_retry`.
+
+- Reason codes: `RETRY_NO_SPEECH`, `RETRY_TOO_SHORT`, `RETRY_TOO_QUIET`, `RETRY_UNINTELLIGIBLE`
+- Additional relevance reason code: `RETRY_OFF_TOPIC` (clearly unrelated/background speech)
+- Message examples:
+  - unclear audio: `I'm sorry, I didn't hear you well. Can you try again?`
+  - off-topic/background speech: `I'm sorry, this sounds like another topic. Let's read the task and try again.`
+- Placement implication: retry attempts do not advance session state (`questionCount`, theta/sigma flow).
 
 ## Benefits
 

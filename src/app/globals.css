@@ -1635,6 +1635,42 @@ select {
   font-weight: 700;
 }
 
+.results-retry-panel {
+  text-align: center;
+}
+
+.results-retry-hero {
+  margin: 2px auto 10px;
+  width: 86px;
+  height: 86px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle at 34% 28%, #fff3d7 0%, #ffdca4 68%, #ffc982 100%);
+  border: 3px solid rgba(240, 177, 94, 0.72);
+  box-shadow:
+    0 8px 0 rgba(216, 146, 67, 0.28),
+    0 12px 22px rgba(185, 114, 42, 0.2);
+}
+
+.results-retry-icon {
+  font-family: "Fredoka", var(--font-display);
+  font-size: 1.4rem;
+  line-height: 1;
+  color: #9e4f1f;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+.results-retry-big {
+  margin: 4px auto 4px;
+  max-width: 28ch;
+  font-family: "Fredoka", var(--font-display);
+  font-size: clamp(1.32rem, 4.2vw, 1.9rem);
+  line-height: 1.2;
+  color: #5d2b1d;
+}
+
 .results-celebrate-panel {
   background: linear-gradient(180deg, #f9f0de 0%, #f6ecd5 100%);
 }
@@ -2312,6 +2348,39 @@ select {
   font-family: "Fredoka", var(--font-display);
   font-size: 0.9rem;
   color: #8c4215;
+}
+
+.placement-retry-card {
+  text-align: center;
+  border-style: solid;
+}
+
+.placement-retry-icon {
+  margin: 0 auto 8px;
+  width: 74px;
+  height: 74px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font-family: "Fredoka", var(--font-display);
+  font-size: 1.25rem;
+  color: #9e4f1f;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  background: radial-gradient(circle at 34% 28%, #fff3d7 0%, #ffdca4 68%, #ffc982 100%);
+  border: 3px solid rgba(240, 177, 94, 0.72);
+  box-shadow:
+    0 8px 0 rgba(216, 146, 67, 0.24),
+    0 12px 20px rgba(185, 114, 42, 0.18);
+}
+
+.placement-retry-big {
+  margin: 2px auto 0;
+  max-width: 28ch;
+  font-family: "Fredoka", var(--font-display);
+  font-size: clamp(1.24rem, 4.5vw, 1.72rem);
+  line-height: 1.2;
+  color: #5a2e16;
 }
 
 .placement-transcript {

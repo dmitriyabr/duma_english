@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { ATTEMPT_STATUS, isAttemptRetryStatus, isAttemptTerminalStatus } from "@/lib/attemptStatus";
 
 type Feedback = {
   summary?: string;
@@ -32,6 +33,11 @@ type AttemptResult = {
     isPlacement?: boolean;
     placementSessionId?: string | null;
   };
+  retry?: {
+    required: true;
+    reasonCode?: string | null;
+    message?: string | null;
+  } | null;
   error: {
     code?: string | null;
     message?: string | null;
@@ -168,6 +174,13 @@ const PROCESSING_HINTS = [
   "Polishing your result stars...",
 ];
 
+function retryHeadline(reasonCode?: string | null) {
+  if (reasonCode === "RETRY_OFF_TOPIC") {
+    return "🧭 I'm sorry, this sounds like another topic. Let's read the task and try again.";
+  }
+  return "🎤 I'm sorry, I didn't hear you well. Can you try again?";
+}
+
 export default function ResultsPage() {
   const [data, setData] = useState<AttemptResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -193,7 +206,7 @@ export default function ResultsPage() {
         const json: AttemptResult = await res.json();
         if (!active) return;
         setData(json);
-        if (json.status !== "completed" && json.status !== "failed") {
+        if (!isAttemptTerminalStatus(json.status)) {
           setTimeout(poll, 2000);
         }
       } catch (err) {
@@ -227,9 +240,10 @@ export default function ResultsPage() {
   const uniqueNodes = Array.from(
     new Map(gseEvidence.map((item) => [item.nodeId, item])).values()
   ).slice(0, 6);
-  const isCompleted = data?.status === "completed";
-  const isFailed = data?.status === "failed";
-  const isBusy = !error && (!data || (!isCompleted && !isFailed));
+  const isCompleted = data?.status === ATTEMPT_STATUS.COMPLETED;
+  const isFailed = data?.status === ATTEMPT_STATUS.FAILED;
+  const isNeedsRetry = Boolean(data?.status && isAttemptRetryStatus(data.status));
+  const isBusy = !error && (!data || !isAttemptTerminalStatus(data.status));
   const overallScore = data?.results?.scores?.overallScore;
   const busyHint = PROCESSING_HINTS[busyHintIndex % PROCESSING_HINTS.length];
   const statusLabel = data?.status
@@ -293,6 +307,25 @@ export default function ResultsPage() {
                 <p className="results-failed-title">Oops! We couldn&apos;t process this recording.</p>
                 <p className="results-failed-text">
                   {data?.error?.message || "Unknown error"} {data?.error?.code ? `(${data.error.code})` : ""}
+                </p>
+                <div className="results-actions">
+                  <Link className="btn task-start-btn results-main-btn" href="/record">
+                    🎙️ Try again
+                  </Link>
+                  <Link className="btn ghost results-secondary-btn" href="/task">
+                    Back to tasks
+                  </Link>
+                </div>
+              </section>
+            )}
+
+            {isNeedsRetry && (
+              <section className="results-panel results-failed-panel results-retry-panel">
+                <div className="results-retry-hero" aria-hidden>
+                  <span className="results-retry-icon">Oops!</span>
+                </div>
+                <p className="results-retry-big">
+                  {retryHeadline(data?.retry?.reasonCode || data?.error?.code)}
                 </p>
                 <div className="results-actions">
                   <Link className="btn task-start-btn results-main-btn" href="/record">

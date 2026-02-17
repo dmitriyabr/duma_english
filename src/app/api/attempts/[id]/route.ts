@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { getStudentFromRequest } from "@/lib/auth";
 import { SpeechMetrics } from "@/lib/scoring";
 import { config } from "@/lib/config";
+import { ATTEMPT_STATUS, isAttemptRetryStatus } from "@/lib/attemptStatus";
 
 type AttemptRouteContext = {
   params: Promise<{ id: string }>;
@@ -347,6 +348,9 @@ export async function GET(_: Request, context: AttemptRouteContext) {
       verificationDueAt: row.verificationDueAt || null,
     }));
 
+  const isFailed = attempt.status === ATTEMPT_STATUS.FAILED;
+  const isRetry = isAttemptRetryStatus(attempt.status);
+
   return NextResponse.json({
     status: attempt.status,
     flow: {
@@ -355,14 +359,21 @@ export async function GET(_: Request, context: AttemptRouteContext) {
         ((attempt.task.metaJson as { placementSessionId?: string } | null)?.placementSessionId) || null,
     },
     error:
-      attempt.status === "failed"
+      isFailed || isRetry
         ? {
             code: attempt.errorCode,
             message: attempt.errorMessage,
           }
         : null,
+    retry: isRetry
+      ? {
+          required: true,
+          reasonCode: attempt.errorCode,
+          message: attempt.errorMessage,
+        }
+      : null,
     results:
-      attempt.status === "completed"
+      attempt.status === ATTEMPT_STATUS.COMPLETED
         ? {
             transcript: attempt.transcript,
             speech,

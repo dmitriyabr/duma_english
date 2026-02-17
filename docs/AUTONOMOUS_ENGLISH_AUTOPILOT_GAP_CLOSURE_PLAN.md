@@ -13,6 +13,12 @@ Execution branch (обязательно):
 - Любая агентская задача стартует с актуализации этой ветки и lock-коммита именно в неё.
 - Реализация ведётся в отдельной ветке агента, созданной от `codex/autopilot-execution-plan`.
 
+Изоляция на одной машине (обязательно):
+- Агенты не работают в одном и том же рабочем каталоге.
+- Каждый агент использует отдельный `git worktree` (или отдельный clone) со своим путем.
+- Рекомендуемый root для worktree: `/Users/skyeng/Desktop/duma_english_agents/<owner_name>`.
+- В одном worktree агент ведёт только одну активную задачу.
+
 Zero-context onboarding (прочитать перед выбором задачи):
 1. `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` (target product contract).
 2. `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_GAP_CLOSURE_PLAN.md` (execution board и протокол).
@@ -52,7 +58,7 @@ Zero-context onboarding (прочитать перед выбором задач
 Task lock handshake (обязательно перед кодом):
 1. Синхронизировать `origin/codex/autopilot-execution-plan`.
 2. В реестре у выбранной задачи поставить `Status=IN_PROGRESS`, `Owner`, `Start (UTC)`, `Branch`.
-3. Сделать отдельный lock-коммит только с изменением реестра и запушить в `origin/codex/autopilot-execution-plan`.
+3. Сделать отдельный lock-коммит только с изменением реестра и запушить в `origin/codex/autopilot-execution-plan` (допустимо из агентской ветки через refspec: `git push origin HEAD:codex/autopilot-execution-plan`).
 4. Только после успешного lock-пуша создать рабочую ветку от `codex/autopilot-execution-plan` и начинать реализацию.
 5. Если lock-пуш не прошёл (non-fast-forward), повторить синхронизацию и заново выбрать первую доступную задачу.
 
@@ -120,6 +126,7 @@ Task lock handshake (обязательно перед кодом):
 | DEC-2026-02-17-001 | 2026-02-17T00:00:00Z | BOARD | system | Введён Active Task Registry + Scope lock + append-only Decision Log | Нужно безопасно запустить параллельную работу агентов без конфликтов | `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_GAP_CLOSURE_PLAN.md` | Все агенты обязаны обновлять статусы и решения в этом файле |
 | DEC-2026-02-17-002 | 2026-02-17T00:00:00Z | BOARD | system | Выбор задачи сделан универсальным (первая доступная), добавлен lock handshake через отдельный push | Чтобы агентам не назначали CH вручную и чтобы избежать double-claim одной задачи | `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_GAP_CLOSURE_PLAN.md` | Все агенты стартуют только через lock-коммит |
 | DEC-2026-02-17-003 | 2026-02-17T00:00:00Z | BOARD | system | Execution branch зафиксирована как `codex/autopilot-execution-plan`; добавлены zero-context onboarding и общий файл связи агентов | Нужны автономный запуск агентов с нулевым контекстом и рабочая коммуникация без чатов | `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_GAP_CLOSURE_PLAN.md`, `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_AGENT_SYNC.md` | Все агенты работают только через execution branch и пишут handoff/blockers в sync-файл |
+| DEC-2026-02-17-004 | 2026-02-17T00:00:00Z | BOARD | system | Добавлена обязательная изоляция через отдельные worktree/clone на агента и уточнён lock push через refspec | На одной машине параллельные агенты не должны делить один рабочий каталог | `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_GAP_CLOSURE_PLAN.md` | Каждый агент стартует из отдельного worktree пути |
 
 ## 4) Execution Board (обособленные изменения)
 
@@ -345,7 +352,12 @@ Task lock handshake (обязательно перед кодом):
    - git fetch origin
    - git checkout codex/autopilot-execution-plan
    - git pull --ff-only origin codex/autopilot-execution-plan
-2) Zero-context onboarding (обязательно прочитать):
+2) Рабочая изоляция (одна машина, много агентов):
+   - используй отдельный worktree: /Users/skyeng/Desktop/duma_english_agents/OWNER_NAME
+   - если worktree отсутствует, создай:
+     git worktree add -b codex/agent-OWNER_NAME /Users/skyeng/Desktop/duma_english_agents/OWNER_NAME origin/codex/autopilot-execution-plan
+   - выполняй задачу только внутри этого пути.
+3) Zero-context onboarding (обязательно прочитать):
    - docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md
    - docs/AUTONOMOUS_ENGLISH_AUTOPILOT_GAP_CLOSURE_PLAN.md
    - README.md
@@ -353,34 +365,35 @@ Task lock handshake (обязательно перед кодом):
    - docs/BRAIN_RUNTIME.md
    - docs/BRAIN_ROADMAP.md
    - docs/DEBUG_PLAYBOOK.md
-3) Выбор задачи:
+4) Выбор задачи:
    - в Active Task Registry (Wave 1) выбери первую строку сверху вниз, где Status=TODO и Owner пустой.
    - если доступной задачи нет: запиши в ответ "no free tasks" и остановись.
-4) Захват задачи (lock):
+5) Захват задачи (lock):
    - обнови выбранную строку: Status=IN_PROGRESS, Owner=OWNER_NAME, Start (UTC), Branch, Scope lock.
    - сделай отдельный lock-коммит только с этой правкой.
-   - запушь lock-коммит в origin/codex/autopilot-execution-plan.
+   - запушь lock-коммит в origin/codex/autopilot-execution-plan:
+     git push origin HEAD:codex/autopilot-execution-plan
    - если push не прошёл (non-fast-forward), повтори синхронизацию и заново выбери первую доступную задачу.
-5) Рабочая ветка:
+6) Рабочая ветка:
    - создай отдельную ветку от codex/autopilot-execution-plan: codex/ch-xx-short-name-owner_name
    - всю реализацию веди в этой ветке.
-6) Реализация:
+7) Реализация:
    - выполняй полный DoD выбранного CH.
    - изменения только в Scope lock; выход за Scope lock только после новой записи в Decision Log (append-only).
    - пиши атомарные коммиты с понятными сообщениями.
-7) Проверки качества:
+8) Проверки качества:
    - прогоняй релевантные тесты/линтер/сборку для изменённых частей.
    - фиксируй фактические результаты проверок (что запускалось и что прошло/не прошло).
-8) Межагентная связь:
+9) Межагентная связь:
    - используй docs/AUTONOMOUS_ENGLISH_AUTOPILOT_AGENT_SYNC.md
    - append-only записи типов INFO/BLOCKER/RISK/HANDOFF/DECISION_REF.
-9) Завершение задачи:
+10) Завершение задачи:
    - обнови строку задачи: Status=DONE, End (UTC), PR/Commit, Artifacts, Decision IDs.
    - обнови чекбокс соответствующего CH в основном execution board.
    - если были экстра-решения, добавь их в Decision Log.
    - добавь короткую HANDOFF/INFO запись в AUTONOMOUS_ENGLISH_AUTOPILOT_AGENT_SYNC.md.
    - запушь рабочую ветку и подготовь PR в codex/autopilot-execution-plan.
-10) Запрещено:
+11) Запрещено:
    - закрывать несколько CH одним статусом;
    - коммитить в main;
    - пропускать lock-коммит и документацию решений.

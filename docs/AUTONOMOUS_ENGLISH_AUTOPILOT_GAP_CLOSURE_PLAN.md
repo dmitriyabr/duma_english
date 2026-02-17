@@ -91,7 +91,7 @@ Source baseline: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` + current code
 | CH-02 | Data model v2 | DONE | Team | 2026-02-17T20:54:34Z | 2026-02-17T20:54:34Z | `52212b0`, `c313e65` | `prisma/schema.prisma`, `prisma/migrations/20260217190535_data_model_v2_entities/migration.sql`, `prisma/seeds/ch02_data_model_v2_seed.sql` | Prisma entities + migration + seed + DB contract tests |
 | CH-03 | Immutable event log + trace linkage | DONE | Agent_3 | 2026-02-17T22:12:43Z | 2026-02-17T22:46:52Z | `480b4b8`, `55fa4b4` | `prisma/migrations/20260217222300_ch03_autopilot_event_log_trace/migration.sql`, `src/lib/autopilot/eventLog.ts`, `src/scripts/export_replay_event_log.ts`, `src/lib/gse/evidence.ts` | Append-only journal + end-to-end trace wiring + replay export |
 | CH-05 | KPI contract + baseline freeze | DONE | Agent_1 | 2026-02-17T22:08:08Z | 2026-02-17T22:37:18Z | `42190a2` | `docs/CH05_KPI_CONTRACT.md`, `docs/reports/CH05_KPI_BASELINE_REPORT.json`, `src/lib/kpi/autopilotDashboard.ts`, `src/app/api/quality/autopilot-kpi/route.ts`, `src/scripts/ch05_kpi_baseline_report.ts` | KPI v1 contract, dashboard endpoint, signed baseline freeze artifacts |
-| CH-06 | Graph quality gates | IN_PROGRESS | Agent_2 | 2026-02-17T22:10:22Z |  |  |  |  |
+| CH-06 | Graph quality gates | DONE | Agent_2 | 2026-02-17T22:10:22Z | 2026-02-17T22:48:13Z | `42190a2`, `dc6f2d1` | `.github/workflows/graph-quality-gates.yml`, `docs/GRAPH_QUALITY_GATES.md`, `src/lib/contracts/gseGraphQuality.ts`, `src/scripts/gse_graph_quality_report.ts` | Release-blocking graph invariants + drift report contract + CI artifact |
 
 ## 3.3) Decision Log
 
@@ -103,6 +103,7 @@ Source baseline: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` + current code
 | 2026-02-17 | CH-02 | Интегрированы рабочие изменения из агентской ветки в `codex/autopilot-execution-plan` |
 | 2026-02-17 | CH-03 | Для trace-linkage введены `AutopilotEventLog` (append-only на уровне БД через trigger `prevent_autopilot_event_log_mutation`) и `AutopilotDelayedOutcome`; события пишутся в planner/task/attempt/evidence runtime и экспортируются скриптом `src/scripts/export_replay_event_log.ts` |
 | 2026-02-17 | CH-05 | Принят KPI contract `autopilot-kpi-v1` с подписываемым baseline freeze (SHA-256), API dashboard `/api/quality/autopilot-kpi` и baseline artifacts в `docs/reports/CH05_KPI_BASELINE_REPORT.{json,md}` |
+| 2026-02-17 | CH-06 | Для release-блокировки добавлен versioned graph quality contract (deterministic snapshot для CI + `--db` режим для live проверки), включая drift edge report и workflow-артефакт |
 
 ## 4) Execution Board (обособленные изменения)
 
@@ -128,7 +129,7 @@ Source baseline: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` + current code
   Done: зафиксирован baseline по `mastery gain/hour`, `verified growth`, `7/30/90 retention`, `OOD pass`, `frustration proxy`, `latency`.  
   Артефакт: dashboard + signed baseline report.
 
-- [ ] **CH-06 — Graph quality gates**  
+- [x] **CH-06 — Graph quality gates**  
   Done: автоматические проверки графа (`acyclic prereqs`, `edge type validity`, `no orphan critical nodes`) блокируют релиз при падении.  
   Артефакт: CI job + отчёт о drift edges.
 

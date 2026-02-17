@@ -3,6 +3,41 @@
 Last updated: 2026-02-17
 Source baseline: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` + current code/docs (`README.md`, `TASKS.MD`, `docs/BRAIN_RUNTIME.md`)
 
+## 0) Multi-Agent Operating Protocol (обязательно)
+
+Этот файл — единый coordination board для всех агентов. Любая работа начинается и заканчивается обновлением этого файла.
+
+Статусы задач:
+- `TODO`: задача свободна, к исполнению не взята.
+- `IN_PROGRESS`: задача захвачена конкретным агентом, работа идёт.
+- `DONE`: задача закрыта, артефакты и проверки заполнены.
+- `BLOCKED`: задача остановлена, указана причина и точка блокировки.
+
+Правило переходов (жёстко):
+1. Перед любыми код-изменениями агент обновляет строку задачи в `Active Task Registry`: `Status=IN_PROGRESS`, заполняет `Owner`, `Branch`, `Start (UTC)`, `Scope lock`.
+2. Агент работает только в пределах `Scope lock`. Выход за scope разрешён только после записи в `Decision Log` с причиной.
+3. После завершения конкретной задачи агент сразу (в этом же PR/коммите) ставит `Status=DONE`, заполняет `End (UTC)`, `PR/Commit`, `Artifacts`, `Decision IDs`.
+4. Закрывать задачи батчем запрещено: статус обновляется по каждой задаче отдельно.
+5. Если задача блокирована, агент ставит `BLOCKED` и фиксирует unblock condition.
+
+Правило изоляции:
+1. Один агент = одна задача `CH-XX` одновременно.
+2. Нельзя менять строки чужих активных задач, кроме явного handoff с записью в `Decision Log`.
+3. Ветка задачи: `codex/ch-XX-short-name`.
+4. Для минимизации merge-конфликтов агент редактирует только свою строку в реестре и только новые строки в `Decision Log`.
+
+Правило выбора задачи (универсальное):
+1. Агент не получает `CH-XX` извне, а сам выбирает первую доступную задачу в `Active Task Registry` сверху вниз.
+2. Доступная задача = `Status=TODO` и пустой `Owner`.
+3. Если доступных задач нет, агент не начинает код, а пишет "no free tasks" и завершает сессию.
+
+Task lock handshake (обязательно перед кодом):
+1. Синхронизировать `main` с remote.
+2. В реестре у выбранной задачи поставить `Status=IN_PROGRESS`, `Owner`, `Start (UTC)`.
+3. Сделать отдельный lock-коммит только с изменением реестра и запушить.
+4. Только после успешного lock-пуша начинать реализацию.
+5. Если lock-пуш не прошёл (non-fast-forward), повторить синхронизацию и заново выбрать первую доступную задачу.
+
 ## 1) Стартовая точка (сегодня)
 
 Что уже есть в продукте:
@@ -38,6 +73,34 @@ Source baseline: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` + current code
 3. После этого policy learning (`CH-19..CH-24`) и self-repair+retention (`CH-25..CH-30`).
 4. Затем localization/discourse/modality expansion (`CH-31..CH-39`).
 5. В финале governance + rollout hardening (`CH-40..CH-45`).
+
+## 3.1) Первая волна задач (параллельно и изолированно)
+
+Первыми запускаем:
+1. `CH-01` — CEFR coverage matrix contract.
+2. `CH-02` — Data model v2.
+3. `CH-05` — KPI contract + baseline freeze.
+4. `CH-06` — Graph quality gates.
+
+Причина: это foundation-слой и их можно вести разными агентами с минимальным пересечением контекста.
+
+## 3.2) Active Task Registry (Wave 1)
+
+| CH | Task | Status | Owner | Branch | Scope lock | Start (UTC) | End (UTC) | PR/Commit | Artifacts | Decision IDs |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| CH-01 | CEFR coverage matrix contract | TODO |  | `codex/ch-01-cefr-coverage` | `docs/**`, `src/lib/contracts/**`, `src/scripts/**` (без `prisma/**`) |  |  |  |  |  |
+| CH-02 | Data model v2 | TODO |  | `codex/ch-02-data-model-v2` | `prisma/**`, `src/lib/db/**`, `src/lib/**/types*` |  |  |  |  |  |
+| CH-05 | KPI contract + baseline freeze | TODO |  | `codex/ch-05-kpi-baseline` | `docs/**`, `src/scripts/**`, `src/lib/gse/quality*`, `.github/workflows/**` |  |  |  |  |  |
+| CH-06 | Graph quality gates | TODO |  | `codex/ch-06-graph-gates` | `src/lib/gse/**`, `src/scripts/**`, `.github/workflows/**`, `docs/**` (без `prisma/**`) |  |  |  |  |  |
+
+## 3.3) Decision Log (append-only)
+
+Записывать только решения/экстра-меры, которых не было в исходном плане.
+
+| Decision ID | Date (UTC) | CH | Owner | Decision | Why | Impacted paths | Follow-up |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| DEC-2026-02-17-001 | 2026-02-17T00:00:00Z | BOARD | system | Введён Active Task Registry + Scope lock + append-only Decision Log | Нужно безопасно запустить параллельную работу агентов без конфликтов | `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_GAP_CLOSURE_PLAN.md` | Все агенты обязаны обновлять статусы и решения в этом файле |
+| DEC-2026-02-17-002 | 2026-02-17T00:00:00Z | BOARD | system | Выбор задачи сделан универсальным (первая доступная), добавлен lock handshake через отдельный push | Чтобы агентам не назначали CH вручную и чтобы избежать double-claim одной задачи | `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_GAP_CLOSURE_PLAN.md` | Все агенты стартуют только через lock-коммит |
 
 ## 4) Execution Board (обособленные изменения)
 
@@ -244,3 +307,32 @@ Source baseline: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` + current code
 - [ ] Политика проходит promotion gate (`offline replay + OPE + shadow + anchor-eval`).
 - [ ] Milestone promotion в production реально опирается на `mastery + transfer + retention`.
 - [ ] C2 claims подтверждены по 4 modality (speaking/listening/reading/writing) с CEFR coverage contract.
+
+## 6) Универсальный промпт для запуска агента
+
+Используй этот шаблон (замени только `OWNER_NAME`):
+
+```text
+Работаем в репозитории /Users/skyeng/Desktop/duma_english.
+
+Твоя задача: взять первую доступную задачу и выполнить её из /Users/skyeng/Desktop/duma_english/docs/AUTONOMOUS_ENGLISH_AUTOPILOT_GAP_CLOSURE_PLAN.md.
+
+Обязательный протокол:
+1) Синхронизируй main с remote.
+2) Открой execution board и в "Active Task Registry (Wave 1)" выбери первую строку сверху вниз, где Status=TODO и Owner пустой.
+3) Если доступной задачи нет, напиши "no free tasks" и остановись.
+4) Перед кодом обнови выбранную строку: Status=IN_PROGRESS, Owner=OWNER_NAME, Start (UTC)=текущее время, подтверди Branch и Scope lock.
+5) Сделай отдельный lock-коммит только с этой правкой и запушь.
+6) Если push lock-коммита не прошёл (non-fast-forward), заново синхронизируйся и снова выбери первую доступную задачу.
+7) После успешного lock-пуша выполняй задачу. Делай изменения только в Scope lock. Если нужен выход за Scope lock, сначала добавь запись в Decision Log (append-only) с причиной и только потом меняй код.
+8) По завершению задачи:
+   - обнови её строку: Status=DONE, End (UTC), PR/Commit, Artifacts, Decision IDs;
+   - отметь прогресс в основном чеклисте соответствующего CH;
+   - кратко перечисли тесты/проверки и результат.
+9) Нельзя закрывать несколько задач сразу одним статусом. Закрывай только выбранный CH.
+
+Требование к результату:
+- полноценная реализация DoD для выбранного CH из плана;
+- без поломки инвариантов;
+- с документированием всех экстра-решений через Decision Log.
+```

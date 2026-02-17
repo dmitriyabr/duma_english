@@ -53,7 +53,8 @@ Zero-context onboarding (прочитать перед выбором задач
 Правило выбора задачи (универсальное):
 1. Агент не получает `CH-XX` извне, а сам выбирает первую доступную задачу в `Active Task Registry` сверху вниз.
 2. Доступная задача = `Status=TODO` и пустой `Owner`.
-3. Если доступных задач нет, агент не начинает код, а пишет "no free tasks" и завершает сессию.
+3. Если доступных задач нет, агент добавляет новую строку для следующего `CH-XX` по критическому пути (раздел 3), затем берёт её в работу.
+4. Если следующий `CH-XX` невозможно определить однозначно, агент пишет `BLOCKER` в `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_AGENT_SYNC.md` и останавливается.
 
 Task lock handshake (обязательно перед кодом):
 1. Синхронизировать `origin/codex/autopilot-execution-plan`.
@@ -98,9 +99,9 @@ Task lock handshake (обязательно перед кодом):
 4. Затем localization/discourse/modality expansion (`CH-31..CH-39`).
 5. В финале governance + rollout hardening (`CH-40..CH-45`).
 
-## 3.1) Первая волна задач (параллельно и изолированно)
+## 3.1) Стартовый seed (параллельно и изолированно)
 
-Первыми запускаем:
+Стартуем с:
 1. `CH-01` — CEFR coverage matrix contract.
 2. `CH-02` — Data model v2.
 3. `CH-05` — KPI contract + baseline freeze.
@@ -108,11 +109,18 @@ Task lock handshake (обязательно перед кодом):
 
 Причина: это foundation-слой и их можно вести разными агентами с минимальным пересечением контекста.
 
-## 3.2) Active Task Registry (Wave 1)
+## 3.2) Active Task Registry (rolling queue)
+
+Это rolling-реестр для долгой работы, не только для первой фазы.
+
+Правила:
+1. Если в реестре есть хотя бы одна свободная строка (`TODO` + пустой `Owner`), агент берёт первую сверху.
+2. Если свободных строк нет, агент добавляет новую строку для следующего `CH-XX` по критическому пути из раздела 3 (минимальный номер/ранний этап, который ещё не `DONE`), и только потом делает lock.
+3. Seed-строки ниже — это стартовая очередь, дальше реестр пополняется по мере завершения задач.
 
 | CH | Task | Status | Owner | Branch | Scope lock | Start (UTC) | End (UTC) | PR/Commit | Artifacts | Decision IDs |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| CH-01 | CEFR coverage matrix contract | IN_PROGRESS | Agent_1 | `codex/ch-01-cefr-coverage-agent_1` | `docs/**`, `src/lib/contracts/**`, `src/scripts/**` (без `prisma/**`) | 2026-02-17T16:01:57Z |  |  |  |  |
+| CH-01 | CEFR coverage matrix contract | TODO |  | `codex/ch-01-cefr-coverage` | `docs/**`, `src/lib/contracts/**`, `src/scripts/**` (без `prisma/**`) |  |  |  |  |  |
 | CH-02 | Data model v2 | TODO |  | `codex/ch-02-data-model-v2` | `prisma/**`, `src/lib/db/**`, `src/lib/**/types*` |  |  |  |  |  |
 | CH-05 | KPI contract + baseline freeze | TODO |  | `codex/ch-05-kpi-baseline` | `docs/**`, `src/scripts/**`, `src/lib/gse/quality*`, `.github/workflows/**` |  |  |  |  |  |
 | CH-06 | Graph quality gates | TODO |  | `codex/ch-06-graph-gates` | `src/lib/gse/**`, `src/scripts/**`, `.github/workflows/**`, `docs/**` (без `prisma/**`) |  |  |  |  |  |
@@ -127,6 +135,7 @@ Task lock handshake (обязательно перед кодом):
 | DEC-2026-02-17-002 | 2026-02-17T00:00:00Z | BOARD | system | Выбор задачи сделан универсальным (первая доступная), добавлен lock handshake через отдельный push | Чтобы агентам не назначали CH вручную и чтобы избежать double-claim одной задачи | `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_GAP_CLOSURE_PLAN.md` | Все агенты стартуют только через lock-коммит |
 | DEC-2026-02-17-003 | 2026-02-17T00:00:00Z | BOARD | system | Execution branch зафиксирована как `codex/autopilot-execution-plan`; добавлены zero-context onboarding и общий файл связи агентов | Нужны автономный запуск агентов с нулевым контекстом и рабочая коммуникация без чатов | `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_GAP_CLOSURE_PLAN.md`, `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_AGENT_SYNC.md` | Все агенты работают только через execution branch и пишут handoff/blockers в sync-файл |
 | DEC-2026-02-17-004 | 2026-02-17T00:00:00Z | BOARD | system | Добавлена обязательная изоляция через отдельные worktree/clone на агента и уточнён lock push через refspec | На одной машине параллельные агенты не должны делить один рабочий каталог | `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_GAP_CLOSURE_PLAN.md` | Каждый агент стартует из отдельного worktree пути |
+| DEC-2026-02-17-005 | 2026-02-17T00:00:00Z | CH-01 | system | Снят stale lock с CH-01 после ручной остановки агента | Нужен чистый re-claim первым новым агентом | `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_GAP_CLOSURE_PLAN.md` | CH-01 снова доступна как TODO |
 
 ## 4) Execution Board (обособленные изменения)
 
@@ -365,9 +374,10 @@ Task lock handshake (обязательно перед кодом):
    - docs/BRAIN_RUNTIME.md
    - docs/BRAIN_ROADMAP.md
    - docs/DEBUG_PLAYBOOK.md
-4) Выбор задачи:
-   - в Active Task Registry (Wave 1) выбери первую строку сверху вниз, где Status=TODO и Owner пустой.
-   - если доступной задачи нет: запиши в ответ "no free tasks" и остановись.
+4) Выбор задачи (долгий горизонт):
+   - в Active Task Registry (rolling queue) выбери первую строку сверху вниз, где Status=TODO и Owner пустой.
+   - если свободных строк нет, добавь новую строку для следующего CH по критическому пути (раздел 3), затем выбери её.
+   - если не можешь однозначно определить следующий CH, запиши BLOCKER в agent sync file и остановись.
 5) Захват задачи (lock):
    - обнови выбранную строку: Status=IN_PROGRESS, Owner=OWNER_NAME, Start (UTC), Branch, Scope lock.
    - сделай отдельный lock-коммит только с этой правкой.
@@ -393,6 +403,7 @@ Task lock handshake (обязательно перед кодом):
    - если были экстра-решения, добавь их в Decision Log.
    - добавь короткую HANDOFF/INFO запись в AUTONOMOUS_ENGLISH_AUTOPILOT_AGENT_SYNC.md.
    - запушь рабочую ветку и подготовь PR в codex/autopilot-execution-plan.
+   - после merge PR синхронизируй coordination branch и только потом бери следующую задачу.
 11) Запрещено:
    - закрывать несколько CH одним статусом;
    - коммитить в main;

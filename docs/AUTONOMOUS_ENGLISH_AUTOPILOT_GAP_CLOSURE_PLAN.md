@@ -7,6 +7,24 @@ Source baseline: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` + current code
 
 Этот файл — единый coordination board для всех агентов. Любая работа начинается и заканчивается обновлением этого файла.
 
+Execution branch (обязательно):
+- Координационная ветка плана: `codex/autopilot-execution-plan`.
+- Работать в `main` запрещено.
+- Любая агентская задача стартует с актуализации этой ветки и lock-коммита именно в неё.
+- Реализация ведётся в отдельной ветке агента, созданной от `codex/autopilot-execution-plan`.
+
+Zero-context onboarding (прочитать перед выбором задачи):
+1. `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` (target product contract).
+2. `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_GAP_CLOSURE_PLAN.md` (execution board и протокол).
+3. `README.md` (runtime/how-to-run).
+4. `TASKS.MD` (текущая runtime truth и текущие gaps).
+5. `docs/BRAIN_RUNTIME.md` и `docs/BRAIN_ROADMAP.md` (brain architecture/status).
+6. `docs/DEBUG_PLAYBOOK.md` (операционные детали текущей системы).
+
+Межагентная коммуникация:
+- Файл: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_AGENT_SYNC.md`.
+- Используется для handoff/blocker/risk сообщений между агентами (append-only, новые строки в конец).
+
 Статусы задач:
 - `TODO`: задача свободна, к исполнению не взята.
 - `IN_PROGRESS`: задача захвачена конкретным агентом, работа идёт.
@@ -32,10 +50,10 @@ Source baseline: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` + current code
 3. Если доступных задач нет, агент не начинает код, а пишет "no free tasks" и завершает сессию.
 
 Task lock handshake (обязательно перед кодом):
-1. Синхронизировать `main` с remote.
-2. В реестре у выбранной задачи поставить `Status=IN_PROGRESS`, `Owner`, `Start (UTC)`.
-3. Сделать отдельный lock-коммит только с изменением реестра и запушить.
-4. Только после успешного lock-пуша начинать реализацию.
+1. Синхронизировать `origin/codex/autopilot-execution-plan`.
+2. В реестре у выбранной задачи поставить `Status=IN_PROGRESS`, `Owner`, `Start (UTC)`, `Branch`.
+3. Сделать отдельный lock-коммит только с изменением реестра и запушить в `origin/codex/autopilot-execution-plan`.
+4. Только после успешного lock-пуша создать рабочую ветку от `codex/autopilot-execution-plan` и начинать реализацию.
 5. Если lock-пуш не прошёл (non-fast-forward), повторить синхронизацию и заново выбрать первую доступную задачу.
 
 ## 1) Стартовая точка (сегодня)
@@ -61,7 +79,7 @@ Task lock handshake (обязательно перед кодом):
 ## 2) Правило закрытия изменений
 
 Каждое изменение ниже закрывается только при одновременном выполнении:
-1. Код/миграции в `main`.
+1. Код/миграции в `codex/autopilot-execution-plan` (через PR) и merge-ready для `main`.
 2. Автотесты/регрессии для новой логики.
 3. Наблюдаемость (метрики/логи/API поля) для контроля в проде.
 4. Явный артефакт проверки (`script`, `dashboard`, `endpoint`, `report`).
@@ -101,6 +119,7 @@ Task lock handshake (обязательно перед кодом):
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | DEC-2026-02-17-001 | 2026-02-17T00:00:00Z | BOARD | system | Введён Active Task Registry + Scope lock + append-only Decision Log | Нужно безопасно запустить параллельную работу агентов без конфликтов | `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_GAP_CLOSURE_PLAN.md` | Все агенты обязаны обновлять статусы и решения в этом файле |
 | DEC-2026-02-17-002 | 2026-02-17T00:00:00Z | BOARD | system | Выбор задачи сделан универсальным (первая доступная), добавлен lock handshake через отдельный push | Чтобы агентам не назначали CH вручную и чтобы избежать double-claim одной задачи | `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_GAP_CLOSURE_PLAN.md` | Все агенты стартуют только через lock-коммит |
+| DEC-2026-02-17-003 | 2026-02-17T00:00:00Z | BOARD | system | Execution branch зафиксирована как `codex/autopilot-execution-plan`; добавлены zero-context onboarding и общий файл связи агентов | Нужны автономный запуск агентов с нулевым контекстом и рабочая коммуникация без чатов | `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_GAP_CLOSURE_PLAN.md`, `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_AGENT_SYNC.md` | Все агенты работают только через execution branch и пишут handoff/blockers в sync-файл |
 
 ## 4) Execution Board (обособленные изменения)
 
@@ -315,24 +334,60 @@ Task lock handshake (обязательно перед кодом):
 ```text
 Работаем в репозитории /Users/skyeng/Desktop/duma_english.
 
-Твоя задача: взять первую доступную задачу и выполнить её из /Users/skyeng/Desktop/duma_english/docs/AUTONOMOUS_ENGLISH_AUTOPILOT_GAP_CLOSURE_PLAN.md.
+Ты автономный инженер. Цель: быстро и качественно двигать execution board к world-class продукту без деградации инвариантов.
+
+Обязательная ветка исполнения:
+- coordination branch: codex/autopilot-execution-plan
+- работать в main запрещено.
 
 Обязательный протокол:
-1) Синхронизируй main с remote.
-2) Открой execution board и в "Active Task Registry (Wave 1)" выбери первую строку сверху вниз, где Status=TODO и Owner пустой.
-3) Если доступной задачи нет, напиши "no free tasks" и остановись.
-4) Перед кодом обнови выбранную строку: Status=IN_PROGRESS, Owner=OWNER_NAME, Start (UTC)=текущее время, подтверди Branch и Scope lock.
-5) Сделай отдельный lock-коммит только с этой правкой и запушь.
-6) Если push lock-коммита не прошёл (non-fast-forward), заново синхронизируйся и снова выбери первую доступную задачу.
-7) После успешного lock-пуша выполняй задачу. Делай изменения только в Scope lock. Если нужен выход за Scope lock, сначала добавь запись в Decision Log (append-only) с причиной и только потом меняй код.
-8) По завершению задачи:
-   - обнови её строку: Status=DONE, End (UTC), PR/Commit, Artifacts, Decision IDs;
-   - отметь прогресс в основном чеклисте соответствующего CH;
-   - кратко перечисли тесты/проверки и результат.
-9) Нельзя закрывать несколько задач сразу одним статусом. Закрывай только выбранный CH.
+1) Синхронизация:
+   - git fetch origin
+   - git checkout codex/autopilot-execution-plan
+   - git pull --ff-only origin codex/autopilot-execution-plan
+2) Zero-context onboarding (обязательно прочитать):
+   - docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md
+   - docs/AUTONOMOUS_ENGLISH_AUTOPILOT_GAP_CLOSURE_PLAN.md
+   - README.md
+   - TASKS.MD
+   - docs/BRAIN_RUNTIME.md
+   - docs/BRAIN_ROADMAP.md
+   - docs/DEBUG_PLAYBOOK.md
+3) Выбор задачи:
+   - в Active Task Registry (Wave 1) выбери первую строку сверху вниз, где Status=TODO и Owner пустой.
+   - если доступной задачи нет: запиши в ответ "no free tasks" и остановись.
+4) Захват задачи (lock):
+   - обнови выбранную строку: Status=IN_PROGRESS, Owner=OWNER_NAME, Start (UTC), Branch, Scope lock.
+   - сделай отдельный lock-коммит только с этой правкой.
+   - запушь lock-коммит в origin/codex/autopilot-execution-plan.
+   - если push не прошёл (non-fast-forward), повтори синхронизацию и заново выбери первую доступную задачу.
+5) Рабочая ветка:
+   - создай отдельную ветку от codex/autopilot-execution-plan: codex/ch-xx-short-name-owner_name
+   - всю реализацию веди в этой ветке.
+6) Реализация:
+   - выполняй полный DoD выбранного CH.
+   - изменения только в Scope lock; выход за Scope lock только после новой записи в Decision Log (append-only).
+   - пиши атомарные коммиты с понятными сообщениями.
+7) Проверки качества:
+   - прогоняй релевантные тесты/линтер/сборку для изменённых частей.
+   - фиксируй фактические результаты проверок (что запускалось и что прошло/не прошло).
+8) Межагентная связь:
+   - используй docs/AUTONOMOUS_ENGLISH_AUTOPILOT_AGENT_SYNC.md
+   - append-only записи типов INFO/BLOCKER/RISK/HANDOFF/DECISION_REF.
+9) Завершение задачи:
+   - обнови строку задачи: Status=DONE, End (UTC), PR/Commit, Artifacts, Decision IDs.
+   - обнови чекбокс соответствующего CH в основном execution board.
+   - если были экстра-решения, добавь их в Decision Log.
+   - добавь короткую HANDOFF/INFO запись в AUTONOMOUS_ENGLISH_AUTOPILOT_AGENT_SYNC.md.
+   - запушь рабочую ветку и подготовь PR в codex/autopilot-execution-plan.
+10) Запрещено:
+   - закрывать несколько CH одним статусом;
+   - коммитить в main;
+   - пропускать lock-коммит и документацию решений.
 
 Требование к результату:
 - полноценная реализация DoD для выбранного CH из плана;
+- production-grade качество (не MVP-черновик);
 - без поломки инвариантов;
 - с документированием всех экстра-решений через Decision Log.
 ```

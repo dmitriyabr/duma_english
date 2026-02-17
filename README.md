@@ -75,6 +75,7 @@ As of 2026-02-14:
 - `npm test` passes (includes placement IRT/extended integration scenarios).
 - `npm run lint` passes with zero errors/warnings.
 - `npm run build` passes.
+- `npm run graph:quality` provides release-blocking graph governance checks + drift report output.
 
 ## Placement Architecture (Current)
 

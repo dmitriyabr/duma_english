@@ -90,7 +90,7 @@ Source baseline: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` + current code
 | CH-01 | CEFR coverage matrix contract | DONE | Team | 2026-02-17T20:54:09Z | 2026-02-17T20:54:09Z | `169ef5e` | `docs/CEFR_COVERAGE_MATRIX_CONTRACT.md`, `src/scripts/cefr_coverage_report.ts` | Coverage matrix, report script, tests added |
 | CH-02 | Data model v2 | DONE | Team | 2026-02-17T20:54:34Z | 2026-02-17T20:54:34Z | `52212b0`, `c313e65` | `prisma/schema.prisma`, `prisma/migrations/20260217190535_data_model_v2_entities/migration.sql`, `prisma/seeds/ch02_data_model_v2_seed.sql` | Prisma entities + migration + seed + DB contract tests |
 | CH-03 | Immutable event log + trace linkage | IN_PROGRESS | Agent_3 | 2026-02-17T22:12:43Z |  |  |  | Claimed as next critical-path item after CH-01..CH-02 while CH-05/CH-06 are in progress |
-| CH-05 | KPI contract + baseline freeze | IN_PROGRESS | Agent_1 | 2026-02-17T22:08:08Z |  |  |  |  |
+| CH-05 | KPI contract + baseline freeze | DONE | Agent_1 | 2026-02-17T22:08:08Z | 2026-02-17T22:37:18Z | `42190a2` | `docs/CH05_KPI_CONTRACT.md`, `docs/reports/CH05_KPI_BASELINE_REPORT.json`, `src/lib/kpi/autopilotDashboard.ts`, `src/app/api/quality/autopilot-kpi/route.ts`, `src/scripts/ch05_kpi_baseline_report.ts` | KPI v1 contract, dashboard endpoint, signed baseline freeze artifacts |
 | CH-06 | Graph quality gates | IN_PROGRESS | Agent_2 | 2026-02-17T22:10:22Z |  |  |  |  |
 
 ## 3.3) Decision Log
@@ -101,6 +101,7 @@ Source baseline: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` + current code
 | 2026-02-17 | BOARD | Процесс упрощён: одна ветка, отдельный файл задач, отдельный файл общения, обязательная запись в общение после каждого шага |
 | 2026-02-17 | CH-01 | Интегрированы рабочие изменения из агентской ветки в `codex/autopilot-execution-plan` |
 | 2026-02-17 | CH-02 | Интегрированы рабочие изменения из агентской ветки в `codex/autopilot-execution-plan` |
+| 2026-02-17 | CH-05 | Принят KPI contract `autopilot-kpi-v1` с подписываемым baseline freeze (SHA-256), API dashboard `/api/quality/autopilot-kpi` и baseline artifacts в `docs/reports/CH05_KPI_BASELINE_REPORT.{json,md}` |
 
 ## 4) Execution Board (обособленные изменения)
 
@@ -122,7 +123,7 @@ Source baseline: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` + current code
   Done: лог содержит `policyVersion`, `contextSnapshotId`, `candidateActionSet`, `preActionScores`, `propensity`, `activeConstraints`, linkage fields.  
   Артефакт: schema validator + %invalid logs dashboard.
 
-- [ ] **CH-05 — KPI contract + baseline freeze**  
+- [x] **CH-05 — KPI contract + baseline freeze**  
   Done: зафиксирован baseline по `mastery gain/hour`, `verified growth`, `7/30/90 retention`, `OOD pass`, `frustration proxy`, `latency`.  
   Артефакт: dashboard + signed baseline report.
 

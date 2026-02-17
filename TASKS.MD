@@ -167,3 +167,4 @@ Authoritative docs are in:
 4. `docs/TEACHER_STUDENT_UI_PLAN.md` (teacher/student UI)
 5. `docs/EVAL_SPLIT_PLAN.md` (split evaluation by domain)
 6. `docs/LAST_ATTEMPT_TRACE.md` (разбор последней попытки по шагам: транскрипт → парсер → retrieval → evaluator → evidence)
+7. `docs/GRAPH_QUALITY_GATES.md` (graph governance release blockers + drift report)

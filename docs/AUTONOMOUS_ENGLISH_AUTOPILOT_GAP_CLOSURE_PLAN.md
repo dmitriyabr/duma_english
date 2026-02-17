@@ -120,7 +120,7 @@ Task lock handshake (обязательно перед кодом):
 
 | CH | Task | Status | Owner | Branch | Scope lock | Start (UTC) | End (UTC) | PR/Commit | Artifacts | Decision IDs |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| CH-01 | CEFR coverage matrix contract | IN_PROGRESS | Agent_1 | `codex/ch-01-cefr-coverage-agent_1` | `docs/**`, `src/lib/contracts/**`, `src/scripts/**` (без `prisma/**`) | 2026-02-17T16:29:33Z |  |  |  |  |
+| CH-01 | CEFR coverage matrix contract | DONE | Agent_1 | `codex/ch-01-cefr-coverage-agent_1` | `docs/**`, `src/lib/contracts/**`, `src/scripts/**` (без `prisma/**`) | 2026-02-17T16:29:33Z | 2026-02-17T16:39:33Z | 053e27e | `src/lib/contracts/cefrCoverageMatrix.ts`, `src/scripts/cefr_coverage_report.ts`, `docs/CEFR_COVERAGE_MATRIX_CONTRACT.md` | DEC-2026-02-17-006 |
 | CH-02 | Data model v2 | TODO |  | `codex/ch-02-data-model-v2` | `prisma/**`, `src/lib/db/**`, `src/lib/**/types*` |  |  |  |  |  |
 | CH-05 | KPI contract + baseline freeze | TODO |  | `codex/ch-05-kpi-baseline` | `docs/**`, `src/scripts/**`, `src/lib/gse/quality*`, `.github/workflows/**` |  |  |  |  |  |
 | CH-06 | Graph quality gates | TODO |  | `codex/ch-06-graph-gates` | `src/lib/gse/**`, `src/scripts/**`, `.github/workflows/**`, `docs/**` (без `prisma/**`) |  |  |  |  |  |
@@ -136,12 +136,13 @@ Task lock handshake (обязательно перед кодом):
 | DEC-2026-02-17-003 | 2026-02-17T00:00:00Z | BOARD | system | Execution branch зафиксирована как `codex/autopilot-execution-plan`; добавлены zero-context onboarding и общий файл связи агентов | Нужны автономный запуск агентов с нулевым контекстом и рабочая коммуникация без чатов | `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_GAP_CLOSURE_PLAN.md`, `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_AGENT_SYNC.md` | Все агенты работают только через execution branch и пишут handoff/blockers в sync-файл |
 | DEC-2026-02-17-004 | 2026-02-17T00:00:00Z | BOARD | system | Добавлена обязательная изоляция через отдельные worktree/clone на агента и уточнён lock push через refspec | На одной машине параллельные агенты не должны делить один рабочий каталог | `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_GAP_CLOSURE_PLAN.md` | Каждый агент стартует из отдельного worktree пути |
 | DEC-2026-02-17-005 | 2026-02-17T00:00:00Z | CH-01 | system | Снят stale lock с CH-01 после ручной остановки агента | Нужен чистый re-claim первым новым агентом | `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_GAP_CLOSURE_PLAN.md` | CH-01 снова доступна как TODO |
+| DEC-2026-02-17-006 | 2026-02-17T16:39:33Z | CH-01 | Agent_1 | Введён CEFR coverage matrix v1 (35 дескрипторов) с контрактом `descriptor -> node selectors -> task family -> rubric row` и strict gap-report | Нужно закрыть blueprint-требование CH-01 без prisma-миграций и дать CI release blocker на coverage gaps | `src/lib/contracts/cefrCoverageMatrix.ts`, `src/lib/contracts/cefrCoverageMatrix.test.ts`, `src/scripts/cefr_coverage_report.ts`, `docs/CEFR_COVERAGE_MATRIX_CONTRACT.md` | На CH-02/CH-06 расширить до runtime endpoint и привязки к canonical CEFR descriptor import |
 
 ## 4) Execution Board (обособленные изменения)
 
 ### A. Product Contract + Data Backbone
 
-- [ ] **CH-01 — CEFR coverage matrix contract**  
+- [x] **CH-01 — CEFR coverage matrix contract**  
   Done: есть versioned матрица `descriptor -> node -> task family -> rubric row` + тест полноты (coverage gaps = release blocker).  
   Артефакт: новый endpoint/отчёт coverage + CI check.
 

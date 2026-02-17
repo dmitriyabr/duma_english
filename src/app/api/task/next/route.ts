@@ -14,6 +14,7 @@ import { generateTaskSpec } from "@/lib/taskGenerator";
 import { buildTaskTemplate } from "@/lib/taskTemplates";
 import { extractReferenceText, extractRequiredWords } from "@/lib/taskText";
 import { buildGseQualityReport } from "@/lib/gse/quality";
+import { buildOodTaskSpecCandidate, buildOodTaskSpecMetadataJson } from "@/lib/ood/generator";
 
 const ALL_TASK_TYPES = [
   "read_aloud",
@@ -126,12 +127,17 @@ export async function GET(req: Request) {
     domainStages,
   });
 
-  const recentTaskInstances = await prisma.taskInstance.findMany({
-    where: { studentId: student.studentId },
-    include: { task: { select: { prompt: true } } },
-    orderBy: { createdAt: "desc" },
-    take: 5,
-  });
+  const [recentTaskInstances, historicalTaskCount] = await Promise.all([
+    prisma.taskInstance.findMany({
+      where: { studentId: student.studentId },
+      include: { task: { select: { prompt: true } } },
+      orderBy: { createdAt: "desc" },
+      take: 5,
+    }),
+    prisma.taskInstance.count({
+      where: { studentId: student.studentId },
+    }),
+  ]);
   const recentPrompts = recentTaskInstances
     .map((item) => item.task?.prompt || "")
     .filter((value) => value.length > 0);
@@ -224,6 +230,19 @@ export async function GET(req: Request) {
     assessmentMode: effectiveAssessmentMode,
     maxDurationSec: effectiveMaxDurationSec,
   };
+
+  const oodCandidate = buildOodTaskSpecCandidate({
+    studentId: student.studentId,
+    taskType: selectedTaskType,
+    taskOrdinal: historicalTaskCount + 1,
+    decisionLogId: decision.decisionId,
+    estimatedDifficulty: generated.estimatedDifficulty ?? decision.estimatedDifficulty,
+  });
+  if (oodCandidate) {
+    taskMeta.oodAxisTags = oodCandidate.axisTags;
+    taskMeta.oodGenerator = (oodCandidate.metadata as Record<string, unknown>) || null;
+  }
+
   if (effectiveReferenceText) {
     taskMeta.referenceText = effectiveReferenceText;
   }
@@ -254,7 +273,7 @@ export async function GET(req: Request) {
     );
   }
 
-  await createTaskInstance({
+  const taskInstance = await createTaskInstance({
     studentId: student.studentId,
     taskId: task.id,
     decisionId: decision.decisionId,
@@ -276,6 +295,38 @@ export async function GET(req: Request) {
     fallbackUsed: generated.fallbackUsed,
     estimatedDifficulty: generated.estimatedDifficulty,
   });
+
+  let oodTaskSpec:
+    | {
+        id: string;
+        axisTags: string[];
+        status: string;
+        difficultyAnchor: number | null;
+        createdAt: Date;
+      }
+    | null = null;
+  if (oodCandidate) {
+    oodTaskSpec = await prisma.oODTaskSpec.create({
+      data: {
+        studentId: student.studentId,
+        taskInstanceId: taskInstance.id,
+        decisionLogId: decision.decisionId,
+        axisTags: oodCandidate.axisTags,
+        difficultyAnchor: oodCandidate.difficultyAnchor ?? null,
+        inDomainDifficulty: oodCandidate.inDomainDifficulty ?? null,
+        difficultyDelta: oodCandidate.difficultyDelta ?? null,
+        status: oodCandidate.status,
+        metadataJson: buildOodTaskSpecMetadataJson(oodCandidate) as Prisma.InputJsonValue,
+      },
+      select: {
+        id: true,
+        axisTags: true,
+        status: true,
+        difficultyAnchor: true,
+        createdAt: true,
+      },
+    });
+  }
 
   await finalizePlannerDecision({
     decisionId: decision.decisionId,
@@ -330,5 +381,14 @@ export async function GET(req: Request) {
     targetNodeIds: gseSelection.targetNodeIds,
     targetNodeLabels,
     selectionReason: decision.selectionReason || gseSelection.selectionReason,
+    oodTaskSpec: oodTaskSpec
+      ? {
+          id: oodTaskSpec.id,
+          axisTags: oodTaskSpec.axisTags,
+          status: oodTaskSpec.status,
+          difficultyAnchor: oodTaskSpec.difficultyAnchor,
+          createdAt: oodTaskSpec.createdAt.toISOString(),
+        }
+      : null,
   });
 }

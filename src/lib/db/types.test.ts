@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  CAUSAL_TAXONOMY_V1_VERSION,
+  adaptLegacyCausalDiagnosisPayload,
   autopilotDelayedOutcomeContractSchema,
   autopilotEventLogContractSchema,
   anchorEvalRunContractSchema,
@@ -34,6 +36,55 @@ test("causal diagnosis contract accepts v1 payload", () => {
   });
 
   assert.equal(parsed.modelVersion, "causal-v1");
+});
+
+test("causal diagnosis contract normalizes legacy label tokens", () => {
+  const parsed = causalDiagnosisContractSchema.parse({
+    attemptId: "att_legacy_token",
+    studentId: "stu_legacy_token",
+    modelVersion: "causal-v1",
+    topLabel: "Rule Error",
+    topProbability: 0.6,
+    distribution: [
+      { label: "Rule Error", p: 0.6 },
+      { label: "Memory Lapse", p: 0.25 },
+      { label: "Multi Cause", p: 0.15 },
+    ],
+  });
+
+  assert.equal(parsed.topLabel, "rule_confusion");
+  assert.deepEqual(
+    parsed.distribution.map((row) => row.label),
+    ["rule_confusion", "retrieval_failure", "mixed"]
+  );
+});
+
+test("legacy adapter upgrades old causal payload to v1 contract", () => {
+  const parsed = adaptLegacyCausalDiagnosisPayload({
+    attemptId: "att_legacy",
+    studentId: "stu_legacy",
+    model: "legacy-causal-v0",
+    topCause: "grammar_confusion",
+    topP: 0.57,
+    causes: [
+      { cause: "grammar_confusion", probability: 57 },
+      { cause: "memory_lapse", probability: 30 },
+      { cause: "other", probability: 13 },
+    ],
+    confidenceInterval: {
+      lower: 0.5,
+      upper: 0.63,
+    },
+  });
+
+  assert.equal(parsed.taxonomyVersion, CAUSAL_TAXONOMY_V1_VERSION);
+  assert.equal(parsed.modelVersion, "legacy-causal-v0");
+  assert.equal(parsed.topLabel, "rule_confusion");
+  assert.equal(parsed.distribution.length, 3);
+  assert.equal(
+    parsed.distribution.reduce((sum, row) => sum + row.p, 0).toFixed(6),
+    "1.000000"
+  );
 });
 
 test("learner twin snapshot contract accepts minimal payload", () => {

@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+export const CAUSAL_TAXONOMY_V1_VERSION = "causal-taxonomy-v1" as const;
+
 export const causalCoreLabels = [
   "rule_confusion",
   "l1_interference",
@@ -10,6 +12,55 @@ export const causalCoreLabels = [
   "mixed",
   "unknown",
 ] as const;
+export type CausalCoreLabel = (typeof causalCoreLabels)[number];
+
+const causalCoreLabelSet = new Set<string>(causalCoreLabels);
+
+export const causalLabelAliasMap: Record<string, CausalCoreLabel> = {
+  rule_confusion: "rule_confusion",
+  grammar_confusion: "rule_confusion",
+  grammar_error: "rule_confusion",
+  rule_error: "rule_confusion",
+  l1_interference: "l1_interference",
+  native_language_interference: "l1_interference",
+  first_language_interference: "l1_interference",
+  retrieval_failure: "retrieval_failure",
+  memory_lapse: "retrieval_failure",
+  lexical_retrieval_failure: "retrieval_failure",
+  instruction_misread: "instruction_misread",
+  task_misread: "instruction_misread",
+  prompt_misread: "instruction_misread",
+  attention_loss: "attention_loss",
+  focus_loss: "attention_loss",
+  off_task: "attention_loss",
+  production_constraint: "production_constraint",
+  time_pressure: "production_constraint",
+  load_constraint: "production_constraint",
+  speech_limit: "production_constraint",
+  mixed: "mixed",
+  mixed_cause: "mixed",
+  multi_cause: "mixed",
+  ambiguous: "mixed",
+  unknown: "unknown",
+  undetermined: "unknown",
+  insufficient_evidence: "unknown",
+  other: "unknown",
+};
+
+function normalizeLabelToken(value: string) {
+  return value.trim().toLowerCase().replace(/[\s-]+/g, "_");
+}
+
+function normalizeCausalLabelValue(value: unknown): CausalCoreLabel {
+  if (typeof value !== "string") return "unknown";
+  const normalized = normalizeLabelToken(value);
+  if (causalCoreLabelSet.has(normalized)) return normalized as CausalCoreLabel;
+  return causalLabelAliasMap[normalized] || "unknown";
+}
+
+export function normalizeCausalLabel(value: string | null | undefined): CausalCoreLabel {
+  return normalizeCausalLabelValue(value);
+}
 
 export const oodAxisTags = ["topic", "register", "interlocutor", "goal", "format"] as const;
 
@@ -37,18 +88,19 @@ export const autopilotEventTypes = [
 
 const nonEmptyString = z.string().trim().min(1);
 const probability = z.number().min(0).max(1);
+const causalLabelSchema = z.preprocess((value) => normalizeCausalLabelValue(value), z.enum(causalCoreLabels));
 
 export const causalDistributionEntrySchema = z.object({
-  label: nonEmptyString,
+  label: causalLabelSchema,
   p: probability,
 });
 
 export const causalDiagnosisContractSchema = z.object({
   attemptId: nonEmptyString,
   studentId: nonEmptyString,
-  taxonomyVersion: nonEmptyString.default("causal-taxonomy-v1"),
+  taxonomyVersion: z.literal(CAUSAL_TAXONOMY_V1_VERSION).default(CAUSAL_TAXONOMY_V1_VERSION),
   modelVersion: nonEmptyString,
-  topLabel: nonEmptyString,
+  topLabel: causalLabelSchema,
   topProbability: probability,
   entropy: z.number().min(0).optional(),
   topMargin: probability.optional(),
@@ -64,6 +116,93 @@ export const causalDiagnosisContractSchema = z.object({
     .optional(),
   counterfactual: z.record(z.any()).optional(),
 });
+
+function readOptionalProbability(value: unknown) {
+  if (typeof value !== "number" || !Number.isFinite(value)) return null;
+  if (value >= 0 && value <= 1) return value;
+  if (value > 1 && value <= 100) return value / 100;
+  return null;
+}
+
+type LegacyDistributionEntry = {
+  label?: unknown;
+  cause?: unknown;
+  name?: unknown;
+  reason?: unknown;
+  p?: unknown;
+  probability?: unknown;
+  prob?: unknown;
+  confidence?: unknown;
+  score?: unknown;
+};
+
+function adaptLegacyDistribution(distribution: unknown): Array<z.infer<typeof causalDistributionEntrySchema>> {
+  if (!Array.isArray(distribution)) return [];
+  const mapped = distribution
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const row = item as LegacyDistributionEntry;
+      const label = normalizeCausalLabelValue(row.label ?? row.cause ?? row.name ?? row.reason);
+      const p = readOptionalProbability(row.p ?? row.probability ?? row.prob ?? row.confidence ?? row.score);
+      if (p === null) return null;
+      return { label, p };
+    })
+    .filter((row): row is { label: CausalCoreLabel; p: number } => row !== null);
+
+  if (mapped.length === 0) return [];
+  const total = mapped.reduce((sum, row) => sum + row.p, 0);
+  if (total <= 0) return [];
+  return mapped.map((row) => ({
+    label: row.label,
+    p: row.p / total,
+  }));
+}
+
+export function adaptLegacyCausalDiagnosisPayload(input: Record<string, unknown>) {
+  const topLabel = normalizeCausalLabelValue(
+    input.topLabel ?? input.topCause ?? input.causeLabel ?? input.cause ?? "unknown"
+  );
+  const topProbability = readOptionalProbability(input.topProbability ?? input.topP ?? input.top_p) ?? 1;
+  const distribution =
+    adaptLegacyDistribution(input.distribution ?? input.causes ?? input.causeDistribution) || [];
+
+  const normalizedDistribution =
+    distribution.length > 0
+      ? distribution
+      : [
+          {
+            label: topLabel,
+            p: topProbability,
+          },
+          {
+            label: "unknown" as const,
+            p: Math.max(0, 1 - topProbability),
+          },
+        ].filter((row) => row.p > 0);
+
+  const topFromDistribution = normalizedDistribution.reduce(
+    (best, row) => (row.p > best.p ? row : best),
+    normalizedDistribution[0]
+  );
+
+  return causalDiagnosisContractSchema.parse({
+    attemptId: input.attemptId,
+    studentId: input.studentId,
+    taxonomyVersion: CAUSAL_TAXONOMY_V1_VERSION,
+    modelVersion: input.modelVersion ?? input.model ?? "causal-v1",
+    topLabel: topFromDistribution.label,
+    topProbability: topFromDistribution.p,
+    entropy: input.entropy,
+    topMargin: input.topMargin ?? input.margin,
+    distribution: normalizedDistribution,
+    confidenceInterval:
+      input.confidenceInterval && typeof input.confidenceInterval === "object"
+        ? input.confidenceInterval
+        : undefined,
+    counterfactual:
+      input.counterfactual && typeof input.counterfactual === "object" ? input.counterfactual : undefined,
+  });
+}
 
 export const learnerTwinSnapshotContractSchema = z.object({
   studentId: nonEmptyString,
@@ -99,7 +238,7 @@ export const selfRepairCycleContractSchema = z.object({
   delayedVerificationAttemptId: nonEmptyString.optional(),
   delayedVerificationTaskInstanceId: nonEmptyString.optional(),
   status: z.enum(selfRepairStatuses).default("pending_immediate_retry"),
-  causeLabel: nonEmptyString.optional(),
+  causeLabel: causalLabelSchema.optional(),
   loopIndex: z.number().int().min(1).default(1),
   feedback: z.record(z.any()).optional(),
   metadata: z.record(z.any()).optional(),

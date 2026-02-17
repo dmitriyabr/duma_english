@@ -51,6 +51,18 @@ Coverage contract:
 Operational artifact:
 1. Maintain a versioned `descriptor -> node -> task -> rubric` matrix with testable completeness checks.
 
+## 2.2 Goal Hierarchy (Global and Local)
+
+Hard decision:
+1. C2 is the fixed global North Star for every learner.
+2. Local goals are required operational milestones on the path to C2.
+
+Hierarchy contract:
+1. Policy optimizes time-to-next-local-goal under a hard constraint of non-regression from the C2 path.
+2. Local goals can differ by age band, program horizon, and current state, but cannot redefine final destination.
+3. Milestone completion requires `mastery + transfer + retention` gates for that stage.
+4. Product reporting always shows both `distance-to-next-local-goal` and `distance-to-C2`.
+
 ## 3. Product Principles
 
 1. Outcome over content volume.
@@ -307,6 +319,25 @@ Update logic:
 2. Time-decay and retrieval gain.
 3. Cause-weighted remediation pressure.
 
+Graph quality governance:
+1. Run graph-consistency tests on every graph version (`acyclic prerequisites`, `no orphan critical nodes`, `edge type validity`).
+2. Track edge drift via observed transfer outcomes and trigger edge-confidence downgrade when empirical evidence diverges.
+3. Block high-stakes promotion if graph version fails consistency checks.
+
+## 5.8.1 Difficulty Calibration Layer
+
+Purpose:
+1. Provide a common calibrated difficulty scale across task families and modalities.
+
+Mechanisms:
+1. Maintain anchor-item sets spanning task families (speaking, listening, reading, writing).
+2. Calibrate task difficulty to a shared latent scale with periodic recalibration windows.
+3. Use anchor continuity checks when adding new task families or major generator changes.
+
+Invariants:
+1. Cross-family progress comparisons require shared-scale confidence above threshold.
+2. OOD difficulty matching must use shared calibrated difficulty, not family-local heuristics only.
+
 ## 5.9 Learner Digital Twin
 
 Purpose:
@@ -333,7 +364,7 @@ Purpose:
 
 Algorithm contract:
 1. Start from age-band and curriculum priors with explicit uncertainty.
-2. Run short adaptive probe sequence across core domains (listening, speaking, grammar, vocabulary, reading).
+2. Run short adaptive probe sequence across core domains (listening, speaking, grammar, vocabulary, reading, writing).
 3. Use information gain objective to pick next probe until stop criteria is met.
 4. Compute initial mastery distribution and uncertainty hotspots.
 5. Hand off to normal policy with placement confidence and recommended first-week strategy.
@@ -388,6 +419,17 @@ Fast-lane progression protocol:
 1. If learner shows high-confidence streak with stable transfer signals, reduce diagnostic/OOD density to configured floor.
 2. Reallocate saved budget to harder productive tasks and broader skill expansion.
 3. Keep milestone safety gates unchanged while accelerating between-milestone progression.
+
+Reward and credit assignment contract:
+1. Optimize a composite reward with explicit terms: mastery delta, transfer success, retention success, and friction penalty.
+2. Use delayed credit windows with fixed horizons (`same session`, `7-day`, `30-day`) for attribution.
+3. Attribute value to actions using linked `decision -> attempt -> delayed outcome` traces; unlinked outcomes cannot train value model.
+4. Keep reward versioned; policy promotion must compare against the same reward version.
+
+Exploration strategy:
+1. Use constrained exploration with a non-zero exploration floor and uncertainty-aware action selection.
+2. Increase exploration when uncertainty or policy stagnation is high; reduce under stable high-confidence regimes.
+3. Exploration is budgeted and cannot violate safety/curriculum hard constraints.
 
 Outputs:
 1. Chosen action.
@@ -565,6 +607,7 @@ Policy promotion gate (formal):
 3. Off-policy evaluation: lower confidence bound for net lift must remain > 0.
 4. Shadow mode: zero invariant violations on configured minimum traffic window.
 5. Online rollout: progressive ramp with stop-loss triggers and automatic rollback.
+6. Independent anchor-eval set must show non-negative lift before production promotion.
 
 ## 6. Data Model Blueprint
 
@@ -585,6 +628,10 @@ Core entities:
 14. FeedbackMessage.
 15. CEFRCoverageMap.
 16. PlacementSession.
+17. ProgramGoalPlan.
+18. DifficultyAnchorSet.
+19. RewardTrace.
+20. AnchorEvalRun.
 
 Event-first design:
 1. Immutable append-only events for attempts and evidence.
@@ -835,3 +882,5 @@ Stage 5: Advanced discourse mastery
 11. Reliability overhead is budgeted: diagnostic + verification workload must not exceed configured session share.
 12. High-friction protocols are allowed only when they change decision quality or protect irreversible promotions.
 13. For stable high-confidence learners, system must automatically switch to fast-lane progression between milestone gates.
+14. C2 remains the global destination; local goals are operational milestones and cannot override it.
+15. Policy promotion requires independent anchor-eval pass in addition to replay/OPE gates.

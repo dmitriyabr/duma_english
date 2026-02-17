@@ -60,6 +60,15 @@ If `LEMMA_SERVICE_URL` is not set (or the service is down), the app falls back t
   - `AZURE_SPEECH_ENDPOINT`
   - `AZURE_SPEECH_REGION`
 
+## Retry-on-unclear speech behavior
+
+- Attempt status can now be `needs_retry` (terminal, additive).
+- Worker applies a pre-evaluation speech gate for silence/too-short/too-quiet/unintelligible responses.
+- Worker also applies a topical relevance gate for clearly unrelated/background speech responses.
+- For `needs_retry`, evaluator/evidence/mastery/progress updates are skipped and UI asks the student to record again.
+- API `GET /api/attempts/[id]` includes additive `retry` payload:
+  - `{ required: true, reasonCode, message }`
+
 ## Quality Gate Status
 
 As of 2026-02-14:

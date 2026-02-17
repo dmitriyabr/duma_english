@@ -66,6 +66,14 @@ export const attemptDetailsResponseSchema = z
         message: z.string().nullable(),
       })
       .nullable(),
+    retry: z
+      .object({
+        required: z.literal(true),
+        reasonCode: z.string().nullable(),
+        message: z.string().nullable(),
+      })
+      .nullable()
+      .optional(),
     results: z
       .object({
         transcript: z.string().nullable(),

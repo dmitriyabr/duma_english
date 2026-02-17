@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getStudentFromRequest } from "@/lib/auth";
+import { ATTEMPT_STATUS, isAttemptTerminalStatus } from "@/lib/attemptStatus";
 
 type AttemptCompleteUploadRouteContext = {
   params: Promise<{ id: string }>;
@@ -21,16 +22,17 @@ export async function POST(_: Request, context: AttemptCompleteUploadRouteContex
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  if (attempt.status === "completed") {
+  if (isAttemptTerminalStatus(attempt.status)) {
     return NextResponse.json({ status: attempt.status });
   }
 
-  if (attempt.status === "created") {
+  if (attempt.status === ATTEMPT_STATUS.CREATED) {
     await prisma.attempt.update({
       where: { id: attempt.id },
-      data: { status: "uploaded" },
+      data: { status: ATTEMPT_STATUS.UPLOADED },
     });
+    return NextResponse.json({ status: ATTEMPT_STATUS.UPLOADED });
   }
 
-  return NextResponse.json({ status: "uploaded" });
+  return NextResponse.json({ status: attempt.status });
 }

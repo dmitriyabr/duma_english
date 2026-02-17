@@ -81,6 +81,25 @@ test("attempt details contract accepts current shape", () => {
   assert.equal(parsed.status, "completed");
 });
 
+test("attempt details contract accepts needs_retry shape", () => {
+  const parsed = attemptDetailsResponseSchema.parse({
+    status: "needs_retry",
+    flow: { isPlacement: true, placementSessionId: "placement_1" },
+    error: {
+      code: "RETRY_TOO_QUIET",
+      message: "I'm sorry, I didn't hear you well. Can you try again?",
+    },
+    retry: {
+      required: true,
+      reasonCode: "RETRY_TOO_QUIET",
+      message: "I'm sorry, I didn't hear you well. Can you try again?",
+    },
+    results: null,
+  });
+  assert.equal(parsed.status, "needs_retry");
+  assert.equal(parsed.retry?.required, true);
+});
+
 test("progress contract accepts current shape", () => {
   const parsed = progressResponseSchema.parse({
     stage: "A2",

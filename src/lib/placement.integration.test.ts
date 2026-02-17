@@ -293,6 +293,40 @@ test("placement extended flow covers finished=false, finished=true, and reset", 
   );
   assert.equal(notFinishedResponse.finished, false);
 
+  const nextPlacementTaskId = notFinished.finished ? null : notFinished.nextTask?.id || null;
+  assert.ok(nextPlacementTaskId);
+
+  const sessionBeforeRetryRejected = await prisma.placementSession.findUnique({
+    where: { id: started.session.id },
+    select: { questionCount: true },
+  });
+  const retryAttempt = await prisma.attempt.create({
+    data: {
+      studentId: fixture.studentId,
+      taskId: nextPlacementTaskId!,
+      status: "needs_retry",
+      transcript: "mumbled response",
+      errorCode: "RETRY_TOO_QUIET",
+      errorMessage: "I'm sorry, I didn't hear you well. Can you try again?",
+      completedAt: new Date(),
+    },
+  });
+  await assert.rejects(
+    () => submitPlacementExtendedAnswer(started.session.id, retryAttempt.id, "just_right"),
+    (error: unknown) => {
+      assert.equal((error as { code?: string }).code, "RETRY_REQUIRED");
+      return true;
+    }
+  );
+  const sessionAfterRetryRejected = await prisma.placementSession.findUnique({
+    where: { id: started.session.id },
+    select: { questionCount: true },
+  });
+  assert.equal(
+    sessionAfterRetryRejected?.questionCount,
+    sessionBeforeRetryRejected?.questionCount
+  );
+
   const regularTask = await prisma.task.create({
     data: {
       type: "topic_talk",
@@ -301,7 +335,7 @@ test("placement extended flow covers finished=false, finished=true, and reset", 
       metaJson: { isPlacement: false } as Prisma.InputJsonValue,
     },
   });
-  await prisma.attempt.create({
+  const regularAttempt = await prisma.attempt.create({
     data: {
       studentId: fixture.studentId,
       taskId: regularTask.id,
@@ -310,11 +344,22 @@ test("placement extended flow covers finished=false, finished=true, and reset", 
       completedAt: new Date(),
     },
   });
+  await assert.rejects(
+    () => submitPlacementExtendedAnswer(started.session.id, regularAttempt.id, "just_right"),
+    (error: unknown) => {
+      assert.equal((error as { code?: string }).code, "ATTEMPT_SESSION_MISMATCH");
+      return true;
+    }
+  );
   const activeAfterRegular = await prisma.placementSession.findUnique({
     where: { id: started.session.id },
-    select: { status: true },
+    select: { status: true, questionCount: true },
   });
   assert.equal(activeAfterRegular?.status, "started");
+  assert.equal(
+    activeAfterRegular?.questionCount,
+    sessionBeforeRetryRejected?.questionCount
+  );
 
   await prisma.placementSession.update({
     where: { id: started.session.id },

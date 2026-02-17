@@ -1,6 +1,10 @@
 import { prisma } from "@/lib/db";
 import { Prisma } from "@prisma/client";
 import {
+  appendAutopilotEvents,
+  recordAutopilotDelayedOutcome,
+} from "@/lib/autopilot/eventLog";
+import {
   applyEvidenceToStudentMastery,
   EvidenceActivationImpact,
   getEvidenceBaseWeight,
@@ -1026,6 +1030,18 @@ export async function persistAttemptGseEvidence(input: BuildAttemptEvidenceInput
     return { evidenceCount: 0, nodeOutcomes: [] as NodeMasteryOutcome[] };
   }
 
+  const [taskInstance, existingAttemptEvidenceRows] = await Promise.all([
+    prisma.taskInstance.findUnique({
+      where: { taskId: input.taskId },
+      select: { id: true, decisionLogId: true },
+    }),
+    prisma.attemptGseEvidence.findMany({
+      where: { attemptId: input.attemptId },
+      select: { id: true },
+    }),
+  ]);
+  const existingEvidenceIds = new Set(existingAttemptEvidenceRows.map((row) => row.id));
+
   await prisma.attemptGseEvidence.createMany({
     data: rows.map((row) => ({
       attemptId: input.attemptId,
@@ -1115,6 +1131,77 @@ export async function persistAttemptGseEvidence(input: BuildAttemptEvidenceInput
       })
     );
   }
+
+  const allAttemptEvidenceRows = await prisma.attemptGseEvidence.findMany({
+    where: { attemptId: input.attemptId },
+    select: {
+      id: true,
+      nodeId: true,
+      signalType: true,
+      evidenceKind: true,
+      opportunityType: true,
+      score: true,
+      confidence: true,
+      domain: true,
+      targeted: true,
+      usedForPromotion: true,
+    },
+  });
+  const newEvidenceRows = allAttemptEvidenceRows.filter((row) => !existingEvidenceIds.has(row.id));
+  const masteryDeltaTotal = Number(nodeOutcomes.reduce((sum, row) => sum + row.deltaMastery, 0).toFixed(6));
+  const delayedOutcome = await recordAutopilotDelayedOutcome({
+    studentId: input.studentId,
+    decisionLogId: taskInstance?.decisionLogId || null,
+    taskInstanceId: taskInstance?.id || null,
+    taskId: input.taskId,
+    attemptId: input.attemptId,
+    outcomeWindow: "same_session",
+    status: "recorded",
+    outcome: {
+      evidenceCount: rows.length,
+      nodeOutcomeCount: nodeOutcomes.length,
+      masteryDeltaTotal,
+      consistency,
+    } as Prisma.InputJsonValue,
+  });
+  await appendAutopilotEvents([
+    ...newEvidenceRows.map((row) => ({
+      eventType: "evidence_written" as const,
+      studentId: input.studentId,
+      decisionLogId: taskInstance?.decisionLogId || null,
+      taskInstanceId: taskInstance?.id || null,
+      taskId: input.taskId,
+      attemptId: input.attemptId,
+      evidenceId: row.id,
+      delayedOutcomeId: delayedOutcome?.id || null,
+      payload: {
+        nodeId: row.nodeId,
+        signalType: row.signalType,
+        evidenceKind: row.evidenceKind,
+        opportunityType: row.opportunityType,
+        score: row.score,
+        confidence: row.confidence,
+        domain: row.domain,
+        targeted: row.targeted,
+        usedForPromotion: row.usedForPromotion,
+      } as Prisma.InputJsonValue,
+    })),
+    {
+      eventType: "delayed_outcome_recorded",
+      studentId: input.studentId,
+      decisionLogId: taskInstance?.decisionLogId || null,
+      taskInstanceId: taskInstance?.id || null,
+      taskId: input.taskId,
+      attemptId: input.attemptId,
+      delayedOutcomeId: delayedOutcome?.id || null,
+      payload: {
+        outcomeWindow: "same_session",
+        evidenceCount: rows.length,
+        nodeOutcomeCount: nodeOutcomes.length,
+        masteryDeltaTotal,
+      } as Prisma.InputJsonValue,
+    },
+  ]);
 
   return { evidenceCount: rows.length, nodeOutcomes };
 }

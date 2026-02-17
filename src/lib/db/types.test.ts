@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  autopilotDelayedOutcomeContractSchema,
+  autopilotEventLogContractSchema,
   anchorEvalRunContractSchema,
   anchorEvalSeedRowSchema,
   causalDiagnosisContractSchema,
@@ -126,4 +128,40 @@ test("anchor eval contracts accept run and seed rows", () => {
 
   assert.equal(run.status, "completed");
   assert.equal(seed.id, "seed_anchor_eval_run_v1");
+});
+
+test("autopilot delayed outcome contract accepts minimal payload", () => {
+  const parsed = autopilotDelayedOutcomeContractSchema.parse({
+    studentId: "stu_1",
+    decisionLogId: "dec_1",
+    taskId: "task_1",
+    attemptId: "att_1",
+    outcome: {
+      masteryDeltaTotal: 1.25,
+      evidenceCount: 8,
+    },
+  });
+
+  assert.equal(parsed.outcomeWindow, "same_session");
+  assert.equal(parsed.status, "recorded");
+});
+
+test("autopilot event contract enforces full linkage for evidence rows", () => {
+  const success = autopilotEventLogContractSchema.safeParse({
+    eventType: "evidence_written",
+    studentId: "stu_1",
+    decisionLogId: "dec_1",
+    taskId: "task_1",
+    attemptId: "att_1",
+    evidenceId: "ev_1",
+    delayedOutcomeId: "out_1",
+  });
+  assert.equal(success.success, true);
+
+  const failure = autopilotEventLogContractSchema.safeParse({
+    eventType: "evidence_written",
+    studentId: "stu_1",
+    evidenceId: "ev_1",
+  });
+  assert.equal(failure.success, false);
 });

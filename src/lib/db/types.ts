@@ -26,6 +26,14 @@ export const reviewQueueStatuses = ["pending", "scheduled", "completed", "expire
 export const rewardWindows = ["same_session", "day_7", "day_30"] as const;
 
 export const anchorEvalStatuses = ["started", "completed", "failed", "rolled_back"] as const;
+export const autopilotEventTypes = [
+  "planner_decision_created",
+  "task_instance_created",
+  "attempt_created",
+  "evidence_written",
+  "delayed_outcome_recorded",
+  "custom",
+] as const;
 
 const nonEmptyString = z.string().trim().min(1);
 const probability = z.number().min(0).max(1);
@@ -151,6 +159,40 @@ export const anchorEvalRunContractSchema = z.object({
   notes: z.string().max(2000).optional(),
 });
 
+export const autopilotDelayedOutcomeContractSchema = z.object({
+  studentId: nonEmptyString,
+  decisionLogId: nonEmptyString.optional(),
+  taskInstanceId: nonEmptyString.optional(),
+  taskId: nonEmptyString.optional(),
+  attemptId: nonEmptyString.optional(),
+  outcomeWindow: nonEmptyString.default("same_session"),
+  status: nonEmptyString.default("recorded"),
+  outcome: z.record(z.any()).optional(),
+});
+
+export const autopilotEventLogContractSchema = z
+  .object({
+    eventType: z.enum(autopilotEventTypes),
+    studentId: nonEmptyString.optional(),
+    decisionLogId: nonEmptyString.optional(),
+    taskInstanceId: nonEmptyString.optional(),
+    taskId: nonEmptyString.optional(),
+    attemptId: nonEmptyString.optional(),
+    evidenceId: nonEmptyString.optional(),
+    delayedOutcomeId: nonEmptyString.optional(),
+    payload: z.any().optional(),
+  })
+  .refine(
+    (value) => {
+      if (!value.evidenceId) return true;
+      return Boolean(value.decisionLogId && value.taskId && value.attemptId);
+    },
+    {
+      message: "evidence linkage requires decisionLogId + taskId + attemptId",
+      path: ["evidenceId"],
+    }
+  );
+
 export const anchorEvalSeedRowSchema = z.object({
   id: nonEmptyString,
   policyVersion: nonEmptyString,
@@ -167,4 +209,6 @@ export type SelfRepairCycleContract = z.infer<typeof selfRepairCycleContractSche
 export type ReviewQueueItemContract = z.infer<typeof reviewQueueItemContractSchema>;
 export type RewardTraceContract = z.infer<typeof rewardTraceContractSchema>;
 export type AnchorEvalRunContract = z.infer<typeof anchorEvalRunContractSchema>;
+export type AutopilotDelayedOutcomeContract = z.infer<typeof autopilotDelayedOutcomeContractSchema>;
+export type AutopilotEventLogContract = z.infer<typeof autopilotEventLogContractSchema>;
 export type AnchorEvalSeedRow = z.infer<typeof anchorEvalSeedRowSchema>;

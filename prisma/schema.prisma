@@ -63,6 +63,8 @@ model Student {
   selfRepairCycles    SelfRepairCycle[]
   reviewQueueItems    ReviewQueueItem[]
   rewardTraces        RewardTrace[]
+  autopilotEventLogs  AutopilotEventLog[]
+  autopilotOutcomes   AutopilotDelayedOutcome[]
   vocabulary          StudentVocabulary[]
   taskInstances       TaskInstance[]
 
@@ -70,15 +72,17 @@ model Student {
 }
 
 model Task {
-  id           String          @id @default(cuid())
-  type         String
-  prompt       String
-  level        Int             @default(1)
-  metaJson     Json?
-  createdAt    DateTime        @default(now())
-  attempts     Attempt[]
-  gseTargets   TaskGseTarget[]
-  taskInstance TaskInstance?
+  id                 String                    @id @default(cuid())
+  type               String
+  prompt             String
+  level              Int                       @default(1)
+  metaJson           Json?
+  createdAt          DateTime                  @default(now())
+  attempts           Attempt[]
+  gseTargets         TaskGseTarget[]
+  taskInstance       TaskInstance?
+  autopilotEventLogs AutopilotEventLog[]
+  autopilotOutcomes  AutopilotDelayedOutcome[]
 }
 
 model Attempt {
@@ -112,6 +116,8 @@ model Attempt {
   delayedRepairCycles   SelfRepairCycle[]    @relation("SelfRepairDelayedAttempt")
   reviewQueueItems      ReviewQueueItem[]    @relation("ReviewQueueAttempt")
   rewardTraces          RewardTrace[]
+  autopilotEventLogs    AutopilotEventLog[]
+  autopilotOutcomes     AutopilotDelayedOutcome[]
 
   @@index([studentId])
   @@index([status])
@@ -398,6 +404,7 @@ model AttemptGseEvidence {
   attempt          Attempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)
   node             GseNode  @relation(fields: [nodeId], references: [nodeId], onDelete: Cascade)
   student          Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  autopilotLogs    AutopilotEventLog[]
 
   @@index([attemptId])
   @@index([studentId, nodeId])
@@ -475,6 +482,8 @@ model PlannerDecisionLog {
   contextSnapshot     LearnerTwinSnapshot? @relation(fields: [contextSnapshotId], references: [id], onDelete: SetNull)
   oodTaskSpecs        OODTaskSpec[]
   rewardTraces        RewardTrace[]
+  autopilotEventLogs  AutopilotEventLog[]
+  autopilotOutcomes   AutopilotDelayedOutcome[]
   student             Student              @relation(fields: [studentId], references: [id], onDelete: Cascade)
   taskInstance        TaskInstance?
 
@@ -498,6 +507,8 @@ model TaskInstance {
   delayedRepairCycles SelfRepairCycle[]   @relation("SelfRepairDelayedTaskInstance")
   reviewQueueItems    ReviewQueueItem[]   @relation("ReviewQueueTaskInstance")
   rewardTraces        RewardTrace[]
+  autopilotEventLogs  AutopilotEventLog[]
+  autopilotOutcomes   AutopilotDelayedOutcome[]
   student             Student             @relation(fields: [studentId], references: [id], onDelete: Cascade)
   task                Task                @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
@@ -678,6 +689,62 @@ model RewardTrace {
   @@unique([decisionLogId, rewardWindow, rewardVersion])
   @@index([studentId, createdAt])
   @@index([decisionLogId, createdAt])
+}
+
+model AutopilotDelayedOutcome {
+  id               String               @id @default(cuid())
+  studentId        String
+  decisionLogId    String?
+  taskInstanceId   String?
+  taskId           String?
+  attemptId        String?
+  outcomeWindow    String               @default("same_session")
+  status           String               @default("recorded")
+  outcomeJson      Json?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  attempt          Attempt?             @relation(fields: [attemptId], references: [id], onDelete: SetNull)
+  decisionLog      PlannerDecisionLog?  @relation(fields: [decisionLogId], references: [id], onDelete: SetNull)
+  student          Student              @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  task             Task?                @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  taskInstance     TaskInstance?        @relation(fields: [taskInstanceId], references: [id], onDelete: SetNull)
+  autopilotLogs    AutopilotEventLog[]
+
+  @@index([studentId, createdAt])
+  @@index([decisionLogId, createdAt])
+  @@index([taskId, createdAt])
+  @@index([attemptId, createdAt])
+  @@index([outcomeWindow, createdAt])
+}
+
+model AutopilotEventLog {
+  id               String                   @id @default(cuid())
+  eventType        String
+  studentId        String?
+  decisionLogId    String?
+  taskInstanceId   String?
+  taskId           String?
+  attemptId        String?
+  evidenceId       String?
+  delayedOutcomeId String?
+  payloadJson      Json?
+  createdAt        DateTime                 @default(now())
+  attempt          Attempt?                 @relation(fields: [attemptId], references: [id], onDelete: SetNull)
+  decisionLog      PlannerDecisionLog?      @relation(fields: [decisionLogId], references: [id], onDelete: SetNull)
+  delayedOutcome   AutopilotDelayedOutcome? @relation(fields: [delayedOutcomeId], references: [id], onDelete: SetNull)
+  evidence         AttemptGseEvidence?      @relation(fields: [evidenceId], references: [id], onDelete: SetNull)
+  student          Student?                 @relation(fields: [studentId], references: [id], onDelete: SetNull)
+  task             Task?                    @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  taskInstance     TaskInstance?            @relation(fields: [taskInstanceId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([eventType, createdAt])
+  @@index([studentId, createdAt])
+  @@index([decisionLogId, createdAt])
+  @@index([taskId, createdAt])
+  @@index([attemptId, createdAt])
+  @@index([evidenceId])
+  @@index([delayedOutcomeId])
 }
 
 model AnchorEvalRun {

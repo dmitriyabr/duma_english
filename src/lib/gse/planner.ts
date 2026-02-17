@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import type { CEFRStage } from "@/lib/curriculum";
+import { appendAutopilotEvent } from "@/lib/autopilot/eventLog";
 import { getBundleNodeIdsForStageAndDomain } from "./bundles";
 import { computeDecayedMastery } from "./mastery";
 import { mapStageToGseRange } from "./utils";
@@ -1104,6 +1105,17 @@ export async function planNextTaskDecision(params: {
       estimatedDifficulty: chosen.estimatedDifficulty,
     },
   });
+  await appendAutopilotEvent({
+    eventType: "planner_decision_created",
+    studentId: params.studentId,
+    decisionLogId: decision.id,
+    payload: {
+      chosenTaskType: chosen.taskType,
+      targetNodeIds: chosen.targetNodeIds,
+      selectionReason: chosen.selectionReason,
+      primaryGoal,
+    } as Prisma.InputJsonValue,
+  });
 
   return {
     decisionId: decision.id,
@@ -1190,7 +1202,7 @@ export async function createTaskInstance(params: {
   if (!params.targetNodeIds || params.targetNodeIds.length === 0) {
     throw new Error("Planner sanity check failed: targetNodeIds is empty.");
   }
-  return prisma.taskInstance.create({
+  const taskInstance = await prisma.taskInstance.create({
     data: {
       studentId: params.studentId,
       taskId: params.taskId,
@@ -1202,6 +1214,20 @@ export async function createTaskInstance(params: {
       estimatedDifficulty: params.estimatedDifficulty ?? null,
     },
   });
+  await appendAutopilotEvent({
+    eventType: "task_instance_created",
+    studentId: params.studentId,
+    decisionLogId: params.decisionId || null,
+    taskInstanceId: taskInstance.id,
+    taskId: params.taskId,
+    payload: {
+      taskType: params.taskType,
+      targetNodeIds: params.targetNodeIds,
+      fallbackUsed: params.fallbackUsed,
+      estimatedDifficulty: params.estimatedDifficulty ?? null,
+    } as Prisma.InputJsonValue,
+  });
+  return taskInstance;
 }
 
 export async function getPlannerDecisionById(decisionId: string, studentId: string) {

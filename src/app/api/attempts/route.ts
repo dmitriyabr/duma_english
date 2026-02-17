@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { getStudentFromRequest } from "@/lib/auth";
+import { appendAutopilotEvent } from "@/lib/autopilot/eventLog";
 import { v4 as uuidv4 } from "uuid";
 
 const schema = z.object({
@@ -18,7 +19,19 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = schema.parse(await req.json());
-    const task = await prisma.task.findUnique({ where: { id: body.taskId } });
+    const task = await prisma.task.findUnique({
+      where: { id: body.taskId },
+      select: {
+        id: true,
+        metaJson: true,
+        taskInstance: {
+          select: {
+            id: true,
+            decisionLogId: true,
+          },
+        },
+      },
+    });
     if (!task) {
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
     }
@@ -58,6 +71,19 @@ export async function POST(req: NextRequest) {
         status: "created",
         audioObjectKey: objectKey,
         durationSec: body.durationSec,
+      },
+    });
+    await appendAutopilotEvent({
+      eventType: "attempt_created",
+      studentId: student.studentId,
+      decisionLogId: task.taskInstance?.decisionLogId || null,
+      taskInstanceId: task.taskInstance?.id || null,
+      taskId: task.id,
+      attemptId: attempt.id,
+      payload: {
+        status: attempt.status,
+        durationSec: body.durationSec,
+        contentType: body.contentType,
       },
     });
 

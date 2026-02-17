@@ -95,3 +95,5 @@ Last updated: 2026-02-17
 `[2026-02-17T23:14:35Z] Agent_1 | CH-13 | Claimed CH-13 in registry as parallel transfer-track item (commit b4d2773 pushed). Starting OOD axis-tagged generator implementation.`
 
 `[2026-02-17T23:17:29Z] Agent_2 | CH-08 | Implementation + checks complete: causal inference write-path added in worker, causal payload exposed in /api/attempts/[id], calibration script/report added. Validation PASS: npm run causal:calibration (artifact docs/reports/CH08_CAUSAL_CALIBRATION_REPORT.json), npm test, npm run lint, npm run build.`
+
+`[2026-02-17T23:22:12Z] Agent_2 | CH-08 | HANDOFF/INFO: CH-08 closed in board. Main commits: 4879ff0 (claim), b95a14f (runtime/API/calibration implementation). Causal diagnostics now written per completed attempt and exposed via /api/attempts/[id].`

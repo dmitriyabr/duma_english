@@ -93,7 +93,7 @@ Source baseline: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` + current code
 | CH-05 | KPI contract + baseline freeze | DONE | Agent_1 | 2026-02-17T22:08:08Z | 2026-02-17T22:37:18Z | `42190a2` | `docs/CH05_KPI_CONTRACT.md`, `docs/reports/CH05_KPI_BASELINE_REPORT.json`, `src/lib/kpi/autopilotDashboard.ts`, `src/app/api/quality/autopilot-kpi/route.ts`, `src/scripts/ch05_kpi_baseline_report.ts` | KPI v1 contract, dashboard endpoint, signed baseline freeze artifacts |
 | CH-06 | Graph quality gates | DONE | Agent_2 | 2026-02-17T22:10:22Z | 2026-02-17T22:48:13Z | `42190a2`, `dc6f2d1` | `.github/workflows/graph-quality-gates.yml`, `docs/GRAPH_QUALITY_GATES.md`, `src/lib/contracts/gseGraphQuality.ts`, `src/scripts/gse_graph_quality_report.ts` | Release-blocking graph invariants + drift report contract + CI artifact |
 | CH-07 | Causal taxonomy v1 + JSON contract | DONE | Agent_1 | 2026-02-17T22:57:40Z | 2026-02-17T23:08:19Z | `4d97c39`, `2101384` | `docs/CAUSAL_TAXONOMY_V1_CONTRACT.md`, `src/lib/db/types.ts`, `src/lib/db/types.test.ts` | Canonical taxonomy labels, strict v1 schema, and legacy payload adapter |
-| CH-08 | Causal model inference in evaluation pipeline | IN_PROGRESS | Agent_2 | 2026-02-17T23:00:13Z |  |  |  | Claimed after CH-07, parallel causal track per section 3 |
+| CH-08 | Causal model inference in evaluation pipeline | DONE | Agent_2 | 2026-02-17T23:00:13Z | 2026-02-17T23:20:13Z | `4879ff0`, `b95a14f` | `src/lib/causal/inference.ts`, `src/worker/index.ts`, `src/app/api/attempts/[id]/route.ts`, `src/scripts/ch08_causal_calibration_report.ts`, `docs/reports/CH08_CAUSAL_CALIBRATION_REPORT.json` | Deterministic causal inference write-path + attempt API causal payload + calibration report artifact |
 | CH-13 | OOD generator v1 (axis-tagged) | IN_PROGRESS | Agent_1 | 2026-02-17T23:13:27Z |  |  |  | Claimed as next independent critical-path item in transfer track (parallel to causal stream) |
 
 ## 3.3) Decision Log
@@ -108,6 +108,7 @@ Source baseline: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` + current code
 | 2026-02-17 | CH-05 | Принят KPI contract `autopilot-kpi-v1` с подписываемым baseline freeze (SHA-256), API dashboard `/api/quality/autopilot-kpi` и baseline artifacts в `docs/reports/CH05_KPI_BASELINE_REPORT.{json,md}` |
 | 2026-02-17 | CH-06 | Для release-блокировки добавлен versioned graph quality contract (deterministic snapshot для CI + `--db` режим для live проверки), включая drift edge report и workflow-артефакт |
 | 2026-02-17 | CH-07 | Для causal taxonomy v1 зафиксированы канонические labels и strict JSON contract; добавлен backward-compat adapter для legacy полей (`topCause/topP/causes`) и legacy label aliases |
+| 2026-02-17 | CH-08 | Causal inference в runtime сделан deterministic и без внешнего вызова модели: `CausalDiagnosis` upsert в worker для каждого completed attempt, выдача `results.causal` в `/api/attempts/[id]`, плюс calibration report script с агрегатами confidence/entropy/margin |
 
 ## 4) Execution Board (обособленные изменения)
 
@@ -143,7 +144,7 @@ Source baseline: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` + current code
   Done: введён единый словарь причин (`rule_confusion`, `l1_interference`, `retrieval_failure`, `instruction_misread`, `attention_loss`, `production_constraint`, `mixed`, `unknown`).  
   Артефакт: typed schema + backward compatibility adapter.
 
-- [ ] **CH-08 — Causal model inference in evaluation pipeline**  
+- [x] **CH-08 — Causal model inference in evaluation pipeline**  
   Done: каждый валидный attempt получает распределение причин + confidence interval, не только pass/fail.  
   Артефакт: causal output в attempt API + calibration report.
 

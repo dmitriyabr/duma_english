@@ -1,0 +1,95 @@
+{
+  "reportId": "ch05-kpi-baseline-2026-02-17",
+  "contractVersion": "autopilot-kpi-v1",
+  "generatedAt": "2026-02-17T22:21:01.774Z",
+  "window": {
+    "from": "2026-01-18T22:21:01.774Z",
+    "to": "2026-02-17T22:21:01.774Z",
+    "windowDays": 30
+  },
+  "metrics": [
+    {
+      "metricId": "mastery_gain_per_hour",
+      "value": 3528.097,
+      "sampleSize": 176,
+      "windowDays": 30,
+      "numerator": 6181.52,
+      "denominator": 1.7521,
+      "status": "ok",
+      "notes": "completed_attempts=176, node_outcomes=2015"
+    },
+    {
+      "metricId": "verified_growth_per_100_attempts",
+      "value": 52.8409,
+      "sampleSize": 176,
+      "windowDays": 30,
+      "numerator": 93,
+      "denominator": 176,
+      "status": "ok",
+      "notes": "verified_transitions=93"
+    },
+    {
+      "metricId": "retention_pass_rate_7d",
+      "value": null,
+      "sampleSize": 0,
+      "windowDays": 7,
+      "numerator": 0,
+      "denominator": 0,
+      "status": "not_available",
+      "notes": "grace_days=21"
+    },
+    {
+      "metricId": "retention_pass_rate_30d",
+      "value": null,
+      "sampleSize": 0,
+      "windowDays": 30,
+      "numerator": 0,
+      "denominator": 0,
+      "status": "not_available",
+      "notes": "grace_days=21"
+    },
+    {
+      "metricId": "retention_pass_rate_90d",
+      "value": null,
+      "sampleSize": 0,
+      "windowDays": 90,
+      "numerator": 0,
+      "denominator": 0,
+      "status": "not_available",
+      "notes": "grace_days=21"
+    },
+    {
+      "metricId": "ood_pass_rate",
+      "value": null,
+      "sampleSize": 0,
+      "windowDays": 30,
+      "numerator": 0,
+      "denominator": 0,
+      "status": "not_available",
+      "notes": "unknown_verdicts=0"
+    },
+    {
+      "metricId": "frustration_proxy_rate",
+      "value": 0.2541,
+      "sampleSize": 181,
+      "windowDays": 30,
+      "numerator": 46,
+      "denominator": 181,
+      "status": "ok",
+      "notes": "terminal_attempts=181"
+    },
+    {
+      "metricId": "planner_latency_p95_ms",
+      "value": 5960,
+      "sampleSize": 204,
+      "windowDays": 30,
+      "status": "ok",
+      "notes": "p50=3104"
+    }
+  ],
+  "signoff": {
+    "signedBy": "Agent_1",
+    "signedAt": "2026-02-17T22:21:01.774Z",
+    "signature": "sha256:204bb95be52bef1abf77a72cba383f7997df891e07c0e1d20b045d850134ceab"
+  }
+}

@@ -13,7 +13,11 @@
     "gse:import:official": "tsx src/scripts/gse_import_from_official_api.ts",
     "gse:aliases:backfill": "tsx src/scripts/gse_backfill_aliases.ts",
     "gse:qa": "tsx src/scripts/gse_quality_checks.ts",
-    "gse:embeddings:backfill": "tsx src/scripts/gse_backfill_semantic_embeddings.ts"
+    "graph:quality": "tsx src/scripts/gse_graph_quality_report.ts",
+    "graph:quality:db": "tsx src/scripts/gse_graph_quality_report.ts --db",
+    "gse:embeddings:backfill": "tsx src/scripts/gse_backfill_semantic_embeddings.ts",
+    "kpi:dashboard": "tsx src/scripts/ch05_kpi_baseline_report.ts",
+    "kpi:baseline:freeze": "tsx src/scripts/ch05_kpi_baseline_report.ts --freeze"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.887.0",

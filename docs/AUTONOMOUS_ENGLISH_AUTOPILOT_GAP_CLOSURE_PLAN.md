@@ -95,7 +95,7 @@ Source baseline: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` + current code
 | CH-07 | Causal taxonomy v1 + JSON contract | DONE | Agent_1 | 2026-02-17T22:57:40Z | 2026-02-17T23:08:19Z | `4d97c39`, `2101384` | `docs/CAUSAL_TAXONOMY_V1_CONTRACT.md`, `src/lib/db/types.ts`, `src/lib/db/types.test.ts` | Canonical taxonomy labels, strict v1 schema, and legacy payload adapter |
 | CH-08 | Causal model inference in evaluation pipeline | DONE | Agent_2 | 2026-02-17T23:00:13Z | 2026-02-17T23:20:13Z | `4879ff0`, `b95a14f` | `src/lib/causal/inference.ts`, `src/worker/index.ts`, `src/app/api/attempts/[id]/route.ts`, `src/scripts/ch08_causal_calibration_report.ts`, `docs/reports/CH08_CAUSAL_CALIBRATION_REPORT.json` | Deterministic causal inference write-path + attempt API causal payload + calibration report artifact |
 | CH-09 | Cause-attributed evidence write path | IN_PROGRESS | Agent_2 | 2026-02-17T23:29:33Z |  |  |  | Claimed as next causal-stream item after CH-08 completion |
-| CH-13 | OOD generator v1 (axis-tagged) | IN_PROGRESS | Agent_1 | 2026-02-17T23:13:27Z |  |  |  | Claimed as next independent critical-path item in transfer track (parallel to causal stream) |
+| CH-13 | OOD generator v1 (axis-tagged) | DONE | Agent_1 | 2026-02-17T23:13:27Z | 2026-02-17T23:39:01Z | `b4d2773`, `b218b85` | `src/lib/ood/generator.ts`, `src/app/api/task/next/route.ts`, `docs/CH13_OOD_GENERATOR_V1.md` | Deterministic OOD axis-tagged generation + OODTaskSpec persistence + API exposure |
 
 ## 3.3) Decision Log
 
@@ -110,6 +110,7 @@ Source baseline: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` + current code
 | 2026-02-17 | CH-06 | Для release-блокировки добавлен versioned graph quality contract (deterministic snapshot для CI + `--db` режим для live проверки), включая drift edge report и workflow-артефакт |
 | 2026-02-17 | CH-07 | Для causal taxonomy v1 зафиксированы канонические labels и strict JSON contract; добавлен backward-compat adapter для legacy полей (`topCause/topP/causes`) и legacy label aliases |
 | 2026-02-17 | CH-08 | Causal inference в runtime сделан deterministic и без внешнего вызова модели: `CausalDiagnosis` upsert в worker для каждого completed attempt, выдача `results.causal` в `/api/attempts/[id]`, плюс calibration report script с агрегатами confidence/entropy/margin |
+| 2026-02-17 | CH-13 | OOD generator v1 добавлен в `task/next`: deterministic cadence, axis tags по task family, запись `OODTaskSpec` на каждую OOD-инъекцию и additive `oodTaskSpec` поле в API ответе |
 
 ## 4) Execution Board (обособленные изменения)
 
@@ -167,7 +168,7 @@ Source baseline: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` + current code
 
 ### C. Transfer/OOD Control
 
-- [ ] **CH-13 — OOD generator v1 (axis-tagged)**  
+- [x] **CH-13 — OOD generator v1 (axis-tagged)**  
   Done: OOD задачи генерируются с явными осями shift (`topic/register/interlocutor/goal/format`).  
   Артефакт: `OODTaskSpec` rows + API exposure.
 

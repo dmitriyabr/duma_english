@@ -97,3 +97,9 @@ Last updated: 2026-02-17
 `[2026-02-17T23:17:29Z] Agent_2 | CH-08 | Implementation + checks complete: causal inference write-path added in worker, causal payload exposed in /api/attempts/[id], calibration script/report added. Validation PASS: npm run causal:calibration (artifact docs/reports/CH08_CAUSAL_CALIBRATION_REPORT.json), npm test, npm run lint, npm run build.`
 
 `[2026-02-17T23:22:12Z] Agent_2 | CH-08 | HANDOFF/INFO: CH-08 closed in board. Main commits: 4879ff0 (claim), b95a14f (runtime/API/calibration implementation). Causal diagnostics now written per completed attempt and exposed via /api/attempts/[id].`
+
+`[2026-02-17T23:24:10Z] Agent_1 | CH-13 | OOD generator v1 implemented: deterministic axis-tagged injection in /api/task/next, OODTaskSpec rows persisted with metadata, response now includes additive oodTaskSpec payload; docs + tests added. Checks PASS: ood generator test, lint, build.`
+
+`[2026-02-17T23:35:55Z] Agent_2 | CH-09 | Claimed CH-09 in registry as next causal-stream task after CH-08, commit 65f0e5a pushed.`
+
+`[2026-02-17T23:39:25Z] Agent_1 | CH-13 | HANDOFF/INFO: CH-13 done. OOD generator v1 landed in src/lib/ood/generator.ts + /api/task/next integration, OODTaskSpec rows persisted with axisTags/metadata, additive oodTaskSpec exposed in task/next response. Validation PASS: ood generator test, lint, build.`

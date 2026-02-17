@@ -41,11 +41,11 @@ model ClassCode {
 }
 
 model Student {
-  id                  String               @id @default(cuid())
+  id                  String                @id @default(cuid())
   classId             String
   displayName         String
-  loginCode           String?              @unique
-  createdAt           DateTime             @default(now())
+  loginCode           String?               @unique
+  createdAt           DateTime              @default(now())
   attempts            Attempt[]
   gseEvidence         AttemptGseEvidence[]
   metrics             AttemptMetric[]
@@ -55,8 +55,14 @@ model Student {
   plannerDecisions    PlannerDecisionLog[]
   progress            ProgressDaily[]
   promotionAudits     PromotionAudit[]
-  class               Class                @relation(fields: [classId], references: [id])
+  class               Class                 @relation(fields: [classId], references: [id])
   gseMastery          StudentGseMastery[]
+  causalDiagnoses     CausalDiagnosis[]
+  twinSnapshots       LearnerTwinSnapshot[]
+  oodTaskSpecs        OODTaskSpec[]
+  selfRepairCycles    SelfRepairCycle[]
+  reviewQueueItems    ReviewQueueItem[]
+  rewardTraces        RewardTrace[]
   vocabulary          StudentVocabulary[]
   taskInstances       TaskInstance[]
 
@@ -76,30 +82,36 @@ model Task {
 }
 
 model Attempt {
-  id                 String               @id @default(cuid())
-  studentId          String
-  taskId             String
-  status             String               @default("created")
-  audioObjectKey     String?
-  transcript         String?
-  speechMetricsJson  Json?
-  scoresJson         Json?
-  feedbackJson       Json?
-  createdAt          DateTime             @default(now())
-  completedAt        DateTime?
-  durationSec        Float?
-  errorCode          String?
-  errorMessage       String?
-  rawRecognitionJson Json?
-  taskEvaluationJson Json?
-  aiDebugJson        Json?
-  nodeOutcomesJson   Json?
-  recoveryTriggered  Boolean              @default(false)
-  student            Student              @relation(fields: [studentId], references: [id])
-  task               Task                 @relation(fields: [taskId], references: [id])
-  gseEvidence        AttemptGseEvidence[]
-  metrics            AttemptMetric[]
-  placementResponses PlacementResponse[]
+  id                    String               @id @default(cuid())
+  studentId             String
+  taskId                String
+  status                String               @default("created")
+  audioObjectKey        String?
+  transcript            String?
+  speechMetricsJson     Json?
+  scoresJson            Json?
+  feedbackJson          Json?
+  createdAt             DateTime             @default(now())
+  completedAt           DateTime?
+  durationSec           Float?
+  errorCode             String?
+  errorMessage          String?
+  rawRecognitionJson    Json?
+  taskEvaluationJson    Json?
+  aiDebugJson           Json?
+  nodeOutcomesJson      Json?
+  recoveryTriggered     Boolean              @default(false)
+  student               Student              @relation(fields: [studentId], references: [id])
+  task                  Task                 @relation(fields: [taskId], references: [id])
+  causalDiagnosis       CausalDiagnosis?
+  gseEvidence           AttemptGseEvidence[]
+  metrics               AttemptMetric[]
+  placementResponses    PlacementResponse[]
+  sourceRepairCycles    SelfRepairCycle[]    @relation("SelfRepairSourceAttempt")
+  immediateRepairCycles SelfRepairCycle[]    @relation("SelfRepairImmediateAttempt")
+  delayedRepairCycles   SelfRepairCycle[]    @relation("SelfRepairDelayedAttempt")
+  reviewQueueItems      ReviewQueueItem[]    @relation("ReviewQueueAttempt")
+  rewardTraces          RewardTrace[]
 
   @@index([studentId])
   @@index([status])
@@ -283,6 +295,8 @@ model GseNode {
   outgoingEdges    GseNodeEdge[]        @relation("GseNodeEdgeFrom")
   incomingEdges    GseNodeEdge[]        @relation("GseNodeEdgeTo")
   mastery          StudentGseMastery[]
+  selfRepairCycles SelfRepairCycle[]
+  reviewQueueItems ReviewQueueItem[]
   taskTargets      TaskGseTarget[]
 
   @@index([catalogVersionId, type])
@@ -441,26 +455,31 @@ model GseStageProjection {
 }
 
 model PlannerDecisionLog {
-  id                  String        @id @default(cuid())
+  id                  String               @id @default(cuid())
   studentId           String
-  decisionTs          DateTime      @default(now())
+  contextSnapshotId   String?
+  decisionTs          DateTime             @default(now())
   candidateSetJson    Json
   chosenTaskType      String
   utilityJson         Json
-  fallbackUsed        Boolean       @default(false)
+  fallbackUsed        Boolean              @default(false)
   latencyMs           Int?
   expectedGain        Float?
   targetNodeIds       String[]
   selectionReason     String
   primaryGoal         String?
   estimatedDifficulty Float?
-  createdAt           DateTime      @default(now())
-  domainsTargeted     String[]      @default([])
-  diagnosticMode      Boolean       @default(false)
-  student             Student       @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  createdAt           DateTime             @default(now())
+  domainsTargeted     String[]             @default([])
+  diagnosticMode      Boolean              @default(false)
+  contextSnapshot     LearnerTwinSnapshot? @relation(fields: [contextSnapshotId], references: [id], onDelete: SetNull)
+  oodTaskSpecs        OODTaskSpec[]
+  rewardTraces        RewardTrace[]
+  student             Student              @relation(fields: [studentId], references: [id], onDelete: Cascade)
   taskInstance        TaskInstance?
 
   @@index([studentId, decisionTs])
+  @@index([contextSnapshotId])
 }
 
 model TaskInstance {
@@ -475,6 +494,10 @@ model TaskInstance {
   estimatedDifficulty Float?
   createdAt           DateTime            @default(now())
   decisionLog         PlannerDecisionLog? @relation(fields: [decisionLogId], references: [id])
+  oodTaskSpec         OODTaskSpec?
+  delayedRepairCycles SelfRepairCycle[]   @relation("SelfRepairDelayedTaskInstance")
+  reviewQueueItems    ReviewQueueItem[]   @relation("ReviewQueueTaskInstance")
+  rewardTraces        RewardTrace[]
   student             Student             @relation(fields: [studentId], references: [id], onDelete: Cascade)
   task                Task                @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
@@ -509,4 +532,170 @@ model TaskGseTarget {
 
   @@unique([taskId, nodeId])
   @@index([nodeId])
+}
+
+model CausalDiagnosis {
+  id                     String   @id @default(cuid())
+  attemptId              String   @unique
+  studentId              String
+  taxonomyVersion        String   @default("causal-taxonomy-v1")
+  modelVersion           String
+  topLabel               String
+  topProbability         Float
+  entropy                Float?
+  topMargin              Float?
+  distributionJson       Json
+  confidenceIntervalJson Json?
+  counterfactualJson     Json?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+  attempt                Attempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  student                Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([studentId, createdAt])
+  @@index([topLabel, createdAt])
+}
+
+model LearnerTwinSnapshot {
+  id                      String               @id @default(cuid())
+  studentId               String
+  snapshotTs              DateTime             @default(now())
+  source                  String               @default("attempt_update")
+  placementStage          String?
+  promotionStage          String?
+  masteryProjectionJson   Json
+  uncertaintyHotspotsJson Json?
+  motivationSignalsJson   Json?
+  frictionSignalsJson     Json?
+  localeProfileJson       Json?
+  createdAt               DateTime             @default(now())
+  updatedAt               DateTime             @updatedAt
+  plannerDecisions        PlannerDecisionLog[]
+  student                 Student              @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([studentId, snapshotTs])
+  @@index([source, snapshotTs])
+}
+
+model OODTaskSpec {
+  id                 String              @id @default(cuid())
+  studentId          String
+  taskInstanceId     String?             @unique
+  decisionLogId      String?
+  axisTags           String[]            @default([])
+  difficultyAnchor   Float?
+  inDomainDifficulty Float?
+  difficultyDelta    Float?
+  status             String              @default("planned")
+  verdict            String?
+  metadataJson       Json?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  decisionLog        PlannerDecisionLog? @relation(fields: [decisionLogId], references: [id], onDelete: SetNull)
+  student            Student             @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  taskInstance       TaskInstance?       @relation(fields: [taskInstanceId], references: [id], onDelete: SetNull)
+
+  @@index([studentId, createdAt])
+  @@index([studentId, status, createdAt])
+  @@index([decisionLogId])
+}
+
+model SelfRepairCycle {
+  id                                String        @id @default(cuid())
+  studentId                         String
+  nodeId                            String?
+  sourceAttemptId                   String
+  immediateAttemptId                String?
+  delayedVerificationAttemptId      String?
+  delayedVerificationTaskInstanceId String?
+  status                            String        @default("pending_immediate_retry")
+  causeLabel                        String?
+  loopIndex                         Int           @default(1)
+  feedbackJson                      Json?
+  metadataJson                      Json?
+  createdAt                         DateTime      @default(now())
+  updatedAt                         DateTime      @updatedAt
+  delayedVerificationAttempt        Attempt?      @relation("SelfRepairDelayedAttempt", fields: [delayedVerificationAttemptId], references: [id], onDelete: SetNull)
+  delayedVerificationTaskInstance   TaskInstance? @relation("SelfRepairDelayedTaskInstance", fields: [delayedVerificationTaskInstanceId], references: [id], onDelete: SetNull)
+  immediateAttempt                  Attempt?      @relation("SelfRepairImmediateAttempt", fields: [immediateAttemptId], references: [id], onDelete: SetNull)
+  node                              GseNode?      @relation(fields: [nodeId], references: [nodeId], onDelete: SetNull)
+  sourceAttempt                     Attempt       @relation("SelfRepairSourceAttempt", fields: [sourceAttemptId], references: [id], onDelete: Cascade)
+  student                           Student       @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceAttemptId, loopIndex])
+  @@index([studentId, status, createdAt])
+  @@index([nodeId, status])
+  @@index([delayedVerificationTaskInstanceId])
+}
+
+model ReviewQueueItem {
+  id             String        @id @default(cuid())
+  studentId      String
+  nodeId         String
+  queueType      String        @default("memory_review")
+  status         String        @default("pending")
+  reasonCode     String?
+  priority       Int           @default(100)
+  dueAt          DateTime
+  taskInstanceId String?
+  attemptId      String?
+  metadataJson   Json?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  completedAt    DateTime?
+  attempt        Attempt?      @relation("ReviewQueueAttempt", fields: [attemptId], references: [id], onDelete: SetNull)
+  node           GseNode       @relation(fields: [nodeId], references: [nodeId], onDelete: Cascade)
+  student        Student       @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  taskInstance   TaskInstance? @relation("ReviewQueueTaskInstance", fields: [taskInstanceId], references: [id], onDelete: SetNull)
+
+  @@index([studentId, status, dueAt])
+  @@index([studentId, nodeId, status])
+  @@index([taskInstanceId])
+}
+
+model RewardTrace {
+  id              String             @id @default(cuid())
+  studentId       String
+  decisionLogId   String
+  taskInstanceId  String?
+  attemptId       String?
+  rewardVersion   String
+  rewardWindow    String             @default("same_session")
+  masteryDelta    Float              @default(0)
+  transferReward  Float              @default(0)
+  retentionReward Float              @default(0)
+  frictionPenalty Float              @default(0)
+  totalReward     Float
+  componentsJson  Json?
+  outcomeLinkedAt DateTime?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  attempt         Attempt?           @relation(fields: [attemptId], references: [id], onDelete: SetNull)
+  decisionLog     PlannerDecisionLog @relation(fields: [decisionLogId], references: [id], onDelete: Cascade)
+  student         Student            @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  taskInstance    TaskInstance?      @relation(fields: [taskInstanceId], references: [id], onDelete: SetNull)
+
+  @@unique([decisionLogId, rewardWindow, rewardVersion])
+  @@index([studentId, createdAt])
+  @@index([decisionLogId, createdAt])
+}
+
+model AnchorEvalRun {
+  id                 String    @id @default(cuid())
+  policyVersion      String
+  rewardVersion      String
+  datasetVersion     String
+  status             String    @default("started")
+  startedAt          DateTime  @default(now())
+  completedAt        DateTime?
+  trafficWindowStart DateTime?
+  trafficWindowEnd   DateTime?
+  metricsJson        Json?
+  reportUri          String?
+  notes              String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@index([status, startedAt])
+  @@index([policyVersion, startedAt])
 }

@@ -94,6 +94,7 @@ Source baseline: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` + current code
 | CH-06 | Graph quality gates | DONE | Agent_2 | 2026-02-17T22:10:22Z | 2026-02-17T22:48:13Z | `42190a2`, `dc6f2d1` | `.github/workflows/graph-quality-gates.yml`, `docs/GRAPH_QUALITY_GATES.md`, `src/lib/contracts/gseGraphQuality.ts`, `src/scripts/gse_graph_quality_report.ts` | Release-blocking graph invariants + drift report contract + CI artifact |
 | CH-07 | Causal taxonomy v1 + JSON contract | DONE | Agent_1 | 2026-02-17T22:57:40Z | 2026-02-17T23:08:19Z | `4d97c39`, `2101384` | `docs/CAUSAL_TAXONOMY_V1_CONTRACT.md`, `src/lib/db/types.ts`, `src/lib/db/types.test.ts` | Canonical taxonomy labels, strict v1 schema, and legacy payload adapter |
 | CH-08 | Causal model inference in evaluation pipeline | IN_PROGRESS | Agent_2 | 2026-02-17T23:00:13Z |  |  |  | Claimed after CH-07, parallel causal track per section 3 |
+| CH-13 | OOD generator v1 (axis-tagged) | IN_PROGRESS | Agent_1 | 2026-02-17T23:13:27Z |  |  |  | Claimed as next independent critical-path item in transfer track (parallel to causal stream) |
 
 ## 3.3) Decision Log
 

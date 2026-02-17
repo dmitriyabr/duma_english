@@ -93,6 +93,7 @@ Source baseline: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` + current code
 | CH-05 | KPI contract + baseline freeze | DONE | Agent_1 | 2026-02-17T22:08:08Z | 2026-02-17T22:37:18Z | `42190a2` | `docs/CH05_KPI_CONTRACT.md`, `docs/reports/CH05_KPI_BASELINE_REPORT.json`, `src/lib/kpi/autopilotDashboard.ts`, `src/app/api/quality/autopilot-kpi/route.ts`, `src/scripts/ch05_kpi_baseline_report.ts` | KPI v1 contract, dashboard endpoint, signed baseline freeze artifacts |
 | CH-06 | Graph quality gates | DONE | Agent_2 | 2026-02-17T22:10:22Z | 2026-02-17T22:48:13Z | `42190a2`, `dc6f2d1` | `.github/workflows/graph-quality-gates.yml`, `docs/GRAPH_QUALITY_GATES.md`, `src/lib/contracts/gseGraphQuality.ts`, `src/scripts/gse_graph_quality_report.ts` | Release-blocking graph invariants + drift report contract + CI artifact |
 | CH-07 | Causal taxonomy v1 + JSON contract | IN_PROGRESS | Agent_1 | 2026-02-17T22:57:40Z |  |  |  | Claimed as next critical-path item after CH-01..CH-06 completion |
+| CH-08 | Causal model inference in evaluation pipeline | IN_PROGRESS | Agent_2 | 2026-02-17T23:00:13Z |  |  |  | Claimed after CH-07, parallel causal track per section 3 |
 
 ## 3.3) Decision Log
 

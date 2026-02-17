@@ -106,7 +106,7 @@ Task lock handshake (обязательно перед кодом):
 
 | CH | Task | Status | Owner | Branch | Scope lock | Start (UTC) | End (UTC) | PR/Commit | Artifacts | Decision IDs |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| CH-01 | CEFR coverage matrix contract | TODO |  | `codex/ch-01-cefr-coverage` | `docs/**`, `src/lib/contracts/**`, `src/scripts/**` (без `prisma/**`) |  |  |  |  |  |
+| CH-01 | CEFR coverage matrix contract | IN_PROGRESS | Agent_1 | `codex/ch-01-cefr-coverage-agent_1` | `docs/**`, `src/lib/contracts/**`, `src/scripts/**` (без `prisma/**`) | 2026-02-17T16:01:57Z |  |  |  |  |
 | CH-02 | Data model v2 | TODO |  | `codex/ch-02-data-model-v2` | `prisma/**`, `src/lib/db/**`, `src/lib/**/types*` |  |  |  |  |  |
 | CH-05 | KPI contract + baseline freeze | TODO |  | `codex/ch-05-kpi-baseline` | `docs/**`, `src/scripts/**`, `src/lib/gse/quality*`, `.github/workflows/**` |  |  |  |  |  |
 | CH-06 | Graph quality gates | TODO |  | `codex/ch-06-graph-gates` | `src/lib/gse/**`, `src/scripts/**`, `.github/workflows/**`, `docs/**` (без `prisma/**`) |  |  |  |  |  |

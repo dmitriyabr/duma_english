@@ -90,7 +90,7 @@ Source baseline: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` + current code
 | CH-01 | CEFR coverage matrix contract | DONE | Team | 2026-02-17T20:54:09Z | 2026-02-17T20:54:09Z | `169ef5e` | `docs/CEFR_COVERAGE_MATRIX_CONTRACT.md`, `src/scripts/cefr_coverage_report.ts` | Coverage matrix, report script, tests added |
 | CH-02 | Data model v2 | DONE | Team | 2026-02-17T20:54:34Z | 2026-02-17T20:54:34Z | `52212b0`, `c313e65` | `prisma/schema.prisma`, `prisma/migrations/20260217190535_data_model_v2_entities/migration.sql`, `prisma/seeds/ch02_data_model_v2_seed.sql` | Prisma entities + migration + seed + DB contract tests |
 | CH-05 | KPI contract + baseline freeze | IN_PROGRESS | Agent_1 | 2026-02-17T22:08:08Z |  |  |  |  |
-| CH-06 | Graph quality gates | TODO |  |  |  |  |  |  |
+| CH-06 | Graph quality gates | IN_PROGRESS | Agent_2 | 2026-02-17T22:10:22Z |  |  |  |  |
 
 ## 3.3) Decision Log
 

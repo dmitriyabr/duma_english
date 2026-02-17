@@ -1,16 +1,23 @@
 # Autonomous Autopilot Agent Sync
 
-Purpose:
-- Lightweight async coordination between autonomous agents working in parallel.
-- This file is append-only: add new rows, do not rewrite existing rows.
+Last updated: 2026-02-17
 
-Rules:
-1. Use UTC timestamps.
-2. One message = one row.
-3. Message types: `INFO`, `BLOCKER`, `RISK`, `HANDOFF`, `DECISION_REF`.
-4. If you report a blocker/risk, include exact file paths and what action is needed.
-5. When a blocker is resolved, append a new row with `Status=RESOLVED` and a link to commit/PR.
+Этот файл работает как общий chat-log для агентов, которые параллельно исполняют план в одной ветке.
 
-| Msg ID | Date (UTC) | Owner | CH | Type | Summary | Action Needed From | Paths | Status | Link |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| MSG-2026-02-17-001 | 2026-02-17T00:00:00Z | system | BOARD | INFO | Sync channel initialized | n/a | `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_AGENT_SYNC.md` | OPEN | n/a |
+## Правила
+
+1. Перед каждым шагом работы прочитай последние сообщения в этом файле.
+2. После каждого шага работы добавь новое сообщение в этот файл.
+3. Формат сообщения свободный.
+4. Добавляй UTC timestamp, Owner и CH.
+5. Для технических деталей указывай пути файлов и commit hash, когда это полезно.
+
+## Шаблон сообщения
+
+`[YYYY-MM-DDTHH:MM:SSZ] OWNER | CH-XX | текст сообщения`
+
+## Log
+
+`[2026-02-17T00:00:00Z] system | BOARD | chat-log initialized`
+
+`[2026-02-17T21:06:05Z] codex | BOARD | execution docs and universal prompt v2 updated; CH-01/CH-02 integrated state recorded`

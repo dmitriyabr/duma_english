@@ -3,65 +3,39 @@
 Last updated: 2026-02-17
 Source baseline: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` + current code/docs (`README.md`, `TASKS.MD`, `docs/BRAIN_RUNTIME.md`)
 
-## 0) Multi-Agent Operating Protocol (обязательно)
+## 0) Working Protocol
 
-Этот файл — единый coordination board для всех агентов. Любая работа начинается и заканчивается обновлением этого файла.
+Работа ведётся в одной ветке: `codex/autopilot-execution-plan`.
 
-Execution branch (обязательно):
-- Координационная ветка плана: `codex/autopilot-execution-plan`.
-- Работать в `main` запрещено.
-- Любая агентская задача стартует с актуализации этой ветки и lock-коммита именно в неё.
-- Реализация ведётся в отдельной ветке агента, созданной от `codex/autopilot-execution-plan`.
-
-Изоляция на одной машине (обязательно):
-- Агенты не работают в одном и том же рабочем каталоге.
-- Каждый агент использует отдельный `git worktree` (или отдельный clone) со своим путем.
-- Рекомендуемый root для worktree: `/Users/skyeng/Desktop/duma_english_agents/<owner_name>`.
-- В одном worktree агент ведёт только одну активную задачу.
-
-Zero-context onboarding (прочитать перед выбором задачи):
-1. `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` (target product contract).
-2. `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_GAP_CLOSURE_PLAN.md` (execution board и протокол).
-3. `README.md` (runtime/how-to-run).
-4. `TASKS.MD` (текущая runtime truth и текущие gaps).
-5. `docs/BRAIN_RUNTIME.md` и `docs/BRAIN_ROADMAP.md` (brain architecture/status).
-6. `docs/DEBUG_PLAYBOOK.md` (операционные детали текущей системы).
-
-Межагентная коммуникация:
-- Файл: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_AGENT_SYNC.md`.
-- Используется для handoff/blocker/risk сообщений между агентами (append-only, новые строки в конец).
+Файлы процесса:
+1. Файл задач: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_GAP_CLOSURE_PLAN.md`
+2. Файл общения: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_AGENT_SYNC.md`
 
 Статусы задач:
-- `TODO`: задача свободна, к исполнению не взята.
-- `IN_PROGRESS`: задача захвачена конкретным агентом, работа идёт.
-- `DONE`: задача закрыта, артефакты и проверки заполнены.
-- `BLOCKED`: задача остановлена, указана причина и точка блокировки.
+1. `TODO`
+2. `IN_PROGRESS`
+3. `BLOCKED`
+4. `DONE`
 
-Правило переходов (жёстко):
-1. Перед любыми код-изменениями агент обновляет строку задачи в `Active Task Registry`: `Status=IN_PROGRESS`, заполняет `Owner`, `Branch`, `Start (UTC)`, `Scope lock`.
-2. Агент работает только в пределах `Scope lock`. Выход за scope разрешён только после записи в `Decision Log` с причиной.
-3. После завершения конкретной задачи агент сразу (в этом же PR/коммите) ставит `Status=DONE`, заполняет `End (UTC)`, `PR/Commit`, `Artifacts`, `Decision IDs`.
-4. Закрывать задачи батчем запрещено: статус обновляется по каждой задаче отдельно.
-5. Если задача блокирована, агент ставит `BLOCKED` и фиксирует unblock condition.
+Обязательный цикл шага:
+1. Перед шагом агент читает файл общения `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_AGENT_SYNC.md`.
+2. После шага агент обязательно пишет сообщение в этот файл.
+3. Текст сообщения свободный.
 
-Правило изоляции:
-1. Один агент = одна задача `CH-XX` одновременно.
-2. Нельзя менять строки чужих активных задач, кроме явного handoff с записью в `Decision Log`.
-3. Ветка задачи: `codex/ch-XX-short-name`.
-4. Для минимизации merge-конфликтов агент редактирует только свою строку в реестре и только новые строки в `Decision Log`.
+Обновление статуса задачи:
+1. Старт задачи: `TODO -> IN_PROGRESS` + `Owner` + `Start (UTC)`.
+2. Блокер: `IN_PROGRESS -> BLOCKED` + короткая причина.
+3. Завершение: `IN_PROGRESS -> DONE` + `End (UTC)` + commit hash в реестре.
+4. Переход статуса выполняется отдельно по каждой задаче сразу в момент события.
 
-Правило выбора задачи (универсальное):
-1. Агент не получает `CH-XX` извне, а сам выбирает первую доступную задачу в `Active Task Registry` сверху вниз.
-2. Доступная задача = `Status=TODO` и пустой `Owner`.
-3. Если доступных задач нет, агент добавляет новую строку для следующего `CH-XX` по критическому пути (раздел 3), затем берёт её в работу.
-4. Если следующий `CH-XX` невозможно определить однозначно, агент пишет `BLOCKER` в `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_AGENT_SYNC.md` и останавливается.
-
-Task lock handshake (обязательно перед кодом):
-1. Синхронизировать `origin/codex/autopilot-execution-plan`.
-2. В реестре у выбранной задачи поставить `Status=IN_PROGRESS`, `Owner`, `Start (UTC)`, `Branch`.
-3. Сделать отдельный lock-коммит только с изменением реестра и запушить в `origin/codex/autopilot-execution-plan` (допустимо из агентской ветки через refspec: `git push origin HEAD:codex/autopilot-execution-plan`).
-4. Только после успешного lock-пуша создать рабочую ветку от `codex/autopilot-execution-plan` и начинать реализацию.
-5. Если lock-пуш не прошёл (non-fast-forward), повторить синхронизацию и заново выбрать первую доступную задачу.
+Контекст перед началом работы:
+1. `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md`
+2. `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_GAP_CLOSURE_PLAN.md`
+3. `README.md`
+4. `TASKS.MD`
+5. `docs/BRAIN_RUNTIME.md`
+6. `docs/BRAIN_ROADMAP.md`
+7. `docs/DEBUG_PLAYBOOK.md`
 
 ## 1) Стартовая точка (сегодня)
 
@@ -109,43 +83,33 @@ Task lock handshake (обязательно перед кодом):
 
 Причина: это foundation-слой и их можно вести разными агентами с минимальным пересечением контекста.
 
-## 3.2) Active Task Registry (rolling queue)
+## 3.2) Active Task Registry
 
-Это rolling-реестр для долгой работы, не только для первой фазы.
+| CH | Task | Status | Owner | Start (UTC) | End (UTC) | Commits | Artifacts | Notes |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| CH-01 | CEFR coverage matrix contract | DONE | Team | 2026-02-17T20:54:09Z | 2026-02-17T20:54:09Z | `169ef5e` | `docs/CEFR_COVERAGE_MATRIX_CONTRACT.md`, `src/scripts/cefr_coverage_report.ts` | Coverage matrix, report script, tests added |
+| CH-02 | Data model v2 | DONE | Team | 2026-02-17T20:54:34Z | 2026-02-17T20:54:34Z | `52212b0`, `c313e65` | `prisma/schema.prisma`, `prisma/migrations/20260217190535_data_model_v2_entities/migration.sql`, `prisma/seeds/ch02_data_model_v2_seed.sql` | Prisma entities + migration + seed + DB contract tests |
+| CH-05 | KPI contract + baseline freeze | TODO |  |  |  |  |  |  |
+| CH-06 | Graph quality gates | TODO |  |  |  |  |  |  |
 
-Правила:
-1. Если в реестре есть хотя бы одна свободная строка (`TODO` + пустой `Owner`), агент берёт первую сверху.
-2. Если свободных строк нет, агент добавляет новую строку для следующего `CH-XX` по критическому пути из раздела 3 (минимальный номер/ранний этап, который ещё не `DONE`), и только потом делает lock.
-3. Seed-строки ниже — это стартовая очередь, дальше реестр пополняется по мере завершения задач.
+## 3.3) Decision Log
 
-| CH | Task | Status | Owner | Branch | Scope lock | Start (UTC) | End (UTC) | PR/Commit | Artifacts | Decision IDs |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| CH-01 | CEFR coverage matrix contract | IN_PROGRESS | Agent_1 | `codex/ch-01-cefr-coverage-agent_1` | `docs/**`, `src/lib/contracts/**`, `src/scripts/**` (без `prisma/**`) | 2026-02-17T16:29:33Z |  |  |  |  |
-| CH-02 | Data model v2 | IN_PROGRESS | Agent_2 | `codex/ch-02-data-model-v2-agent_2` | `prisma/**`, `src/lib/db/**`, `src/lib/**/types*` | 2026-02-17T16:35:13Z |  |  |  |  |
-| CH-05 | KPI contract + baseline freeze | TODO |  | `codex/ch-05-kpi-baseline` | `docs/**`, `src/scripts/**`, `src/lib/gse/quality*`, `.github/workflows/**` |  |  |  |  |  |
-| CH-06 | Graph quality gates | TODO |  | `codex/ch-06-graph-gates` | `src/lib/gse/**`, `src/scripts/**`, `.github/workflows/**`, `docs/**` (без `prisma/**`) |  |  |  |  |  |
-
-## 3.3) Decision Log (append-only)
-
-Записывать только решения/экстра-меры, которых не было в исходном плане.
-
-| Decision ID | Date (UTC) | CH | Owner | Decision | Why | Impacted paths | Follow-up |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| DEC-2026-02-17-001 | 2026-02-17T00:00:00Z | BOARD | system | Введён Active Task Registry + Scope lock + append-only Decision Log | Нужно безопасно запустить параллельную работу агентов без конфликтов | `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_GAP_CLOSURE_PLAN.md` | Все агенты обязаны обновлять статусы и решения в этом файле |
-| DEC-2026-02-17-002 | 2026-02-17T00:00:00Z | BOARD | system | Выбор задачи сделан универсальным (первая доступная), добавлен lock handshake через отдельный push | Чтобы агентам не назначали CH вручную и чтобы избежать double-claim одной задачи | `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_GAP_CLOSURE_PLAN.md` | Все агенты стартуют только через lock-коммит |
-| DEC-2026-02-17-003 | 2026-02-17T00:00:00Z | BOARD | system | Execution branch зафиксирована как `codex/autopilot-execution-plan`; добавлены zero-context onboarding и общий файл связи агентов | Нужны автономный запуск агентов с нулевым контекстом и рабочая коммуникация без чатов | `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_GAP_CLOSURE_PLAN.md`, `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_AGENT_SYNC.md` | Все агенты работают только через execution branch и пишут handoff/blockers в sync-файл |
-| DEC-2026-02-17-004 | 2026-02-17T00:00:00Z | BOARD | system | Добавлена обязательная изоляция через отдельные worktree/clone на агента и уточнён lock push через refspec | На одной машине параллельные агенты не должны делить один рабочий каталог | `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_GAP_CLOSURE_PLAN.md` | Каждый агент стартует из отдельного worktree пути |
-| DEC-2026-02-17-005 | 2026-02-17T00:00:00Z | CH-01 | system | Снят stale lock с CH-01 после ручной остановки агента | Нужен чистый re-claim первым новым агентом | `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_GAP_CLOSURE_PLAN.md` | CH-01 снова доступна как TODO |
+| Date (UTC) | CH | Decision |
+| --- | --- | --- |
+| 2026-02-17 | BOARD | Обновлены execution docs: реестр с `Start/End/Commits/Artifacts`, универсальный prompt v2, chat-log протокол для `AUTONOMOUS_ENGLISH_AUTOPILOT_AGENT_SYNC.md` |
+| 2026-02-17 | BOARD | Процесс упрощён: одна ветка, отдельный файл задач, отдельный файл общения, обязательная запись в общение после каждого шага |
+| 2026-02-17 | CH-01 | Интегрированы рабочие изменения из агентской ветки в `codex/autopilot-execution-plan` |
+| 2026-02-17 | CH-02 | Интегрированы рабочие изменения из агентской ветки в `codex/autopilot-execution-plan` |
 
 ## 4) Execution Board (обособленные изменения)
 
 ### A. Product Contract + Data Backbone
 
-- [ ] **CH-01 — CEFR coverage matrix contract**  
+- [x] **CH-01 — CEFR coverage matrix contract**  
   Done: есть versioned матрица `descriptor -> node -> task family -> rubric row` + тест полноты (coverage gaps = release blocker).  
   Артефакт: новый endpoint/отчёт coverage + CI check.
 
-- [ ] **CH-02 — Data model v2 (core blueprint entities)**  
+- [x] **CH-02 — Data model v2 (core blueprint entities)**  
   Done: добавлены сущности для `CausalDiagnosis`, `LearnerTwinSnapshot`, `OODTaskSpec`, `SelfRepairCycle`, `ReviewQueueItem`, `RewardTrace`, `AnchorEvalRun`.  
   Артефакт: Prisma migration + seed + schema tests.
 
@@ -350,23 +314,17 @@ Task lock handshake (обязательно перед кодом):
 ```text
 Работаем в репозитории /Users/skyeng/Desktop/duma_english.
 
-Ты автономный инженер. Цель: быстро и качественно двигать execution board к world-class продукту без деградации инвариантов.
+Ты автономный инженер. Цель: быстро и качественно двигать execution board к world-class продукту с сохранением инвариантов.
 
 Обязательная ветка исполнения:
-- coordination branch: codex/autopilot-execution-plan
-- работать в main запрещено.
+- codex/autopilot-execution-plan
 
 Обязательный протокол:
 1) Синхронизация:
    - git fetch origin
    - git checkout codex/autopilot-execution-plan
    - git pull --ff-only origin codex/autopilot-execution-plan
-2) Рабочая изоляция (одна машина, много агентов):
-   - используй отдельный worktree: /Users/skyeng/Desktop/duma_english_agents/OWNER_NAME
-   - если worktree отсутствует, создай:
-     git worktree add -b codex/agent-OWNER_NAME /Users/skyeng/Desktop/duma_english_agents/OWNER_NAME origin/codex/autopilot-execution-plan
-   - выполняй задачу только внутри этого пути.
-3) Zero-context onboarding (обязательно прочитать):
+2) Zero-context onboarding (обязательно прочитать):
    - docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md
    - docs/AUTONOMOUS_ENGLISH_AUTOPILOT_GAP_CLOSURE_PLAN.md
    - README.md
@@ -374,44 +332,37 @@ Task lock handshake (обязательно перед кодом):
    - docs/BRAIN_RUNTIME.md
    - docs/BRAIN_ROADMAP.md
    - docs/DEBUG_PLAYBOOK.md
-4) Выбор задачи (долгий горизонт):
+3) Выбор задачи (долгий горизонт):
    - в Active Task Registry (rolling queue) выбери первую строку сверху вниз, где Status=TODO и Owner пустой.
    - если свободных строк нет, добавь новую строку для следующего CH по критическому пути (раздел 3), затем выбери её.
-   - если не можешь однозначно определить следующий CH, запиши BLOCKER в agent sync file и остановись.
-5) Захват задачи (lock):
-   - обнови выбранную строку: Status=IN_PROGRESS, Owner=OWNER_NAME, Start (UTC), Branch, Scope lock.
-   - сделай отдельный lock-коммит только с этой правкой.
-   - запушь lock-коммит в origin/codex/autopilot-execution-plan:
-     git push origin HEAD:codex/autopilot-execution-plan
-   - если push не прошёл (non-fast-forward), повтори синхронизацию и заново выбери первую доступную задачу.
-6) Рабочая ветка:
-   - создай отдельную ветку от codex/autopilot-execution-plan: codex/ch-xx-short-name-owner_name
-   - всю реализацию веди в этой ветке.
-7) Реализация:
+4) Захват задачи:
+   - обнови выбранную строку: Status=IN_PROGRESS, Owner=OWNER_NAME, Start (UTC).
+   - сделай отдельный commit только с этой правкой.
+   - запушь изменение в origin/codex/autopilot-execution-plan.
+5) Шаг исполнения:
+   - перед каждым шагом читай docs/AUTONOMOUS_ENGLISH_AUTOPILOT_AGENT_SYNC.md.
+   - после каждого шага добавляй новую строку в docs/AUTONOMOUS_ENGLISH_AUTOPILOT_AGENT_SYNC.md.
+   - текст сообщения свободный; указывай Owner, CH, краткий контекст шага.
+6) Реализация:
    - выполняй полный DoD выбранного CH.
-   - изменения только в Scope lock; выход за Scope lock только после новой записи в Decision Log (append-only).
    - пиши атомарные коммиты с понятными сообщениями.
+7) Документация решений:
+   - при дополнительных технических решениях добавляй запись в раздел 3.3 Decision Log.
 8) Проверки качества:
    - прогоняй релевантные тесты/линтер/сборку для изменённых частей.
-   - фиксируй фактические результаты проверок (что запускалось и что прошло/не прошло).
-9) Межагентная связь:
-   - используй docs/AUTONOMOUS_ENGLISH_AUTOPILOT_AGENT_SYNC.md
-   - append-only записи типов INFO/BLOCKER/RISK/HANDOFF/DECISION_REF.
-10) Завершение задачи:
-   - обнови строку задачи: Status=DONE, End (UTC), PR/Commit, Artifacts, Decision IDs.
+   - фиксируй фактические результаты проверок (что запускалось и итог каждого запуска).
+9) Завершение задачи:
+   - обнови строку задачи: Status=DONE, End (UTC), Commit, Artifacts.
    - обнови чекбокс соответствующего CH в основном execution board.
-   - если были экстра-решения, добавь их в Decision Log.
    - добавь короткую HANDOFF/INFO запись в AUTONOMOUS_ENGLISH_AUTOPILOT_AGENT_SYNC.md.
-   - запушь рабочую ветку и подготовь PR в codex/autopilot-execution-plan.
-   - после merge PR синхронизируй coordination branch и только потом бери следующую задачу.
-11) Запрещено:
-   - закрывать несколько CH одним статусом;
-   - коммитить в main;
-   - пропускать lock-коммит и документацию решений.
+   - запушь изменения в origin/codex/autopilot-execution-plan.
+10) Следующий цикл:
+   - снова синхронизируй ветку.
+   - переходи к выбору следующего CH.
 
 Требование к результату:
 - полноценная реализация DoD для выбранного CH из плана;
-- production-grade качество (не MVP-черновик);
-- без поломки инвариантов;
-- с документированием всех экстра-решений через Decision Log.
+- production-grade качество;
+- сохранение инвариантов blueprint;
+- документирование всех экстра-решений через Decision Log.
 ```

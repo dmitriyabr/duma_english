@@ -4,9 +4,16 @@ import type { CEFRStage } from "@/lib/curriculum";
 import { appendAutopilotEvent } from "@/lib/autopilot/eventLog";
 import {
   evaluateAmbiguityTrigger,
+  mapTaskTypeToActionFamily,
   type AmbiguityTriggerEvaluation,
   type CausalSnapshot,
+  type PlannerActionFamily,
 } from "@/lib/causal/ambiguityTrigger";
+import {
+  evaluateCausalRemediationPolicy,
+  type CausalRemediationAlignment,
+  type CausalRemediationTrace,
+} from "@/lib/causal/remediationPolicy";
 import { getBundleNodeIdsForStageAndDomain } from "./bundles";
 import { computeDecayedMastery } from "./mastery";
 import { mapStageToGseRange } from "./utils";
@@ -151,6 +158,7 @@ type NodeState = {
 
 type CandidateScore = {
   taskType: string;
+  actionFamily: PlannerActionFamily;
   targetNodeIds: string[];
   targetNodeDescriptors: string[];
   targetNodeTypes: string[];
@@ -162,10 +170,24 @@ type CandidateScore = {
   latencyRisk: number;
   explorationBonus: number;
   verificationGain: number;
+  baseUtility: number;
+  causalRemediationAdjustment: number;
+  causalRemediationAlignment: CausalRemediationAlignment;
   utility: number;
   estimatedDifficulty: number;
   selectionReason: string;
   selectionReasonType: "weakness" | "overdue" | "uncertainty" | "verification";
+};
+
+type PlannerCausalRemediation = CausalRemediationTrace & {
+  applied: boolean;
+  policyChangedTopChoice: boolean;
+  topByBaseUtilityTaskType: string | null;
+  topByPolicyUtilityTaskType: string | null;
+  chosenTaskType: string;
+  chosenActionFamily: PlannerActionFamily;
+  chosenAdjustment: number;
+  chosenAlignment: CausalRemediationAlignment;
 };
 
 type PlannerAmbiguityTrigger = Pick<
@@ -205,6 +227,7 @@ export type PlannerDecision = {
   verificationTargetNodeIds: string[];
   primaryGoal: string;
   candidateScores: CandidateScore[];
+  causalRemediation: PlannerCausalRemediation;
   ambiguityTrigger: PlannerAmbiguityTrigger;
 };
 
@@ -831,7 +854,7 @@ function scoreCandidate(params: {
       ? 0.9
       : -0.55
     : 0;
-  const utility =
+  const baseUtility =
     expectedGain -
     engagementRisk * 1.6 -
     repetitionPenalty -
@@ -866,6 +889,7 @@ function scoreCandidate(params: {
 
   return {
     taskType: params.taskType,
+    actionFamily: mapTaskTypeToActionFamily(params.taskType),
     targetNodeIds: targetNodes.map((node) => node.nodeId),
     targetNodeDescriptors: targetNodes.map((node) => {
       const d = node.descriptor?.trim();
@@ -883,7 +907,10 @@ function scoreCandidate(params: {
     latencyRisk: round(latencyRisk),
     explorationBonus: round(explorationBonus),
     verificationGain: round(verificationGain),
-    utility: round(utility),
+    baseUtility: round(baseUtility),
+    causalRemediationAdjustment: 0,
+    causalRemediationAlignment: "neutral",
+    utility: round(baseUtility),
     estimatedDifficulty,
     selectionReason,
     selectionReasonType,
@@ -1032,7 +1059,7 @@ export async function planNextTaskDecision(params: {
     ...targetStageBundleNodeIds,
     ...(params.preferredNodeIds || []),
   ]);
-  const scored = taskTypes.map((taskType) =>
+  const baseScored = taskTypes.map((taskType) =>
     scoreCandidate({
       taskType,
       nodes: nodeStates,
@@ -1046,7 +1073,31 @@ export async function planNextTaskDecision(params: {
       recentlyTargetedNodeIds,
     })
   );
+  const remediationPolicy = evaluateCausalRemediationPolicy({
+    taskTypes: baseScored.map((row) => row.taskType),
+    causalSnapshot: params.causalSnapshot ?? null,
+  });
+  const remediationByTaskType = new Map(
+    remediationPolicy.adjustments.map((row) => [row.taskType, row] as const)
+  );
+  const scored = baseScored.map((row) => {
+    const remediation = remediationByTaskType.get(row.taskType);
+    const adjustment = remediation?.adjustment ?? 0;
+    return {
+      ...row,
+      causalRemediationAdjustment: round(adjustment),
+      causalRemediationAlignment: remediation?.alignment ?? "neutral",
+      utility: round(row.baseUtility + adjustment),
+    };
+  });
+  const topByBaseUtility = [...scored].sort((a, b) => b.baseUtility - a.baseUtility)[0] || null;
   scored.sort((a, b) => b.utility - a.utility);
+  const topByPolicyUtility = scored[0] || null;
+  const policyChangedTopChoice = Boolean(
+    topByBaseUtility &&
+      topByPolicyUtility &&
+      topByBaseUtility.taskType !== topByPolicyUtility.taskType
+  );
   const topCandidate = scored[0];
   let chosen = topCandidate;
   let rotationApplied = false;
@@ -1127,10 +1178,28 @@ export async function planNextTaskDecision(params: {
     ...ambiguityTrigger,
     applied: ambiguityTriggerApplied,
   };
+  const causalRemediationSummary: PlannerCausalRemediation = {
+    ...remediationPolicy.trace,
+    applied: remediationPolicy.trace.evaluated,
+    policyChangedTopChoice,
+    topByBaseUtilityTaskType: topByBaseUtility?.taskType || null,
+    topByPolicyUtilityTaskType: topByPolicyUtility?.taskType || null,
+    chosenTaskType: chosen.taskType,
+    chosenActionFamily: chosen.actionFamily,
+    chosenAdjustment: round(chosen.causalRemediationAdjustment),
+    chosenAlignment: chosen.causalRemediationAlignment,
+  };
   const effectiveDiagnosticMode = Boolean(params.diagnosticMode) || ambiguityTriggerApplied;
-  const finalSelectionReason = ambiguityTriggerApplied
-    ? `${chosen.selectionReason} Causal ambiguity trigger selected a diagnostic probe.`
-    : chosen.selectionReason;
+  const causalSelectionReason =
+    causalRemediationSummary.applied && Math.abs(chosen.causalRemediationAdjustment) >= 0.05
+      ? ` Cause-driven remediation (${causalRemediationSummary.topCauseLabel || "unknown"}) ` +
+        `${chosen.causalRemediationAdjustment > 0 ? "boosted" : "deprioritized"} ` +
+        `${chosen.actionFamily} by ${Math.abs(chosen.causalRemediationAdjustment)}.`
+      : "";
+  const finalSelectionReason =
+    (ambiguityTriggerApplied
+      ? `${chosen.selectionReason} Causal ambiguity trigger selected a diagnostic probe.`
+      : chosen.selectionReason) + causalSelectionReason;
   const finalSelectionReasonType: CandidateScore["selectionReasonType"] = ambiguityTriggerApplied
     ? "uncertainty"
     : chosen.selectionReasonType;
@@ -1161,6 +1230,7 @@ export async function planNextTaskDecision(params: {
         rotationApplied,
         rotationReason,
         qualityDomainFocus: params.qualityDomainFocus || null,
+        causalRemediation: causalRemediationSummary,
         ambiguityTrigger: ambiguityTriggerSummary,
         causalSnapshotUsed: params.causalSnapshot
           ? {
@@ -1193,6 +1263,9 @@ export async function planNextTaskDecision(params: {
       selectionReason: finalSelectionReason,
       primaryGoal,
       ambiguityTriggerApplied,
+      causalRemediationApplied: causalRemediationSummary.applied,
+      causalRemediationTopCause: causalRemediationSummary.topCauseLabel,
+      causalRemediationChosenAdjustment: chosen.causalRemediationAdjustment,
     } as Prisma.InputJsonValue,
   });
 
@@ -1213,6 +1286,7 @@ export async function planNextTaskDecision(params: {
     verificationTargetNodeIds,
     primaryGoal,
     candidateScores: scored,
+    causalRemediation: causalRemediationSummary,
     ambiguityTrigger: ambiguityTriggerSummary,
   };
 }

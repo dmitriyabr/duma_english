@@ -86,6 +86,7 @@ export async function POST(req: NextRequest) {
     diagnosticMode: decision.diagnosticMode,
     primaryGoal: decision.primaryGoal,
     candidateScores: decision.candidateScores,
+    causalRemediation: decision.causalRemediation,
     ambiguityTrigger: decision.ambiguityTrigger,
   });
 }

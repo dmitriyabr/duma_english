@@ -187,3 +187,34 @@ test("evaluateTaskQuality attaches perception language and code-switch signals",
 
   if (originalKey) process.env.OPENAI_API_KEY = originalKey;
 });
+
+test("evaluateTaskQuality attaches discourse pragmatics dimensions for discourse tasks", async () => {
+  const originalKey = process.env.OPENAI_API_KEY;
+  delete process.env.OPENAI_API_KEY;
+
+  const result = await evaluateTaskQuality({
+    taskType: "topic_talk",
+    taskPrompt: "Give a formal short presentation for your teacher.",
+    transcript:
+      "I think school clubs are important because they build teamwork. For example, in our debate club we practice speaking. Therefore, every class should have one. In conclusion, clubs help students and teachers.",
+    speechMetrics: { speechRate: 108, fillerCount: 0 },
+  });
+
+  const artifacts = result.taskEvaluation.artifacts as {
+    discoursePragmatics?: {
+      version?: string;
+      scores?: Record<string, number>;
+    };
+  };
+  const rubricNames = result.taskEvaluation.rubricChecks.map((check) => check.name);
+
+  assert.equal(artifacts.discoursePragmatics?.version, "discourse-pragmatics-v1");
+  assert.equal(typeof artifacts.discoursePragmatics?.scores?.argumentStructure, "number");
+  assert.equal(rubricNames.includes("argument_structure"), true);
+  assert.equal(rubricNames.includes("register_control"), true);
+  assert.equal(rubricNames.includes("turn_taking_repair"), true);
+  assert.equal(rubricNames.includes("cohesion"), true);
+  assert.equal(rubricNames.includes("audience_fit"), true);
+
+  if (originalKey) process.env.OPENAI_API_KEY = originalKey;
+});

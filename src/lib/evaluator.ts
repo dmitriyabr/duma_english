@@ -5,6 +5,10 @@ import { chatJson } from "./llm";
 import { buildSemanticEvaluationContext } from "./gse/semanticAssessor";
 import { buildVocabEvaluationContext } from "./gse/vocabRetrieval";
 import { config } from "./config";
+import {
+  evaluateDiscoursePragmatics,
+  isDiscoursePragmaticsTaskType,
+} from "./discourse/pragmatics";
 import { inferPerceptionLanguageSignals } from "./perception/languageSignals";
 
 export type RubricCheck = {
@@ -212,6 +216,53 @@ function withPerceptionLanguageSignals(taskEvaluation: TaskEvaluation, transcrip
       ...artifacts,
       languageSignals: inferPerceptionLanguageSignals({ transcript }),
     },
+  };
+}
+
+function withDiscoursePragmatics(
+  taskEvaluation: TaskEvaluation,
+  input: Pick<EvaluationInput, "taskType" | "taskPrompt" | "transcript">,
+): TaskEvaluation {
+  if (!isDiscoursePragmaticsTaskType(input.taskType)) {
+    return taskEvaluation;
+  }
+
+  const artifacts =
+    taskEvaluation.artifacts && typeof taskEvaluation.artifacts === "object"
+      ? taskEvaluation.artifacts
+      : {};
+  const assessment = evaluateDiscoursePragmatics({
+    taskType: input.taskType,
+    taskPrompt: input.taskPrompt,
+    transcript: input.transcript,
+  });
+
+  const existingCheckIds = new Set(
+    taskEvaluation.rubricChecks.map((check) => slugify(check.name || "")),
+  );
+  const addedChecks = assessment.rubricChecks.filter(
+    (check) => !existingCheckIds.has(slugify(check.name)),
+  );
+
+  return {
+    ...taskEvaluation,
+    artifacts: {
+      ...artifacts,
+      argumentScore: assessment.scores.argumentStructure,
+      registerScore: assessment.scores.registerControl,
+      coherenceScore: assessment.scores.cohesion,
+      turnTakingScore: assessment.scores.turnTakingRepair,
+      audienceFitScore: assessment.scores.audienceFit,
+      discoursePragmatics: {
+        version: assessment.version,
+        expectedRegister: assessment.expectedRegister,
+        overallScore: assessment.overallScore,
+        scores: assessment.scores,
+        passByDimension: assessment.passByDimension,
+        signals: assessment.signals,
+      },
+    },
+    rubricChecks: [...taskEvaluation.rubricChecks, ...addedChecks],
   };
 }
 
@@ -1331,9 +1382,12 @@ export async function evaluateTaskQuality(input: EvaluationInput) {
       grammarChecks: fromModel.parsed.taskEvaluation.grammarChecks || [],
       vocabChecks: fromModel.parsed.taskEvaluation.vocabChecks || [],
     };
-    const modelTaskEvaluation = withPerceptionLanguageSignals(
-      attachStructuredChecks(baseTaskEvaluation, input.transcript),
-      input.transcript
+    const modelTaskEvaluation = withDiscoursePragmatics(
+      withPerceptionLanguageSignals(
+        attachStructuredChecks(baseTaskEvaluation, input.transcript),
+        input.transcript
+      ),
+      input,
     );
     const normalizedFeedback = {
       ...fromModel.parsed.feedback,
@@ -1356,9 +1410,12 @@ export async function evaluateTaskQuality(input: EvaluationInput) {
 
   const fallback = evaluateDeterministic(input);
   const normalizedFallback = {
-    taskEvaluation: withPerceptionLanguageSignals(
-      attachStructuredChecks(fallback.taskEvaluation, input.transcript),
-      input.transcript
+    taskEvaluation: withDiscoursePragmatics(
+      withPerceptionLanguageSignals(
+        attachStructuredChecks(fallback.taskEvaluation, input.transcript),
+        input.transcript
+      ),
+      input,
     ),
     feedback: fallback.feedback,
   };

@@ -1,0 +1,75 @@
+{
+  "generatedAt": "2026-02-18T07:00:01.789Z",
+  "contractVersion": "discourse-pragmatics-benchmark-v1",
+  "engineVersion": "discourse-pragmatics-v1",
+  "windowDays": 30,
+  "totalAttempts": 181,
+  "discourseAttempts": 98,
+  "engineCoverageCount": 0,
+  "engineCoverageRate": 0,
+  "overallAgreementRate": 0.995918,
+  "dimensions": [
+    {
+      "dimension": "argumentStructure",
+      "coverageCount": 98,
+      "enginePassRate": 0.387755,
+      "adjudicatedPassRate": 0.387755,
+      "agreementRate": 1,
+      "meanAbsoluteError": 4
+    },
+    {
+      "dimension": "registerControl",
+      "coverageCount": 98,
+      "enginePassRate": 1,
+      "adjudicatedPassRate": 1,
+      "agreementRate": 1,
+      "meanAbsoluteError": 3
+    },
+    {
+      "dimension": "turnTakingRepair",
+      "coverageCount": 98,
+      "enginePassRate": 0,
+      "adjudicatedPassRate": 0,
+      "agreementRate": 1,
+      "meanAbsoluteError": 6
+    },
+    {
+      "dimension": "cohesion",
+      "coverageCount": 98,
+      "enginePassRate": 0.77551,
+      "adjudicatedPassRate": 0.765306,
+      "agreementRate": 0.989796,
+      "meanAbsoluteError": 4
+    },
+    {
+      "dimension": "audienceFit",
+      "coverageCount": 98,
+      "enginePassRate": 0.102041,
+      "adjudicatedPassRate": 0.091837,
+      "agreementRate": 0.989796,
+      "meanAbsoluteError": 3
+    }
+  ],
+  "byTaskType": [
+    {
+      "taskType": "topic_talk",
+      "count": 52,
+      "agreementRate": 0.996154
+    },
+    {
+      "taskType": "qa_prompt",
+      "count": 31,
+      "agreementRate": 1
+    },
+    {
+      "taskType": "role_play",
+      "count": 11,
+      "agreementRate": 0.981818
+    },
+    {
+      "taskType": "speech_builder",
+      "count": 4,
+      "agreementRate": 1
+    }
+  ]
+}

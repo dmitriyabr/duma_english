@@ -113,6 +113,14 @@ export async function GET(_: Request, context: AttemptRouteContext) {
     typeof taskEvaluation?.artifacts?.argumentScore === "number"
       ? taskEvaluation.artifacts.argumentScore
       : undefined;
+  const turnTakingScore =
+    typeof taskEvaluation?.artifacts?.turnTakingScore === "number"
+      ? taskEvaluation.artifacts.turnTakingScore
+      : undefined;
+  const audienceFitScore =
+    typeof taskEvaluation?.artifacts?.audienceFitScore === "number"
+      ? taskEvaluation.artifacts.audienceFitScore
+      : undefined;
   const perceptionLanguageSignals =
     taskEvaluation?.artifacts &&
     typeof taskEvaluation.artifacts.languageSignals === "object" &&
@@ -161,6 +169,18 @@ export async function GET(_: Request, context: AttemptRouteContext) {
       key: "argumentScore",
       label: "Argument",
       value: argumentScore,
+      kind: "score",
+    },
+    {
+      key: "turnTakingScore",
+      label: "Turn-taking",
+      value: turnTakingScore,
+      kind: "score",
+    },
+    {
+      key: "audienceFitScore",
+      label: "Audience fit",
+      value: audienceFitScore,
       kind: "score",
     },
     {
@@ -324,6 +344,8 @@ export async function GET(_: Request, context: AttemptRouteContext) {
         typeof taskEvaluation?.artifacts?.registerScore === "number"
           ? taskEvaluation.artifacts.registerScore
           : undefined,
+      turnTakingScore,
+      audienceFitScore,
     },
   };
   const nodeOutcomes = Array.isArray(attempt.nodeOutcomesJson)

@@ -117,6 +117,7 @@ Source baseline: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` + current code
 | CH-28 | Memory scheduler v1 | DONE | Agent_3 | 2026-02-18T05:13:41Z | 2026-02-18T05:24:41Z | `f4e0e41`, `6c387bf` | `src/lib/memory/scheduler.ts`, `src/lib/contracts/memorySchedulerDashboard.ts`, `src/lib/quality/memorySchedulerDashboard.ts`, `src/app/api/quality/memory-scheduler/route.ts`, `src/scripts/ch28_memory_scheduler_report.ts`, `docs/reports/CH28_MEMORY_SCHEDULER_REPORT.json`, `docs/CH28_MEMORY_SCHEDULER_V1.md` | Memory scheduler v1 now syncs node-level queue portfolio (`memory_fresh`, `memory_review`, transfer queue telemetry) with fragile-node priority and due-miss/latency dashboard |
 | CH-29 | 7/30/90 retention checks | IN_PROGRESS | Agent_2 | 2026-02-18T05:20:54Z |  |  |  | Added as next critical-path row while CH-27/CH-28 are in progress; implementing retention checks dashboard and counters |
 | CH-30 | Retention-aware promotion blockers | IN_PROGRESS | Agent_3 | 2026-02-18T06:30:58Z |  |  |  | Added as next critical-path row after CH-29 claim; implementing promotion blockers that enforce retention gates (7/30/90) before high-stakes stage promotion |
+| CH-31 | Perception language-id + code-switch signals | IN_PROGRESS | Agent_1 | 2026-02-18T06:35:02Z |  |  |  | Added as next critical-path row after CH-29/CH-30 claims; implementing language-id and code-switch tagging telemetry in attempt quality flow |
 
 ## 3.3) Decision Log
 

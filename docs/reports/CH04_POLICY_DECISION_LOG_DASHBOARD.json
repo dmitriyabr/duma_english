@@ -1,0 +1,28 @@
+{
+  "generatedAt": "2026-02-18T02:24:38.251Z",
+  "windowDays": 30,
+  "totalLogs": 204,
+  "validLogs": 0,
+  "invalidLogs": 204,
+  "invalidRate": 1,
+  "reasons": [
+    {
+      "reason": "missing contextSnapshotId",
+      "count": 204
+    },
+    {
+      "reason": "missing linkageAttemptId",
+      "count": 89
+    },
+    {
+      "reason": "missing linkageTaskId",
+      "count": 6
+    }
+  ],
+  "policyVersions": [
+    {
+      "policyVersion": "policy-rules-v1",
+      "count": 204
+    }
+  ]
+}

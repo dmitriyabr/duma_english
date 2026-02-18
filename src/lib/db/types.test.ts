@@ -10,6 +10,7 @@ import {
   causalDiagnosisContractSchema,
   learnerTwinSnapshotContractSchema,
   oodTaskSpecContractSchema,
+  policyDecisionLogV2ContractSchema,
   reviewQueueItemContractSchema,
   rewardTraceContractSchema,
   selfRepairCycleContractSchema,
@@ -213,6 +214,40 @@ test("autopilot event contract enforces full linkage for evidence rows", () => {
     eventType: "evidence_written",
     studentId: "stu_1",
     evidenceId: "ev_1",
+  });
+  assert.equal(failure.success, false);
+});
+
+test("policy decision log v2 contract validates candidate/preAction alignment", () => {
+  const success = policyDecisionLogV2ContractSchema.safeParse({
+    decisionLogId: "dec_1",
+    studentId: "stu_1",
+    policyVersion: "policy-rules-v1",
+    contextSnapshotId: "twin_1",
+    candidateActionSet: ["targeted_practice", "diagnostic_probe"],
+    preActionScores: {
+      targeted_practice: 0.57,
+      diagnostic_probe: 0.42,
+    },
+    propensity: 0.61,
+    activeConstraints: ["target_nodes_required", "verification_sla"],
+    linkageTaskId: "task_1",
+    linkageAttemptId: "att_1",
+    linkageSessionId: "sess_1",
+    source: "sql_trigger_v1",
+  });
+  assert.equal(success.success, true);
+
+  const failure = policyDecisionLogV2ContractSchema.safeParse({
+    decisionLogId: "dec_2",
+    studentId: "stu_1",
+    policyVersion: "policy-rules-v1",
+    candidateActionSet: ["targeted_practice", "diagnostic_probe"],
+    preActionScores: {
+      targeted_practice: 0.57,
+    },
+    activeConstraints: ["target_nodes_required"],
+    source: "sql_trigger_v1",
   });
   assert.equal(failure.success, false);
 });

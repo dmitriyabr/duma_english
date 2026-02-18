@@ -65,6 +65,7 @@ model Student {
   rewardTraces        RewardTrace[]
   autopilotEventLogs  AutopilotEventLog[]
   autopilotOutcomes   AutopilotDelayedOutcome[]
+  policyDecisionLogsV2 PolicyDecisionLogV2[]
   vocabulary          StudentVocabulary[]
   taskInstances       TaskInstance[]
 
@@ -83,6 +84,7 @@ model Task {
   taskInstance       TaskInstance?
   autopilotEventLogs AutopilotEventLog[]
   autopilotOutcomes  AutopilotDelayedOutcome[]
+  policyDecisionLogsV2 PolicyDecisionLogV2[]
 }
 
 model Attempt {
@@ -118,6 +120,7 @@ model Attempt {
   rewardTraces          RewardTrace[]
   autopilotEventLogs    AutopilotEventLog[]
   autopilotOutcomes     AutopilotDelayedOutcome[]
+  policyDecisionLogsV2  PolicyDecisionLogV2[]
 
   @@index([studentId])
   @@index([status])
@@ -494,6 +497,7 @@ model PlannerDecisionLog {
   rewardTraces        RewardTrace[]
   autopilotEventLogs  AutopilotEventLog[]
   autopilotOutcomes   AutopilotDelayedOutcome[]
+  contractV2          PolicyDecisionLogV2?
   student             Student              @relation(fields: [studentId], references: [id], onDelete: Cascade)
   taskInstance        TaskInstance?
 
@@ -592,6 +596,7 @@ model LearnerTwinSnapshot {
   createdAt               DateTime             @default(now())
   updatedAt               DateTime             @updatedAt
   plannerDecisions        PlannerDecisionLog[]
+  policyDecisionLogsV2    PolicyDecisionLogV2[]
   student                 Student              @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@index([studentId, snapshotTs])
@@ -699,6 +704,35 @@ model RewardTrace {
   @@unique([decisionLogId, rewardWindow, rewardVersion])
   @@index([studentId, createdAt])
   @@index([decisionLogId, createdAt])
+}
+
+model PolicyDecisionLogV2 {
+  id                 String             @id @default(cuid())
+  decisionLogId      String             @unique
+  studentId          String
+  policyVersion      String
+  contextSnapshotId  String?
+  candidateActionSet Json
+  preActionScores    Json
+  propensity         Float?
+  activeConstraints  String[]           @default([])
+  linkageTaskId      String?
+  linkageAttemptId   String?
+  linkageSessionId   String?
+  source             String             @default("sql_trigger_v1")
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  attempt            Attempt?           @relation(fields: [linkageAttemptId], references: [id], onDelete: SetNull)
+  contextSnapshot    LearnerTwinSnapshot? @relation(fields: [contextSnapshotId], references: [id], onDelete: SetNull)
+  decisionLog        PlannerDecisionLog @relation(fields: [decisionLogId], references: [id], onDelete: Cascade)
+  student            Student            @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  task               Task?              @relation(fields: [linkageTaskId], references: [id], onDelete: SetNull)
+
+  @@index([studentId, createdAt])
+  @@index([policyVersion, createdAt])
+  @@index([linkageTaskId, createdAt])
+  @@index([linkageAttemptId, createdAt])
+  @@index([contextSnapshotId, createdAt])
 }
 
 model AutopilotDelayedOutcome {

@@ -85,6 +85,7 @@ export const autopilotEventTypes = [
   "delayed_outcome_recorded",
   "custom",
 ] as const;
+export const policyDecisionLogSources = ["sql_trigger_v1", "runtime_v2"] as const;
 
 const nonEmptyString = z.string().trim().min(1);
 const probability = z.number().min(0).max(1);
@@ -332,6 +333,44 @@ export const autopilotEventLogContractSchema = z
     }
   );
 
+export const policyDecisionLogV2ContractSchema = z
+  .object({
+    decisionLogId: nonEmptyString,
+    studentId: nonEmptyString,
+    policyVersion: nonEmptyString,
+    contextSnapshotId: nonEmptyString.optional(),
+    candidateActionSet: z.array(nonEmptyString).min(1),
+    preActionScores: z.record(z.number()),
+    propensity: probability.optional(),
+    activeConstraints: z.array(nonEmptyString).min(1),
+    linkageTaskId: nonEmptyString.optional(),
+    linkageAttemptId: nonEmptyString.optional(),
+    linkageSessionId: nonEmptyString.optional(),
+    source: z.enum(policyDecisionLogSources).default("sql_trigger_v1"),
+  })
+  .refine(
+    (value) => {
+      for (const action of value.candidateActionSet) {
+        if (typeof value.preActionScores[action] !== "number") return false;
+      }
+      return true;
+    },
+    {
+      message: "preActionScores must contain scores for all candidateActionSet actions",
+      path: ["preActionScores"],
+    }
+  )
+  .refine(
+    (value) => {
+      if (!value.linkageAttemptId) return true;
+      return Boolean(value.linkageTaskId);
+    },
+    {
+      message: "linkageAttemptId requires linkageTaskId",
+      path: ["linkageAttemptId"],
+    }
+  );
+
 export const anchorEvalSeedRowSchema = z.object({
   id: nonEmptyString,
   policyVersion: nonEmptyString,
@@ -350,4 +389,5 @@ export type RewardTraceContract = z.infer<typeof rewardTraceContractSchema>;
 export type AnchorEvalRunContract = z.infer<typeof anchorEvalRunContractSchema>;
 export type AutopilotDelayedOutcomeContract = z.infer<typeof autopilotDelayedOutcomeContractSchema>;
 export type AutopilotEventLogContract = z.infer<typeof autopilotEventLogContractSchema>;
+export type PolicyDecisionLogV2Contract = z.infer<typeof policyDecisionLogV2ContractSchema>;
 export type AnchorEvalSeedRow = z.infer<typeof anchorEvalSeedRowSchema>;

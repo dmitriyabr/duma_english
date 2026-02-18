@@ -16,6 +16,10 @@ import { inferCausalDiagnosis } from "../lib/causal/inference";
 import { evaluateAndPersistOodTransferVerdict } from "../lib/ood/transferVerdict";
 import { syncTransferRemediationQueueForVerdict } from "../lib/ood/transferRemediationQueue";
 import { upsertSameSessionRewardTrace } from "../lib/reward/function";
+import {
+  completeImmediateSelfRepairCycle,
+  createImmediateSelfRepairCycle,
+} from "../lib/selfRepair/immediateLoop";
 
 const POLL_INTERVAL_MS = config.worker.pollIntervalMs;
 const SCORE_VERSION = "score-v3";
@@ -294,7 +298,7 @@ async function processAttempt(attemptId: string) {
   if (!attempt || !attempt.audioObjectKey || attempt.status !== ATTEMPT_STATUS.PROCESSING) return;
   const taskInstance = await prisma.taskInstance.findUnique({
     where: { taskId: attempt.taskId },
-    select: { id: true, decisionLogId: true },
+    select: { id: true, decisionLogId: true, targetNodeIds: true },
   });
 
   console.log(
@@ -494,6 +498,22 @@ async function processAttempt(attemptId: string) {
         completedAt: new Date(),
       },
     });
+    const completedImmediateRepair = await completeImmediateSelfRepairCycle({
+      attemptId: attempt.id,
+      studentId: attempt.studentId,
+      taskMeta,
+      taskEvaluation: evaluated.taskEvaluation,
+    });
+    if (completedImmediateRepair) {
+      console.log(
+        JSON.stringify({
+          event: "self_repair_immediate_completed",
+          attemptId: attempt.id,
+          cycleId: completedImmediateRepair.cycleId,
+          status: completedImmediateRepair.status,
+        })
+      );
+    }
 
     await prisma.attemptMetric.deleteMany({
       where: { attemptId: attempt.id },
@@ -651,6 +671,29 @@ async function processAttempt(attemptId: string) {
       taskEvaluation: evaluated.taskEvaluation,
       taskScore: evaluated.taskEvaluation.taskScore,
     });
+    const immediateSelfRepairCycle = await createImmediateSelfRepairCycle({
+      attemptId: attempt.id,
+      studentId: attempt.studentId,
+      taskId: attempt.taskId,
+      taskType: attempt.task.type,
+      taskPrompt: attempt.task.prompt,
+      taskMeta,
+      taskEvaluation: evaluated.taskEvaluation,
+      feedback: evaluated.feedback,
+      causeLabel: causalDiagnosis.topLabel,
+      sourceTargetNodeIds: taskInstance?.targetNodeIds || [],
+      sourceTaskInstanceId: taskInstance?.id || null,
+    });
+    if (immediateSelfRepairCycle) {
+      console.log(
+        JSON.stringify({
+          event: "self_repair_immediate_cycle_created",
+          attemptId: attempt.id,
+          cycleId: immediateSelfRepairCycle.cycleId,
+          created: immediateSelfRepairCycle.created,
+        })
+      );
+    }
     const isPlacementTask = Boolean(taskMeta.isPlacement);
     if (!isPlacementTask) {
       await prisma.learnerProfile.updateMany({

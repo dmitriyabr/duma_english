@@ -1,0 +1,15 @@
+{
+  "generatedAt": "2026-02-18T05:03:48.131Z",
+  "protocolVersion": "self-repair-immediate-v1",
+  "windowDays": 30,
+  "totalCycles": 0,
+  "immediateCompletedCount": 0,
+  "immediateCompletionRate": 0,
+  "pendingImmediateCount": 0,
+  "pendingDelayedCount": 0,
+  "completedCount": 0,
+  "escalatedCount": 0,
+  "cancelledCount": 0,
+  "medianImmediateLatencyMinutes": null,
+  "causeLabels": []
+}

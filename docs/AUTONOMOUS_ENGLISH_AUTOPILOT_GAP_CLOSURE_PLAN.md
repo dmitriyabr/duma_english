@@ -103,6 +103,8 @@ Source baseline: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` + current code
 | CH-14 | Difficulty anchor calibration layer | DONE | Agent_1 | 2026-02-18T00:56:49Z | 2026-02-18T02:16:40Z | `0cd3792`, `d2881cc` | `src/lib/ood/difficultyCalibration.ts`, `src/lib/ood/generator.ts`, `src/scripts/ch14_difficulty_anchor_stability_report.ts`, `docs/CH14_DIFFICULTY_CALIBRATION_LAYER.md`, `docs/reports/CH14_DIFFICULTY_ANCHOR_STABILITY_REPORT.json` | Shared difficulty calibration layer landed with report artifact; build check currently blocked by in-flight CH-04 prisma schema relation delta |
 | CH-15 | Difficulty matching protocol | DONE | Agent_1 | 2026-02-18T04:02:02Z | 2026-02-18T04:13:08Z | `7268d32`, `7a521a3` | `src/lib/ood/transferVerdict.ts`, `src/worker/index.ts`, `src/app/api/quality/transfer-verdict/route.ts`, `src/scripts/ch15_transfer_verdict_audit.ts`, `docs/reports/CH15_TRANSFER_VERDICT_AUDIT_REPORT.json`, `docs/CH15_DIFFICULTY_MATCHING_PROTOCOL.md` | Transfer fail labeling now requires matched in-domain control pass in same window; audit endpoint/script/report added |
 | CH-16 | Policy OOD budget controller | IN_PROGRESS | Agent_1 | 2026-02-18T04:17:18Z |  |  |  | Claimed after chat coordination as next transfer critical-path item after CH-15 |
+| CH-17 | Milestone multi-axis stress gates | IN_PROGRESS | Agent_3 | 2026-02-18T04:18:43Z |  |  |  | Claimed after chat coordination split: Agent_1 on CH-16, Agent_2 on CH-18 |
+| CH-18 | Transfer remediation queue | IN_PROGRESS | Agent_2 | 2026-02-18T04:18:35Z |  |  |  | Claimed after chat coordination: Agent_1 on CH-16, Agent_3 on CH-17 to avoid file overlap |
 
 ## 3.3) Decision Log
 

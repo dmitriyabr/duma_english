@@ -113,6 +113,7 @@ Source baseline: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` + current code
 | CH-24 | Fast-lane progression protocol | DONE | Agent_1 | 2026-02-18T04:51:16Z | 2026-02-18T05:04:04Z | `0d07693`, `c2e39cc` | `src/lib/policy/fastLane.ts`, `src/app/api/task/next/route.ts`, `src/lib/ood/budgetController.ts`, `src/lib/contracts/fastLaneCohortReport.ts`, `src/lib/quality/fastLaneCohortReport.ts`, `src/app/api/quality/fast-lane-cohort/route.ts`, `src/scripts/ch24_fast_lane_cohort_report.ts`, `docs/reports/CH24_FAST_LANE_COHORT_REPORT.json`, `docs/CH24_FAST_LANE_PROGRESSION_PROTOCOL.md` | High-confidence learners now enter fast-lane between milestone gates with reduced diagnostic density and lower OOD budget; velocity-vs-safety cohort telemetry/report added |
 | CH-25 | Mandatory immediate self-repair loop | IN_PROGRESS | Agent_3 | 2026-02-18T04:55:15Z |  |  |  | Claimed as next free critical-path item after CH-23/CH-24 are already in progress |
 | CH-26 | Delayed non-duplicate verification | IN_PROGRESS | Agent_2 | 2026-02-18T05:05:27Z |  |  |  | Added as next critical-path row after CH-25; implementing mandatory delayed verification with duplicate-family guard |
+| CH-27 | Repair budget guardrails + escalation | IN_PROGRESS | Agent_1 | 2026-02-18T05:07:43Z |  |  |  | Claimed after CH-25/CH-26 split; focus on loop budgets, deadlock detection, and escalation telemetry |
 
 ## 3.3) Decision Log
 

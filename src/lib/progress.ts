@@ -291,6 +291,8 @@ export async function getStudentProgress(studentId: string) {
       })),
       targetStageBundleProgress: projection.targetStageBundleProgress ?? [],
       stressGate: projection.stressGate,
+      retentionGate: projection.retentionGate,
+      retention: projection.retention,
     },
     blockedByNodes: projection.blockedByNodes,
     weeklyFocusReason,

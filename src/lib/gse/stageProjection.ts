@@ -4,13 +4,21 @@ import { CEFRStage, SkillKey } from "@/lib/curriculum";
 import type { MilestoneStressGateResult } from "@/lib/ood/stressGate";
 import { evaluateStudentMilestoneStressGate } from "@/lib/ood/stressGate";
 import {
-  evaluateRetentionPromotionGate,
+  evaluateRetentionPromotionGateFromRows,
+  RETENTION_PROMOTION_LOOKBACK_DAYS,
   type RetentionPromotionGateResult,
 } from "@/lib/retention/promotionGate";
+import {
+  buildRetentionConfidenceFromEvidence,
+  mapRetentionDomain,
+  mapRetentionStage,
+  type RetentionConfidenceSummary,
+} from "@/lib/retention/probes";
 import { computeStageBundleReadiness } from "./bundles";
 
 const STAGE_ORDER: CEFRStage[] = ["A0", "A1", "A2", "B1", "B2", "C1", "C2"];
 const RELIABILITY_THRESHOLD = 0.65;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 type StageBandStats = {
   stage: CEFRStage;
@@ -57,6 +65,7 @@ export type StageProjection = {
   targetStageStats: StageBandStats;
   stressGate: MilestoneStressGateResult;
   retentionGate: RetentionPromotionGateResult;
+  retention: RetentionConfidenceSummary;
   blockedByNodes: string[];
   blockedByNodeDescriptors: string[];
   blockedBundles: Array<{
@@ -346,6 +355,37 @@ async function computePronunciationScore(studentId: string): Promise<number | nu
   return Number((scores.reduce((s, v) => s + v, 0) / scores.length).toFixed(1));
 }
 
+async function loadRetentionEvidenceRows(params: {
+  studentId: string;
+  now: Date;
+}) {
+  const retentionFrom = new Date(
+    params.now.getTime() - RETENTION_PROMOTION_LOOKBACK_DAYS * DAY_MS
+  );
+  return prisma.attemptGseEvidence.findMany({
+    where: {
+      studentId: params.studentId,
+      evidenceKind: "direct",
+      createdAt: { gte: retentionFrom },
+    },
+    orderBy: [{ nodeId: "asc" }, { createdAt: "asc" }],
+    select: {
+      studentId: true,
+      nodeId: true,
+      createdAt: true,
+      score: true,
+      domain: true,
+      node: {
+        select: {
+          gseCenter: true,
+          type: true,
+          skill: true,
+        },
+      },
+    },
+  });
+}
+
 function computeDomainStages(rows: MasteryRow[], placementMode?: boolean): DomainStages {
   const vocabRows = rows.filter(r => r.node.type === "GSE_VOCAB");
   const grammarRows = rows.filter(r => r.node.type === "GSE_GRAMMAR");
@@ -366,6 +406,7 @@ export async function projectLearnerStageFromGse(
   studentId: string,
   opts?: { placementMode?: boolean }
 ): Promise<StageProjection> {
+  const now = new Date();
   const rows = await prisma.studentGseMastery.findMany({
     where: { studentId },
     include: {
@@ -402,13 +443,25 @@ export async function projectLearnerStageFromGse(
     (row) => row.stage === (promotionStage === "A0" ? "A1" : promotionStage)
   );
   const targetStageRow = bundleReadiness.stageRows.find((row) => row.stage === targetStage);
-  const stressGate = await evaluateStudentMilestoneStressGate({
-    studentId,
+  const [stressGate, retentionEvidenceRows] = await Promise.all([
+    evaluateStudentMilestoneStressGate({
+      studentId,
+      targetStage,
+    }),
+    loadRetentionEvidenceRows({
+      studentId,
+      now,
+    }),
+  ]);
+  const retentionGate = evaluateRetentionPromotionGateFromRows({
+    rows: retentionEvidenceRows.map((row) => ({
+      studentId: row.studentId,
+      nodeId: row.nodeId,
+      createdAt: row.createdAt,
+      score: row.score,
+    })),
     targetStage,
-  });
-  const retentionGate = await evaluateRetentionPromotionGate({
-    studentId,
-    targetStage,
+    now,
   });
   const toStats = (stage: CEFRStage, row?: (typeof bundleReadiness.stageRows)[number]): StageBandStats => ({
     stage,
@@ -492,7 +545,24 @@ export async function projectLearnerStageFromGse(
   const blockedByNodeDescriptors = blockedBundles.flatMap((bundle) =>
     bundle.blockers.map((item) => item.descriptor)
   );
-  const confidence = confidenceFromRows(rows);
+  const baseConfidence = confidenceFromRows(rows);
+  const retention = buildRetentionConfidenceFromEvidence({
+    baseConfidence,
+    now,
+    rows: retentionEvidenceRows.map((row) => ({
+      studentId: row.studentId,
+      nodeId: row.nodeId,
+      createdAt: row.createdAt,
+      score: row.score,
+      stage: mapRetentionStage(row.node.gseCenter),
+      domain: mapRetentionDomain({
+        domain: row.domain,
+        nodeType: row.node.type,
+        nodeSkill: row.node.skill,
+      }),
+    })),
+  }).confidence;
+  const confidence = retention.adjustedConfidence;
   const score = Number(
     (
       (targetStageRow?.coverage ?? targetStats.coverage70 ?? currentStats.coverage70 ?? 0) * 60 +
@@ -546,6 +616,7 @@ export async function projectLearnerStageFromGse(
     targetStageStats: targetStats,
     stressGate,
     retentionGate,
+    retention,
     blockedByNodes,
     blockedByNodeDescriptors,
     blockedBundles,
@@ -598,6 +669,7 @@ export async function refreshLearnerProfileFromGse(params: {
     targetStageStats: projection.targetStageStats,
     stressGate: projection.stressGate,
     retentionGate: projection.retentionGate,
+    retention: projection.retention,
     domainStages: projection.domainStages,
     pronunciationScore: projection.pronunciationScore,
   };
@@ -648,6 +720,7 @@ export async function refreshLearnerProfileFromGse(params: {
         targetStageStats: projection.targetStageStats,
         stressGate: projection.stressGate,
         retentionGate: projection.retentionGate,
+        retention: projection.retention,
         blockedByNodes: projection.blockedByNodes,
         blockedBundles: projection.blockedBundles,
         domainStages: projection.domainStages,

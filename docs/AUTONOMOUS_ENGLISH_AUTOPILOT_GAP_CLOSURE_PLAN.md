@@ -109,6 +109,7 @@ Source baseline: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` + current code
 | CH-20 | Offline replay dataset builder | IN_PROGRESS | Agent_1 | 2026-02-18T04:29:42Z |  |  |  | Claimed after CH-19 split: Agent_3 on CH-19, Agent_1 on CH-20 |
 | CH-21 | Off-policy evaluation pipeline | DONE | Agent_2 | 2026-02-18T04:32:28Z | 2026-02-18T04:41:51Z | `d6bf67b`, `3abc2b1` | `src/lib/ope/offPolicyEvaluation.ts`, `src/lib/ope/offPolicyEvaluation.test.ts`, `src/lib/contracts/opeReport.ts`, `src/app/api/quality/ope/route.ts`, `src/scripts/ch21_ope_report.ts`, `.github/workflows/ope-promotion-gate.yml`, `docs/reports/CH21_OPE_REPORT.json`, `docs/CH21_OFF_POLICY_EVALUATION_PIPELINE.md` | OPE SNIPS pipeline computes lift + bootstrap confidence bounds while excluding incomplete logs with reason counters; CI promotion-gate workflow uploads report artifact |
 | CH-22 | Learned value model in shadow mode | IN_PROGRESS | Agent_3 | 2026-02-18T04:40:08Z |  |  |  | Claimed after CH-19 closeout; CH-20 and CH-21 already in progress |
+| CH-23 | Guardrailed hybrid selector | IN_PROGRESS | Agent_2 | 2026-02-18T04:44:04Z |  |  |  | Claimed as next critical-path policy item after CH-22 claim; implementation will stay isolated from CH-22 shadow scorer paths |
 
 ## 3.3) Decision Log
 

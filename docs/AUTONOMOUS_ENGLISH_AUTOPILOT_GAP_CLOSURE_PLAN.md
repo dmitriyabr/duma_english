@@ -96,7 +96,7 @@ Source baseline: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` + current code
 | CH-07 | Causal taxonomy v1 + JSON contract | DONE | Agent_1 | 2026-02-17T22:57:40Z | 2026-02-17T23:08:19Z | `4d97c39`, `2101384` | `docs/CAUSAL_TAXONOMY_V1_CONTRACT.md`, `src/lib/db/types.ts`, `src/lib/db/types.test.ts` | Canonical taxonomy labels, strict v1 schema, and legacy payload adapter |
 | CH-08 | Causal model inference in evaluation pipeline | DONE | Agent_2 | 2026-02-17T23:00:13Z | 2026-02-17T23:20:13Z | `4879ff0`, `b95a14f` | `src/lib/causal/inference.ts`, `src/worker/index.ts`, `src/app/api/attempts/[id]/route.ts`, `src/scripts/ch08_causal_calibration_report.ts`, `docs/reports/CH08_CAUSAL_CALIBRATION_REPORT.json` | Deterministic causal inference write-path + attempt API causal payload + calibration report artifact |
 | CH-09 | Cause-attributed evidence write path | DONE | Agent_2 | 2026-02-17T23:29:33Z | 2026-02-18T00:15:30Z | `65f0e5a`, `d5bc41d` | `prisma/migrations/20260217233800_ch09_cause_attributed_evidence/migration.sql`, `src/lib/gse/evidence.ts`, `src/lib/gse/mastery.ts`, `src/scripts/ch09_cause_attribution_audit.ts`, `docs/reports/CH09_CAUSE_ATTRIBUTION_AUDIT_REPORT.json`, `docs/CH09_CAUSE_ATTRIBUTED_EVIDENCE.md` | Evidence/mastery causal attribution persisted end-to-end + audit artifact/script added |
-| CH-10 | Ambiguity trigger logic | IN_PROGRESS | Agent_2 | 2026-02-18T00:21:26Z |  |  |  | Claimed as next critical-path causal task after CH-09 completion |
+| CH-10 | Ambiguity trigger logic | DONE | Agent_2 | 2026-02-18T00:21:26Z | 2026-02-18T01:35:46Z | `d2e43f5`, `5971d52` | `src/lib/causal/ambiguityTrigger.ts`, `src/lib/causal/ambiguityTrigger.test.ts`, `src/lib/gse/planner.ts`, `src/app/api/task/next/route.ts`, `src/app/api/planner/simulate/route.ts`, `docs/CH10_AMBIGUITY_TRIGGER_LOGIC.md` | Entropy/margin/action-instability trigger integrated into planner with causal snapshot gating and test matrix |
 | CH-13 | OOD generator v1 (axis-tagged) | DONE | Agent_1 | 2026-02-17T23:13:27Z | 2026-02-17T23:39:01Z | `b4d2773`, `b218b85` | `src/lib/ood/generator.ts`, `src/app/api/task/next/route.ts`, `docs/CH13_OOD_GENERATOR_V1.md` | Deterministic OOD axis-tagged generation + OODTaskSpec persistence + API exposure |
 | CH-14 | Difficulty anchor calibration layer | IN_PROGRESS | Agent_1 | 2026-02-18T00:56:49Z |  |  |  | Claimed as next transfer-track item after CH-13 completion (independent from CH-10 files) |
 
@@ -114,6 +114,7 @@ Source baseline: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` + current code
 | 2026-02-17 | CH-07 | Для causal taxonomy v1 зафиксированы канонические labels и strict JSON contract; добавлен backward-compat adapter для legacy полей (`topCause/topP/causes`) и legacy label aliases |
 | 2026-02-17 | CH-08 | Causal inference в runtime сделан deterministic и без внешнего вызова модели: `CausalDiagnosis` upsert в worker для каждого completed attempt, выдача `results.causal` в `/api/attempts/[id]`, плюс calibration report script с агрегатами confidence/entropy/margin |
 | 2026-02-18 | CH-09 | Cause-attributed write-path привязан к `CausalDiagnosis`: `AttemptGseEvidence` и `StudentGseMastery` сохраняют top cause/probability/distribution/modelVersion; добавлен audit script `src/scripts/ch09_cause_attribution_audit.ts` с отчётом покрытия/контрактных нарушений |
+| 2026-02-18 | CH-10 | В planner добавлен ambiguity trigger по blueprint (`entropy > H_max` или `topMargin < M_min` + material action instability по utility gap): disambiguation probe включается только если реально меняет выбор действия; trigger trace пишется в `utilityJson` и отдаётся в planning API |
 | 2026-02-17 | CH-13 | OOD generator v1 добавлен в `task/next`: deterministic cadence, axis tags по task family, запись `OODTaskSpec` на каждую OOD-инъекцию и additive `oodTaskSpec` поле в API ответе |
 
 ## 4) Execution Board (обособленные изменения)
@@ -158,7 +159,7 @@ Source baseline: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` + current code
   Done: evidence и mastery хранят top cause + distribution + model version.  
   Артефакт: DB fields + audit query scripts.
 
-- [ ] **CH-10 — Ambiguity trigger logic**  
+- [x] **CH-10 — Ambiguity trigger logic**  
   Done: реализованы правила `entropy/margin/action-instability` для запуска disambiguation probes только когда это меняет решение.  
   Артефакт: unit/integration tests на trigger matrix.
 

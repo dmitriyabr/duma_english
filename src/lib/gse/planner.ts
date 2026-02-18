@@ -15,6 +15,10 @@ import {
   type CausalRemediationTrace,
 } from "@/lib/causal/remediationPolicy";
 import {
+  toInterferenceDomain,
+  type InterferenceDomain,
+} from "@/lib/localization/interferencePrior";
+import {
   evaluateShadowValueDecision,
   type ShadowValueCandidateInput,
 } from "@/lib/shadow/valueModel";
@@ -81,6 +85,101 @@ function round(value: number) {
 
 function dedupe<T>(items: T[]) {
   return Array.from(new Set(items));
+}
+
+type PlannerLanguageSignals = {
+  primaryTag: string | null;
+  tagSet: string[];
+  codeSwitchDetected: boolean;
+  homeLanguageHints: string[];
+};
+
+function asObject(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return value as Record<string, unknown>;
+}
+
+function asString(value: unknown) {
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+}
+
+function asBoolean(value: unknown) {
+  return typeof value === "boolean" ? value : false;
+}
+
+function parseLanguageSignalsFromTaskEvaluation(taskEvaluationJson: unknown): PlannerLanguageSignals | null {
+  const evaluation = asObject(taskEvaluationJson);
+  const artifacts = asObject(evaluation.artifacts);
+  const languageSignals = asObject(artifacts.languageSignals);
+  if (Object.keys(languageSignals).length === 0) return null;
+
+  const primaryTag = asString(languageSignals.primaryTag);
+  const tagSet = Array.isArray(languageSignals.tags)
+    ? Array.from(
+        new Set(
+          languageSignals.tags
+            .map((item) => asString(asObject(item).tag))
+            .filter((value): value is string => Boolean(value))
+            .map((value) => value.toLowerCase()),
+        ),
+      )
+    : [];
+  const codeSwitch = asObject(languageSignals.codeSwitch);
+  const homeLanguageHints = Array.isArray(languageSignals.homeLanguageHints)
+    ? Array.from(
+        new Set(
+          languageSignals.homeLanguageHints
+            .map((item) => asString(asObject(item).language))
+            .filter((value): value is string => Boolean(value))
+            .map((value) => value.toLowerCase()),
+        ),
+      )
+    : [];
+
+  if (tagSet.length === 0 && primaryTag) {
+    tagSet.push(primaryTag.toLowerCase());
+  }
+
+  return {
+    primaryTag: primaryTag ? primaryTag.toLowerCase() : null,
+    tagSet,
+    codeSwitchDetected: asBoolean(codeSwitch.detected),
+    homeLanguageHints,
+  };
+}
+
+function deriveLanguageSignalsFromRecentAttempts(
+  recentAttempts: Array<{ taskEvaluationJson: unknown }>,
+): PlannerLanguageSignals | null {
+  const parsed = recentAttempts
+    .map((attempt) => parseLanguageSignalsFromTaskEvaluation(attempt.taskEvaluationJson))
+    .filter((value): value is PlannerLanguageSignals => Boolean(value));
+  if (parsed.length === 0) return null;
+
+  const primaryTag = parsed[0].primaryTag;
+  const tagSet = Array.from(new Set(parsed.flatMap((row) => row.tagSet)));
+  const homeLanguageHints = Array.from(
+    new Set(parsed.flatMap((row) => row.homeLanguageHints)),
+  );
+  return {
+    primaryTag,
+    tagSet,
+    codeSwitchDetected: parsed.some((row) => row.codeSwitchDetected),
+    homeLanguageHints,
+  };
+}
+
+function domainForInterferenceFromCandidate(candidate: {
+  taskType: string;
+  domainsTargeted: DomainKey[];
+}): InterferenceDomain {
+  const dominant = candidate.domainsTargeted[0] || null;
+  if (dominant) return toInterferenceDomain(dominant);
+  const weights = taskDomainWeights(candidate.taskType);
+  const ranked = (Object.keys(weights) as DomainKey[]).sort(
+    (left, right) => weights[right] - weights[left],
+  );
+  return toInterferenceDomain(ranked[0] || "mixed");
 }
 
 /** Weighted random sample without replacement; weightFn must return > 0. */
@@ -225,6 +324,11 @@ type CandidateScore = {
   baseUtility: number;
   causalRemediationAdjustment: number;
   causalRemediationAlignment: CausalRemediationAlignment;
+  causalRemediationTemplateKey: string | null;
+  causalRemediationTemplateTitle: string | null;
+  causalRemediationTemplatePrompt: string | null;
+  causalRemediationDomain: InterferenceDomain;
+  causalRemediationInterferencePriorBoost: number;
   utility: number;
   ruleUtility?: number;
   learnedValue?: number;
@@ -245,6 +349,11 @@ type PlannerCausalRemediation = CausalRemediationTrace & {
   chosenActionFamily: PlannerActionFamily;
   chosenAdjustment: number;
   chosenAlignment: CausalRemediationAlignment;
+  chosenDomain: InterferenceDomain;
+  chosenInterferencePriorBoost: number;
+  chosenTemplateKey: string | null;
+  chosenTemplateTitle: string | null;
+  chosenTemplatePrompt: string | null;
 };
 
 type PlannerAmbiguityTrigger = Pick<
@@ -975,6 +1084,11 @@ function scoreCandidate(params: {
     baseUtility: round(baseUtility),
     causalRemediationAdjustment: 0,
     causalRemediationAlignment: "neutral",
+    causalRemediationTemplateKey: null,
+    causalRemediationTemplateTitle: null,
+    causalRemediationTemplatePrompt: null,
+    causalRemediationDomain: "mixed",
+    causalRemediationInterferencePriorBoost: 0,
     utility: round(baseUtility),
     estimatedDifficulty,
     selectionReason,
@@ -1138,8 +1252,15 @@ export async function planNextTaskDecision(params: {
       recentlyTargetedNodeIds,
     })
   );
+  const domainByTaskType = Object.fromEntries(
+    baseScored.map((row) => [row.taskType, domainForInterferenceFromCandidate(row)]),
+  );
+  const languageSignals = deriveLanguageSignalsFromRecentAttempts(recentAttempts);
   const remediationPolicy = evaluateCausalRemediationPolicy({
     taskTypes: baseScored.map((row) => row.taskType),
+    ageBand: params.ageBand ?? null,
+    domainByTaskType,
+    languageSignals,
     causalSnapshot: params.causalSnapshot ?? null,
   });
   const remediationByTaskType = new Map(
@@ -1152,6 +1273,12 @@ export async function planNextTaskDecision(params: {
       ...row,
       causalRemediationAdjustment: round(adjustment),
       causalRemediationAlignment: remediation?.alignment ?? "neutral",
+      causalRemediationTemplateKey: remediation?.templateKey ?? null,
+      causalRemediationTemplateTitle: remediation?.templateTitle ?? null,
+      causalRemediationTemplatePrompt: remediation?.templatePrompt ?? null,
+      causalRemediationDomain: remediation?.domain ?? domainForInterferenceFromCandidate(row),
+      causalRemediationInterferencePriorBoost:
+        remediation?.interferencePriorBoost ?? 0,
       utility: round(row.baseUtility + adjustment),
     };
   });
@@ -1334,6 +1461,13 @@ export async function planNextTaskDecision(params: {
     chosenActionFamily: chosen.actionFamily,
     chosenAdjustment: round(chosen.causalRemediationAdjustment),
     chosenAlignment: chosen.causalRemediationAlignment,
+    chosenDomain: chosen.causalRemediationDomain,
+    chosenInterferencePriorBoost: round(
+      chosen.causalRemediationInterferencePriorBoost,
+    ),
+    chosenTemplateKey: chosen.causalRemediationTemplateKey,
+    chosenTemplateTitle: chosen.causalRemediationTemplateTitle,
+    chosenTemplatePrompt: chosen.causalRemediationTemplatePrompt,
   };
   const effectiveDiagnosticMode = Boolean(params.diagnosticMode) || ambiguityTriggerApplied;
   const causalSelectionReason =
@@ -1342,10 +1476,14 @@ export async function planNextTaskDecision(params: {
         `${chosen.causalRemediationAdjustment > 0 ? "boosted" : "deprioritized"} ` +
         `${chosen.actionFamily} by ${Math.abs(chosen.causalRemediationAdjustment)}.`
       : "";
+  const causalTemplateReason =
+    causalRemediationSummary.applied && causalRemediationSummary.chosenTemplateKey
+      ? ` Targeted template ${causalRemediationSummary.chosenTemplateKey} selected for ${causalRemediationSummary.chosenDomain}.`
+      : "";
   const finalSelectionReason =
     (ambiguityTriggerApplied
       ? `${chosen.selectionReason} Causal ambiguity trigger selected a diagnostic probe.`
-      : chosen.selectionReason) + causalSelectionReason;
+      : chosen.selectionReason) + causalSelectionReason + causalTemplateReason;
   const finalSelectionReasonType: CandidateScore["selectionReasonType"] = ambiguityTriggerApplied
     ? "uncertainty"
     : chosen.selectionReasonType;
@@ -1427,6 +1565,8 @@ export async function planNextTaskDecision(params: {
       causalRemediationApplied: causalRemediationSummary.applied,
       causalRemediationTopCause: causalRemediationSummary.topCauseLabel,
       causalRemediationChosenAdjustment: chosen.causalRemediationAdjustment,
+      causalRemediationTemplateKey: causalRemediationSummary.chosenTemplateKey,
+      causalRemediationTemplateDomain: causalRemediationSummary.chosenDomain,
       chosenPropensity,
       activeConstraints,
       shadowPolicyEvaluated: Boolean(shadowPolicy),

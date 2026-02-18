@@ -1,0 +1,15 @@
+{
+  "generatedAt": "2026-02-18T06:50:14.838Z",
+  "priorVersion": "l1-interference-prior-v1",
+  "windowDays": 30,
+  "totalDecisionLogs": 205,
+  "causalRemediationEvaluatedCount": 0,
+  "l1TopCauseCount": 0,
+  "templatedL1Count": 0,
+  "missingTemplateForL1Count": 0,
+  "templatedL1Rate": null,
+  "ageBandBreakdown": [],
+  "domainBreakdown": [],
+  "templateBreakdown": [],
+  "causeTemplateMappings": []
+}

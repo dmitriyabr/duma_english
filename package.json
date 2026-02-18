@@ -29,6 +29,7 @@
     "self-repair:immediate:report": "tsx src/scripts/ch25_self_repair_immediate_loop_report.ts",
     "self-repair:budget": "tsx src/scripts/ch27_self_repair_budget_telemetry_report.ts",
     "language-signals:report": "tsx src/scripts/ch31_language_signal_report.ts",
+    "l1-interference:report": "tsx src/scripts/ch32_l1_interference_template_report.ts",
     "policy-log:validate": "tsx src/scripts/ch04_policy_decision_log_validator.ts",
     "transfer:verdict:audit": "tsx src/scripts/ch15_transfer_verdict_audit.ts"
   },

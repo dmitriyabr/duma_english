@@ -1,5 +1,12 @@
 import { normalizeCausalLabel, type CausalCoreLabel } from "@/lib/db/types";
 import {
+  getL1InterferencePrior,
+  L1_INTERFERENCE_PRIOR_VERSION,
+  toInterferenceDomain,
+  type InterferenceDomain,
+  type InterferenceLanguageSignals,
+} from "@/lib/localization/interferencePrior";
+import {
   mapTaskTypeToActionFamily,
   type CausalSnapshot,
   type PlannerActionFamily,
@@ -10,6 +17,10 @@ export const CAUSAL_REMEDIATION_POLICY_VERSION = "cause-remediation-v1" as const
 const DEFAULT_MAX_ABS_ADJUSTMENT = 0.9;
 const POSITIVE_ALIGNMENT_THRESHOLD = 0.14;
 const NEGATIVE_ALIGNMENT_THRESHOLD = -0.1;
+const TEMPLATE_ASSIGNMENT_MIN_PRIOR = 0.045;
+const TRANSFER_PRIOR_SCALE = 0.82;
+const TARGETED_PRIOR_SCALE = 0.46;
+const DIAGNOSTIC_PRIOR_SCALE = -0.52;
 
 type CauseWeight = {
   label: CausalCoreLabel;
@@ -21,8 +32,23 @@ export type CausalRemediationAlignment = "preferred" | "discouraged" | "neutral"
 export type CausalRemediationAdjustment = {
   taskType: string;
   actionFamily: PlannerActionFamily;
+  domain: InterferenceDomain;
   adjustment: number;
+  interferencePriorBoost: number;
+  templateKey: string | null;
+  templateTitle: string | null;
+  templatePrompt: string | null;
   alignment: CausalRemediationAlignment;
+};
+
+export type CausalRemediationTemplateRecommendation = {
+  taskType: string;
+  actionFamily: PlannerActionFamily;
+  domain: InterferenceDomain;
+  templateKey: string;
+  templateTitle: string;
+  templatePrompt: string;
+  priority: number;
 };
 
 export type CausalRemediationTrace = {
@@ -40,6 +66,13 @@ export type CausalRemediationTrace = {
     actionFamily: PlannerActionFamily;
     score: number;
   }>;
+  interferencePrior: {
+    version: string | null;
+    ageBand: string | null;
+    l1EvidenceWeight: number;
+    languageSignalScore: number | null;
+  };
+  templateRecommendations: CausalRemediationTemplateRecommendation[];
   recommendedActionFamilies: PlannerActionFamily[];
   discouragedActionFamilies: PlannerActionFamily[];
   reasonCodes: string[];
@@ -195,9 +228,29 @@ function scoreActionFamilies(weights: CauseWeight[]) {
   };
 }
 
+function l1EvidenceWeight(weights: CauseWeight[]) {
+  if (weights.length === 0) return 0;
+  const l1 = weights.find((row) => row.label === "l1_interference");
+  if (!l1 || l1.p <= 0) return 0;
+  if (weights[0]?.label === "l1_interference") {
+    return round(clamp(Math.max(l1.p, 0.45), 0, 1));
+  }
+  return round(clamp(l1.p, 0, 1));
+}
+
+function toPriorAdjustment(actionFamily: PlannerActionFamily, priorBoost: number) {
+  if (priorBoost <= 0) return 0;
+  if (actionFamily === "transfer_probe") return round(priorBoost * TRANSFER_PRIOR_SCALE);
+  if (actionFamily === "targeted_practice") return round(priorBoost * TARGETED_PRIOR_SCALE);
+  return round(priorBoost * DIAGNOSTIC_PRIOR_SCALE);
+}
+
 export function evaluateCausalRemediationPolicy(params: {
   taskTypes: string[];
   causalSnapshot?: CausalSnapshot | null;
+  ageBand?: string | null;
+  domainByTaskType?: Record<string, string | null | undefined>;
+  languageSignals?: InterferenceLanguageSignals | null;
   maxAbsAdjustment?: number;
 }): CausalRemediationPolicyResult {
   const snapshot = params.causalSnapshot ?? null;
@@ -206,11 +259,13 @@ export function evaluateCausalRemediationPolicy(params: {
   const topMargin = toFiniteOrNull(snapshot?.topMargin);
   const confidenceScale = computeConfidenceScale(snapshot);
   const actionFamilyScores = scoreActionFamilies(weights);
+  const l1PriorWeight = l1EvidenceWeight(weights);
   const maxAbsAdjustment = clamp(
     params.maxAbsAdjustment ?? DEFAULT_MAX_ABS_ADJUSTMENT,
     0,
-    2
+    2,
   );
+  const priorReasonCodes = new Set<string>();
 
   const rankedActionFamilies: Array<{
     actionFamily: PlannerActionFamily;
@@ -226,17 +281,74 @@ export function evaluateCausalRemediationPolicy(params: {
     reasonCodes.push("low_confidence_softened_adjustments");
   }
 
+  const templateRecommendations: CausalRemediationTemplateRecommendation[] = [];
+  let maxLanguageSignalScore = 0;
   const adjustments: CausalRemediationAdjustment[] = params.taskTypes.map((taskType) => {
     const actionFamily = mapTaskTypeToActionFamily(taskType);
-    const raw = actionFamilyScores[actionFamily] * confidenceScale;
+    const domain = toInterferenceDomain(params.domainByTaskType?.[taskType] || null);
+    const prior = getL1InterferencePrior({
+      ageBand: params.ageBand ?? null,
+      domain,
+      languageSignals: params.languageSignals ?? null,
+    });
+    maxLanguageSignalScore = Math.max(maxLanguageSignalScore, prior.languageSignalScore);
+    const scaledPriorBoost = round(prior.priorBoost * l1PriorWeight);
+    if (scaledPriorBoost > 0) {
+      for (const code of prior.reasonCodes) {
+        priorReasonCodes.add(code);
+      }
+    }
+    const priorActionOffset = toPriorAdjustment(actionFamily, scaledPriorBoost);
+    const raw = (actionFamilyScores[actionFamily] + priorActionOffset) * confidenceScale;
     const adjustment = round(clamp(raw, -maxAbsAdjustment, maxAbsAdjustment));
+    let templateKey: string | null = null;
+    let templateTitle: string | null = null;
+    let templatePrompt: string | null = null;
+
+    const templatePriority = round(
+      scaledPriorBoost * (actionFamily === "transfer_probe" ? 1 : 0.86),
+    );
+    if (
+      l1PriorWeight > 0 &&
+      scaledPriorBoost >= TEMPLATE_ASSIGNMENT_MIN_PRIOR &&
+      actionFamily !== "diagnostic_probe"
+    ) {
+      templateKey = prior.template.key;
+      templateTitle = prior.template.title;
+      templatePrompt = prior.template.prompt;
+      templateRecommendations.push({
+        taskType,
+        actionFamily,
+        domain,
+        templateKey,
+        templateTitle,
+        templatePrompt,
+        priority: templatePriority,
+      });
+    }
     return {
       taskType,
       actionFamily,
+      domain,
       adjustment,
+      interferencePriorBoost: scaledPriorBoost,
+      templateKey,
+      templateTitle,
+      templatePrompt,
       alignment: alignmentFromAdjustment(adjustment),
     };
   });
+  if (l1PriorWeight > 0) {
+    reasonCodes.push("l1_interference_prior_applied");
+    if (priorReasonCodes.size > 0) {
+      for (const code of priorReasonCodes) {
+        reasonCodes.push(`l1_prior:${code}`);
+      }
+    }
+  }
+  if (templateRecommendations.length > 0) {
+    reasonCodes.push("l1_interference_template_selected");
+  }
 
   const topCause = weights[0] || null;
   const trace: CausalRemediationTrace = {
@@ -254,6 +366,16 @@ export function evaluateCausalRemediationPolicy(params: {
       actionFamily: row.actionFamily,
       score: round(row.score),
     })),
+    interferencePrior: {
+      version: l1PriorWeight > 0 ? L1_INTERFERENCE_PRIOR_VERSION : null,
+      ageBand: params.ageBand || null,
+      l1EvidenceWeight: l1PriorWeight,
+      languageSignalScore:
+        l1PriorWeight > 0 ? round(maxLanguageSignalScore) : null,
+    },
+    templateRecommendations: templateRecommendations.sort(
+      (left, right) => right.priority - left.priority,
+    ),
     recommendedActionFamilies: rankedActionFamilies
       .filter((row) => row.score > 0.04)
       .map((row) => row.actionFamily),

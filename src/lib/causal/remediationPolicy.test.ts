@@ -55,6 +55,18 @@ test("rule_confusion favors targeted practice over transfer probes", () => {
 test("l1_interference boosts transfer probes and suppresses diagnostics", () => {
   const policy = evaluateCausalRemediationPolicy({
     taskTypes: TASK_TYPES,
+    ageBand: "9-11",
+    domainByTaskType: {
+      read_aloud: "grammar",
+      target_vocab: "vocab",
+      role_play: "lo",
+    },
+    languageSignals: {
+      primaryTag: "swahili",
+      tagSet: ["english", "swahili", "sheng"],
+      codeSwitchDetected: true,
+      homeLanguageHints: ["kikuyu"],
+    },
     causalSnapshot: {
       topLabel: "l1_interference",
       entropy: 0.27,
@@ -72,9 +84,15 @@ test("l1_interference boosts transfer probes and suppresses diagnostics", () => 
   const transfer = adjustmentFor(policy, "role_play");
 
   assert.equal(policy.trace.topCauseLabel, "l1_interference");
+  assert.equal(policy.trace.interferencePrior.version, "l1-interference-prior-v1");
+  assert.ok((policy.trace.interferencePrior.languageSignalScore || 0) > 0);
   assert.ok(transfer.adjustment > targeted.adjustment);
   assert.ok(transfer.adjustment > 0);
   assert.equal(transfer.alignment, "preferred");
+  assert.equal(transfer.domain, "lo");
+  assert.ok(transfer.interferencePriorBoost > 0);
+  assert.equal(typeof transfer.templateKey, "string");
+  assert.ok(policy.trace.templateRecommendations.length > 0);
   assert.ok(diagnostic.adjustment < 0);
 });
 
@@ -113,4 +131,54 @@ test("high ambiguity softens but does not erase cause-driven offsets", () => {
   assert.ok(
     uncertain.trace.reasonCodes.includes("low_confidence_softened_adjustments")
   );
+});
+
+test("language-signal priors increase template-ready transfer adjustment", () => {
+  const baseline = evaluateCausalRemediationPolicy({
+    taskTypes: ["role_play"],
+    ageBand: "12-14",
+    domainByTaskType: {
+      role_play: "lo",
+    },
+    causalSnapshot: {
+      topLabel: "l1_interference",
+      entropy: 0.38,
+      topMargin: 0.22,
+      distributionJson: [
+        { label: "l1_interference", p: 0.52 },
+        { label: "rule_confusion", p: 0.21 },
+        { label: "unknown", p: 0.27 },
+      ],
+    },
+  });
+  const enriched = evaluateCausalRemediationPolicy({
+    taskTypes: ["role_play"],
+    ageBand: "12-14",
+    domainByTaskType: {
+      role_play: "lo",
+    },
+    languageSignals: {
+      primaryTag: "sheng",
+      tagSet: ["english", "sheng"],
+      codeSwitchDetected: true,
+      homeLanguageHints: ["luo"],
+    },
+    causalSnapshot: {
+      topLabel: "l1_interference",
+      entropy: 0.38,
+      topMargin: 0.22,
+      distributionJson: [
+        { label: "l1_interference", p: 0.52 },
+        { label: "rule_confusion", p: 0.21 },
+        { label: "unknown", p: 0.27 },
+      ],
+    },
+  });
+
+  const baselineTransfer = adjustmentFor(baseline, "role_play");
+  const enrichedTransfer = adjustmentFor(enriched, "role_play");
+
+  assert.ok(enrichedTransfer.adjustment > baselineTransfer.adjustment);
+  assert.ok(enrichedTransfer.interferencePriorBoost > baselineTransfer.interferencePriorBoost);
+  assert.equal(enrichedTransfer.templateKey, "l1_discourse_repair_12_14");
 });

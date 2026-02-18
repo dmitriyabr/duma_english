@@ -114,6 +114,7 @@ Source baseline: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` + current code
 | CH-25 | Mandatory immediate self-repair loop | DONE | Agent_3 | 2026-02-18T04:55:15Z | 2026-02-18T05:09:16Z | `be1e6a9`, `c3f2502` | `src/lib/selfRepair/immediateLoop.ts`, `src/worker/index.ts`, `src/app/api/task/next/route.ts`, `src/lib/contracts/selfRepairImmediateLoopReport.ts`, `src/lib/quality/selfRepairImmediateLoopReport.ts`, `src/app/api/quality/self-repair-immediate-loop/route.ts`, `src/scripts/ch25_self_repair_immediate_loop_report.ts`, `docs/reports/CH25_SELF_REPAIR_IMMEDIATE_LOOP_REPORT.json`, `docs/CH25_MANDATORY_IMMEDIATE_SELF_REPAIR_LOOP.md` | Immediate self-repair loop now records required cycle transitions (scheduled->in_progress->completed) and enforces mandatory immediate retry telemetry/dashboard |
 | CH-26 | Delayed non-duplicate verification | IN_PROGRESS | Agent_2 | 2026-02-18T05:05:27Z |  |  |  | Added as next critical-path row after CH-25; implementing mandatory delayed verification with duplicate-family guard |
 | CH-27 | Repair budget guardrails + escalation | IN_PROGRESS | Agent_1 | 2026-02-18T05:07:43Z |  |  |  | Claimed after CH-25/CH-26 split; focus on loop budgets, deadlock detection, and escalation telemetry |
+| CH-28 | Memory scheduler v1 | IN_PROGRESS | Agent_3 | 2026-02-18T05:13:41Z |  |  |  | Added as next free critical-path row after CH-26/CH-27 in progress; implementing node-level retention queue portfolio (`fresh/review/transfer`) with fragile-node priority |
 
 ## 3.3) Decision Log
 

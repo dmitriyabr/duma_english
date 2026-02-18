@@ -13,6 +13,7 @@ import { ATTEMPT_STATUS } from "../lib/attemptStatus";
 import { evaluateSpeechRetryGate } from "../lib/speechRetryGate";
 import { evaluateTopicRetryGate } from "../lib/topicRetryGate";
 import { inferCausalDiagnosis } from "../lib/causal/inference";
+import { evaluateAndPersistOodTransferVerdict } from "../lib/ood/transferVerdict";
 
 const POLL_INTERVAL_MS = config.worker.pollIntervalMs;
 const SCORE_VERSION = "score-v3";
@@ -544,6 +545,24 @@ async function processAttempt(attemptId: string) {
             : (causalDiagnosis.counterfactual as unknown as Prisma.InputJsonValue),
       },
     });
+    const oodTransferVerdict = await evaluateAndPersistOodTransferVerdict({
+      attemptId: attempt.id,
+      studentId: attempt.studentId,
+      taskId: attempt.taskId,
+      oodTaskScore:
+        typeof evaluated.taskEvaluation.taskScore === "number" ? evaluated.taskEvaluation.taskScore : null,
+    });
+    if (oodTransferVerdict) {
+      console.log(
+        JSON.stringify({
+          event: "ood_transfer_verdict_evaluated",
+          attemptId: attempt.id,
+          oodTaskSpecId: oodTransferVerdict.oodTaskSpecId,
+          verdict: oodTransferVerdict.verdict,
+          matchedControlPass: oodTransferVerdict.matchedControlPass,
+        })
+      );
+    }
 
     await updateStudentVocabularyFromAttempt(attempt.studentId, evaluated.taskEvaluation);
     const learnerProfile = await prisma.learnerProfile.findUnique({

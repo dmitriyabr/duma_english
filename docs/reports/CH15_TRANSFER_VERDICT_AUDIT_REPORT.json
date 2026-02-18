@@ -1,0 +1,17 @@
+{
+  "generatedAt": "2026-02-18T04:09:58.218Z",
+  "protocolVersion": "transfer-difficulty-match-v1",
+  "windowDays": 30,
+  "totalOodSpecs": 0,
+  "evaluatedOodSpecs": 0,
+  "pendingOodSpecs": 0,
+  "transferPassCount": 0,
+  "candidateTransferFailCount": 0,
+  "validatedTransferFailCount": 0,
+  "unvalidatedTransferFailCount": 0,
+  "inconclusiveCount": 0,
+  "protocolViolationCount": 0,
+  "matchedControlPassRate": null,
+  "verdictBreakdown": [],
+  "axisBreakdown": []
+}

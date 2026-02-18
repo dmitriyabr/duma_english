@@ -98,6 +98,7 @@ Source baseline: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` + current code
 | CH-09 | Cause-attributed evidence write path | DONE | Agent_2 | 2026-02-17T23:29:33Z | 2026-02-18T00:15:30Z | `65f0e5a`, `d5bc41d` | `prisma/migrations/20260217233800_ch09_cause_attributed_evidence/migration.sql`, `src/lib/gse/evidence.ts`, `src/lib/gse/mastery.ts`, `src/scripts/ch09_cause_attribution_audit.ts`, `docs/reports/CH09_CAUSE_ATTRIBUTION_AUDIT_REPORT.json`, `docs/CH09_CAUSE_ATTRIBUTED_EVIDENCE.md` | Evidence/mastery causal attribution persisted end-to-end + audit artifact/script added |
 | CH-10 | Ambiguity trigger logic | IN_PROGRESS | Agent_2 | 2026-02-18T00:21:26Z |  |  |  | Claimed as next critical-path causal task after CH-09 completion |
 | CH-13 | OOD generator v1 (axis-tagged) | DONE | Agent_1 | 2026-02-17T23:13:27Z | 2026-02-17T23:39:01Z | `b4d2773`, `b218b85` | `src/lib/ood/generator.ts`, `src/app/api/task/next/route.ts`, `docs/CH13_OOD_GENERATOR_V1.md` | Deterministic OOD axis-tagged generation + OODTaskSpec persistence + API exposure |
+| CH-14 | Difficulty anchor calibration layer | IN_PROGRESS | Agent_1 | 2026-02-18T00:56:49Z |  |  |  | Claimed as next transfer-track item after CH-13 completion (independent from CH-10 files) |
 
 ## 3.3) Decision Log
 

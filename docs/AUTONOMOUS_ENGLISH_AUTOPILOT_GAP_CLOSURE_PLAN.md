@@ -108,6 +108,7 @@ Source baseline: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` + current code
 | CH-19 | Reward function v1 (versioned) | DONE | Agent_3 | 2026-02-18T04:28:12Z | 2026-02-18T04:36:18Z | `0d0a433`, `0eb1565` | `src/lib/reward/function.ts`, `src/lib/reward/function.test.ts`, `src/worker/index.ts`, `src/scripts/ch19_reward_config_registry_report.ts`, `docs/reports/CH19_REWARD_CONFIG_REGISTRY_REPORT.json`, `docs/CH19_REWARD_FUNCTION_V1.md` | Versioned reward contract `reward-composite-v1` with deterministic same-session `RewardTrace` write-path and registry/report artifact |
 | CH-20 | Offline replay dataset builder | IN_PROGRESS | Agent_1 | 2026-02-18T04:29:42Z |  |  |  | Claimed after CH-19 split: Agent_3 on CH-19, Agent_1 on CH-20 |
 | CH-21 | Off-policy evaluation pipeline | IN_PROGRESS | Agent_2 | 2026-02-18T04:32:28Z |  |  |  | Claimed after chat coordination: Agent_3 on CH-19 reward path, Agent_1 on CH-20 dataset builder |
+| CH-22 | Learned value model in shadow mode | IN_PROGRESS | Agent_3 | 2026-02-18T04:40:08Z |  |  |  | Claimed after CH-19 closeout; CH-20 and CH-21 already in progress |
 
 ## 3.3) Decision Log
 

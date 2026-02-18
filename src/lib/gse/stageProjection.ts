@@ -3,6 +3,10 @@ import { prisma } from "@/lib/db";
 import { CEFRStage, SkillKey } from "@/lib/curriculum";
 import type { MilestoneStressGateResult } from "@/lib/ood/stressGate";
 import { evaluateStudentMilestoneStressGate } from "@/lib/ood/stressGate";
+import {
+  evaluateRetentionPromotionGate,
+  type RetentionPromotionGateResult,
+} from "@/lib/retention/promotionGate";
 import { computeStageBundleReadiness } from "./bundles";
 
 const STAGE_ORDER: CEFRStage[] = ["A0", "A1", "A2", "B1", "B2", "C1", "C2"];
@@ -52,6 +56,7 @@ export type StageProjection = {
   targetStage: CEFRStage;
   targetStageStats: StageBandStats;
   stressGate: MilestoneStressGateResult;
+  retentionGate: RetentionPromotionGateResult;
   blockedByNodes: string[];
   blockedByNodeDescriptors: string[];
   blockedBundles: Array<{
@@ -401,6 +406,10 @@ export async function projectLearnerStageFromGse(
     studentId,
     targetStage,
   });
+  const retentionGate = await evaluateRetentionPromotionGate({
+    studentId,
+    targetStage,
+  });
   const toStats = (stage: CEFRStage, row?: (typeof bundleReadiness.stageRows)[number]): StageBandStats => ({
     stage,
     total: row?.bundleRows.reduce((sum, item) => sum + item.totalRequired, 0) || 0,
@@ -438,7 +447,12 @@ export async function projectLearnerStageFromGse(
     Boolean(targetStageRow?.ready);
   const stressGateBlocksPromotion =
     stressGate.required && bundlePromotionReady && !stressGate.passed;
-  const promotionReady = bundlePromotionReady && !stressGateBlocksPromotion;
+  const retentionGateBlocksPromotion =
+    retentionGate.required && bundlePromotionReady && !retentionGate.passed;
+  const promotionReady =
+    bundlePromotionReady &&
+    !stressGateBlocksPromotion &&
+    !retentionGateBlocksPromotion;
 
   const blockedBundles = [...(targetStageRow?.blockedBundles || [])];
   if (stressGateBlocksPromotion) {
@@ -454,6 +468,24 @@ export async function projectLearnerStageFromGse(
           value: stressGate.worstCaseScore ?? 0,
         },
       ],
+    });
+  }
+  if (retentionGateBlocksPromotion) {
+    blockedBundles.push({
+      bundleKey: `stage:${targetStage}:retention_gate`,
+      title: `${targetStage} retention gate`,
+      domain: "lo",
+      reason: "retention_gate_not_passed",
+      blockers: retentionGate.windows
+        .filter((window) => !window.passed)
+        .map((window) => ({
+          nodeId: `retention_gate:${targetStage}:${window.windowDays}d`,
+          descriptor:
+            window.status === "insufficient_sample"
+              ? `Retention ${window.windowDays}d has insufficient sample (${window.sampleSize}/${window.minSampleSize}).`
+              : `Retention ${window.windowDays}d pass rate ${(window.value ?? 0).toFixed(3)} is below ${retentionGate.passThreshold.toFixed(2)}.`,
+          value: window.value ?? 0,
+        })),
     });
   }
   const blockedByNodes = blockedBundles.flatMap((bundle) => bundle.blockers.map((item) => item.nodeId));
@@ -513,6 +545,7 @@ export async function projectLearnerStageFromGse(
     targetStage,
     targetStageStats: targetStats,
     stressGate,
+    retentionGate,
     blockedByNodes,
     blockedByNodeDescriptors,
     blockedBundles,
@@ -564,6 +597,7 @@ export async function refreshLearnerProfileFromGse(params: {
     currentStageStats: projection.currentStageStats,
     targetStageStats: projection.targetStageStats,
     stressGate: projection.stressGate,
+    retentionGate: projection.retentionGate,
     domainStages: projection.domainStages,
     pronunciationScore: projection.pronunciationScore,
   };
@@ -613,6 +647,7 @@ export async function refreshLearnerProfileFromGse(params: {
         currentStageStats: projection.currentStageStats,
         targetStageStats: projection.targetStageStats,
         stressGate: projection.stressGate,
+        retentionGate: projection.retentionGate,
         blockedByNodes: projection.blockedByNodes,
         blockedBundles: projection.blockedBundles,
         domainStages: projection.domainStages,

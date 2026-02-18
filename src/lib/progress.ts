@@ -45,6 +45,7 @@ function readableBundleReason(reason: string) {
     if (item === "stability") return "14-day stability is not met";
     if (item === "direct_evidence") return "not enough direct evidence";
     if (item === "stress_gate_not_passed") return "milestone multi-axis stress gate is not passed";
+    if (item === "retention_gate_not_passed") return "retention gate (7/30/90) is not passed";
     return item;
   });
   return mapped.join("; ");

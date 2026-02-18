@@ -1,0 +1,101 @@
+{
+  "generatedAt": "2026-02-18T06:36:41.399Z",
+  "gateVersion": "retention-promotion-gate-v1",
+  "windowDays": 30,
+  "totalAudits": 165,
+  "promotedCount": 10,
+  "blockedCount": 155,
+  "blockedByRetentionCount": 0,
+  "blockedByRetentionRate": 0,
+  "highStakesAuditCount": 15,
+  "highStakesRetentionBlockedCount": 0,
+  "highStakesRetentionBlockedRate": 0,
+  "missingRetentionGateContextCount": 15,
+  "reasonBreakdown": [],
+  "transitionBreakdown": [
+    {
+      "fromStage": "A0",
+      "toStage": "A0",
+      "count": 23,
+      "blockedByRetentionCount": 0
+    },
+    {
+      "fromStage": "A0",
+      "toStage": "A1",
+      "count": 14,
+      "blockedByRetentionCount": 0
+    },
+    {
+      "fromStage": "A0",
+      "toStage": "A2",
+      "count": 4,
+      "blockedByRetentionCount": 0
+    },
+    {
+      "fromStage": "A0",
+      "toStage": "C1",
+      "count": 1,
+      "blockedByRetentionCount": 0
+    },
+    {
+      "fromStage": "A1",
+      "toStage": "A1",
+      "count": 1,
+      "blockedByRetentionCount": 0
+    },
+    {
+      "fromStage": "A1",
+      "toStage": "A2",
+      "count": 2,
+      "blockedByRetentionCount": 0
+    },
+    {
+      "fromStage": "A2",
+      "toStage": "A0",
+      "count": 1,
+      "blockedByRetentionCount": 0
+    },
+    {
+      "fromStage": "A2",
+      "toStage": "A2",
+      "count": 102,
+      "blockedByRetentionCount": 0
+    },
+    {
+      "fromStage": "A2",
+      "toStage": "B1",
+      "count": 3,
+      "blockedByRetentionCount": 0
+    },
+    {
+      "fromStage": "B1",
+      "toStage": "A0",
+      "count": 1,
+      "blockedByRetentionCount": 0
+    },
+    {
+      "fromStage": "B1",
+      "toStage": "A2",
+      "count": 2,
+      "blockedByRetentionCount": 0
+    },
+    {
+      "fromStage": "B1",
+      "toStage": "B1",
+      "count": 5,
+      "blockedByRetentionCount": 0
+    },
+    {
+      "fromStage": "B1",
+      "toStage": "B2",
+      "count": 4,
+      "blockedByRetentionCount": 0
+    },
+    {
+      "fromStage": "C1",
+      "toStage": "C2",
+      "count": 2,
+      "blockedByRetentionCount": 0
+    }
+  ]
+}

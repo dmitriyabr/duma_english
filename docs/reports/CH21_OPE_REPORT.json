@@ -1,0 +1,36 @@
+{
+  "generatedAt": "2026-02-18T04:39:47.532Z",
+  "policyVersion": "ope-snips-v1",
+  "windowDays": 90,
+  "totalRows": 204,
+  "completeRows": 113,
+  "excludedRows": 91,
+  "incompleteRate": 0.446078,
+  "bootstrapSamples": 400,
+  "validBootstrapSamples": 400,
+  "exclusionReasons": [
+    {
+      "key": "missing_linkage_attempt",
+      "count": 89
+    },
+    {
+      "key": "attempt_not_completed",
+      "count": 2
+    }
+  ],
+  "policyVersions": [
+    {
+      "key": "policy-rules-v1",
+      "count": 204
+    }
+  ],
+  "metrics": {
+    "baselineValue": 0.713451,
+    "targetPolicyValue": 0.729762,
+    "lift": 0.016311,
+    "ciLower": -0.012591,
+    "ciUpper": 0.044158,
+    "effectiveSampleSize": 64.69219,
+    "targetMatchRate": 0.663717
+  }
+}

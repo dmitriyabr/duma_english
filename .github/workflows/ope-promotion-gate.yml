@@ -1,0 +1,54 @@
+name: ope-promotion-gate
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  ope-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run OPE gate report
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          mkdir -p docs/reports
+          if [ -z "${DATABASE_URL:-}" ]; then
+            ts="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+            cat > docs/reports/CH21_OPE_REPORT.json <<EOF
+            {
+              "generatedAt": "${ts}",
+              "policyVersion": "ope-snips-v1",
+              "status": "skipped",
+              "reason": "DATABASE_URL missing"
+            }
+            EOF
+            echo "DATABASE_URL missing: OPE gate skipped."
+            exit 0
+          fi
+
+          npx tsx src/scripts/ch21_ope_report.ts \
+            --window-days 90 \
+            --limit 20000 \
+            --bootstrap-samples 400 \
+            --min-complete-samples 100 \
+            --max-incomplete-rate 0.35 \
+            --output docs/reports/CH21_OPE_REPORT.json
+
+      - name: Upload OPE report artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ch21-ope-report
+          path: docs/reports/CH21_OPE_REPORT.json

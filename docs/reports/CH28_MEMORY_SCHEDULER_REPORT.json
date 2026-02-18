@@ -1,0 +1,60 @@
+{
+  "generatedAt": "2026-02-18T05:21:48.397Z",
+  "schedulerVersion": "memory-scheduler-v1",
+  "windowDays": 30,
+  "totalQueueItems": 703,
+  "openCount": 703,
+  "overdueOpenCount": 251,
+  "dueMissCount": 251,
+  "dueMissRate": 0.357041,
+  "medianResolutionLatencyHours": null,
+  "medianOpenAgeHours": 0.0001,
+  "fragileOpenCount": 502,
+  "portfolio": [
+    {
+      "portfolio": "fresh",
+      "openCount": 212,
+      "overdueOpenCount": 0,
+      "completedCount": 0,
+      "dueMissCount": 0,
+      "medianResolutionLatencyHours": null,
+      "medianOpenAgeHours": 0.0002
+    },
+    {
+      "portfolio": "review",
+      "openCount": 491,
+      "overdueOpenCount": 251,
+      "completedCount": 0,
+      "dueMissCount": 251,
+      "medianResolutionLatencyHours": null,
+      "medianOpenAgeHours": 0.0001
+    },
+    {
+      "portfolio": "transfer",
+      "openCount": 0,
+      "overdueOpenCount": 0,
+      "completedCount": 0,
+      "dueMissCount": 0,
+      "medianResolutionLatencyHours": null,
+      "medianOpenAgeHours": null
+    }
+  ],
+  "reasonBreakdown": [
+    {
+      "key": "fragile_decay_risk",
+      "count": 240
+    },
+    {
+      "key": "fresh_consolidation",
+      "count": 212
+    },
+    {
+      "key": "memory_overdue",
+      "count": 207
+    },
+    {
+      "key": "verification_due",
+      "count": 44
+    }
+  ]
+}

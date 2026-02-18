@@ -1,0 +1,18 @@
+{
+  "generatedAt": "2026-02-18T04:51:35.939Z",
+  "windowDays": 30,
+  "totalDecisions": 204,
+  "tracedDecisions": 0,
+  "traceCoverageRate": 0,
+  "disagreementRate": 0,
+  "disagreementAfterSafetyRate": 0,
+  "blockedBySafetyGuardRate": 0,
+  "averageValueGap": null,
+  "modelVersions": [],
+  "safetyCounters": {
+    "highRiskDisagreementCount": 0,
+    "verificationGuardTrips": 0,
+    "blockedBySafetyGuardCount": 0
+  },
+  "disagreementsByTaskType": []
+}

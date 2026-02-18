@@ -14,6 +14,11 @@ import {
   type CausalRemediationAlignment,
   type CausalRemediationTrace,
 } from "@/lib/causal/remediationPolicy";
+import {
+  evaluateShadowValueDecision,
+  type ShadowValueCandidateInput,
+} from "@/lib/shadow/valueModel";
+import type { ShadowPolicyTrace } from "@/lib/contracts/shadowPolicyDashboard";
 import { getBundleNodeIdsForStageAndDomain } from "./bundles";
 import { computeDecayedMastery } from "./mastery";
 import { mapStageToGseRange } from "./utils";
@@ -229,6 +234,7 @@ export type PlannerDecision = {
   candidateScores: CandidateScore[];
   causalRemediation: PlannerCausalRemediation;
   ambiguityTrigger: PlannerAmbiguityTrigger;
+  shadowPolicy: ShadowPolicyTrace | null;
 };
 
 export async function assignTaskTargetsFromCatalog(params: {
@@ -1178,6 +1184,35 @@ export async function planNextTaskDecision(params: {
     ...ambiguityTrigger,
     applied: ambiguityTriggerApplied,
   };
+  let shadowPolicy: ShadowPolicyTrace | null = null;
+  try {
+    const shadowCandidates: ShadowValueCandidateInput[] = scored.map((row) => ({
+      taskType: row.taskType,
+      actionFamily: row.actionFamily,
+      expectedGain: row.expectedGain,
+      successProbability: row.successProbability,
+      engagementRisk: row.engagementRisk,
+      latencyRisk: row.latencyRisk,
+      explorationBonus: row.explorationBonus,
+      verificationGain: row.verificationGain,
+      causalRemediationAdjustment: row.causalRemediationAdjustment,
+      baseUtility: row.baseUtility,
+      utility: row.utility,
+    }));
+    shadowPolicy = await evaluateShadowValueDecision({
+      candidates: shadowCandidates,
+      rulesChosenTaskType: chosen.taskType,
+      requiresVerificationCoverage: verificationTargetNodeIds.length > 0 && !recentVerificationHit,
+    });
+  } catch (error) {
+    console.error(
+      JSON.stringify({
+        event: "planner_shadow_policy_error",
+        studentId: params.studentId,
+        message: error instanceof Error ? error.message : String(error),
+      })
+    );
+  }
   const causalRemediationSummary: PlannerCausalRemediation = {
     ...remediationPolicy.trace,
     applied: remediationPolicy.trace.evaluated,
@@ -1241,6 +1276,7 @@ export async function planNextTaskDecision(params: {
               topMargin: params.causalSnapshot.topMargin ?? null,
             }
           : null,
+        shadowPolicy,
       } as Prisma.InputJsonValue,
       fallbackUsed: false,
       latencyMs: Date.now() - startedAt,
@@ -1266,6 +1302,9 @@ export async function planNextTaskDecision(params: {
       causalRemediationApplied: causalRemediationSummary.applied,
       causalRemediationTopCause: causalRemediationSummary.topCauseLabel,
       causalRemediationChosenAdjustment: chosen.causalRemediationAdjustment,
+      shadowPolicyEvaluated: Boolean(shadowPolicy),
+      shadowPolicyDisagreement: shadowPolicy?.disagreement ?? null,
+      shadowPolicyBlockedBySafetyGuard: shadowPolicy?.blockedBySafetyGuard ?? null,
     } as Prisma.InputJsonValue,
   });
 
@@ -1288,6 +1327,7 @@ export async function planNextTaskDecision(params: {
     candidateScores: scored,
     causalRemediation: causalRemediationSummary,
     ambiguityTrigger: ambiguityTriggerSummary,
+    shadowPolicy,
   };
 }
 

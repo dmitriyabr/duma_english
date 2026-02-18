@@ -292,6 +292,7 @@ export async function GET(req: Request) {
           createdAt: latestCausalDiagnosis.createdAt.toISOString(),
         }
       : null,
+    shadowPolicy: decision.shadowPolicy,
     oodBudgetController: oodBudgetDecision,
   };
 
@@ -435,6 +436,7 @@ export async function GET(req: Request) {
     selectionReasonType: decision.selectionReasonType,
     causalRemediation: decision.causalRemediation,
     causalAmbiguityTrigger: decision.ambiguityTrigger,
+    shadowPolicy: decision.shadowPolicy,
     verificationTargetNodeIds: decision.verificationTargetNodeIds,
     domainsTargeted: decision.domainsTargeted,
     rotationApplied: decision.rotationApplied,

@@ -15,6 +15,7 @@ import { buildTaskTemplate } from "@/lib/taskTemplates";
 import { extractReferenceText, extractRequiredWords } from "@/lib/taskText";
 import { buildGseQualityReport } from "@/lib/gse/quality";
 import { buildOodTaskSpecCandidate, buildOodTaskSpecMetadataJson } from "@/lib/ood/generator";
+import { buildDisambiguationProbePlan } from "@/lib/causal/disambiguationProbe";
 
 const ALL_TASK_TYPES = [
   "read_aloud",
@@ -153,9 +154,9 @@ export async function GET(req: Request) {
   const [recentTaskInstances, historicalTaskCount] = await Promise.all([
     prisma.taskInstance.findMany({
       where: { studentId: student.studentId },
-      include: { task: { select: { prompt: true } } },
+      include: { task: { select: { prompt: true, metaJson: true } } },
       orderBy: { createdAt: "desc" },
-      take: 5,
+      take: 16,
     }),
     prisma.taskInstance.count({
       where: { studentId: student.studentId },
@@ -164,11 +165,24 @@ export async function GET(req: Request) {
   const recentPrompts = recentTaskInstances
     .map((item) => item.task?.prompt || "")
     .filter((value) => value.length > 0);
+  const disambiguationProbePlan = buildDisambiguationProbePlan({
+    shouldTrigger: decision.ambiguityTrigger.shouldTrigger,
+    topCauseLabels: decision.ambiguityTrigger.topCauseLabels,
+    recentTasks: recentTaskInstances.map((row) => ({
+      taskType: row.taskType,
+      createdAt: row.createdAt,
+      metaJson: row.task?.metaJson || null,
+    })),
+  });
+  const selectedTaskType =
+    disambiguationProbePlan.enabled && disambiguationProbePlan.selectedTaskType
+      ? disambiguationProbePlan.selectedTaskType
+      : decision.chosenTaskType;
 
   // For target_vocab, words in the prompt MUST match planner target nodes — otherwise we penalize for words we never asked for.
   // Only use GSE_VOCAB descriptors as words; LO/grammar descriptors are sentences, not words.
   const targetWordsForPrompt =
-    decision.chosenTaskType === "target_vocab"
+    selectedTaskType === "target_vocab"
       ? (() => {
           const types = decision.targetNodeTypes ?? [];
           const fromNodes = decision.targetNodeDescriptors
@@ -185,10 +199,10 @@ export async function GET(req: Request) {
       : [];
 
   const generated = await generateTaskSpec({
-    taskType: decision.chosenTaskType,
+    taskType: selectedTaskType,
     stage: projection.promotionStage,
     ageBand: profile?.ageBand || "9-11",
-    targetWords: decision.chosenTaskType === "target_vocab" ? targetWordsForPrompt : [],
+    targetWords: selectedTaskType === "target_vocab" ? targetWordsForPrompt : [],
     targetNodeIds: decision.targetNodeIds,
     targetNodeLabels: decision.targetNodeDescriptors,
     targetNodeTypes: decision.targetNodeTypes,
@@ -200,9 +214,8 @@ export async function GET(req: Request) {
       vocab: domainStages.vocab,
       grammar: domainStages.grammar,
     },
+    disambiguationProbe: disambiguationProbePlan,
   });
-
-  const selectedTaskType = decision.chosenTaskType;
   const effectiveAssessmentMode: "pa" | "stt" = selectedTaskType === "read_aloud" ? "pa" : "stt";
   const durationCap = effectiveAssessmentMode === "pa" ? 30 : 60;
   const effectiveMaxDurationSec = Math.max(10, Math.min(durationCap, generated.maxDurationSec));
@@ -253,6 +266,8 @@ export async function GET(req: Request) {
     assessmentMode: effectiveAssessmentMode,
     maxDurationSec: effectiveMaxDurationSec,
     ambiguityTrigger: decision.ambiguityTrigger,
+    causalRemediation: decision.causalRemediation,
+    causalDisambiguationProbe: disambiguationProbePlan,
     causalSnapshotRef: latestCausalDiagnosis
       ? {
           attemptId: latestCausalDiagnosis.attemptId,
@@ -399,6 +414,7 @@ export async function GET(req: Request) {
     decisionId: decision.decisionId,
     primaryGoal: decision.primaryGoal,
     selectionReasonType: decision.selectionReasonType,
+    causalRemediation: decision.causalRemediation,
     causalAmbiguityTrigger: decision.ambiguityTrigger,
     verificationTargetNodeIds: decision.verificationTargetNodeIds,
     domainsTargeted: decision.domainsTargeted,
@@ -410,6 +426,7 @@ export async function GET(req: Request) {
     fallbackUsed: generated.fallbackUsed,
     fallbackReason: generated.fallbackReason || null,
     correctivePolicyDomain: qualityDiagnosticOverride,
+    disambiguationProbe: disambiguationProbePlan,
     targetNodeIds: gseSelection.targetNodeIds,
     targetNodeLabels,
     selectionReason: decision.selectionReason || gseSelection.selectionReason,

@@ -48,3 +48,42 @@ test("task generator with targetNodeLabels uses them in prompt and returns same 
 
   if (original) process.env.OPENAI_API_KEY = original;
 });
+
+test("task generator respects enabled disambiguation probe task override in fallback", async () => {
+  const original = process.env.OPENAI_API_KEY;
+  delete process.env.OPENAI_API_KEY;
+
+  const spec = await generateTaskSpec({
+    taskType: "read_aloud",
+    stage: "A1",
+    ageBand: "9-11",
+    targetWords: ["library", "borrow", "book"],
+    targetNodeIds: ["gse:vocab:library"],
+    focusSkills: ["vocabulary"],
+    plannerReason: "Causal ambiguity trigger selected a diagnostic probe.",
+    primaryGoal: "reduce_uncertainty",
+    disambiguationProbe: {
+      enabled: true,
+      reasonCode: "ready",
+      selectedTaskType: "target_vocab",
+      probeSkill: "vocab_retrieval",
+      templateKey: "retrieval_cue_probe",
+      topCauseLabels: ["retrieval_failure", "production_constraint"],
+      budget: {
+        sessionWindowMinutes: 90,
+        maxPerSession: 2,
+        maxPerSkillPerSession: 1,
+        maxPerCausePairPerSession: 1,
+        sessionUsed: 0,
+        skillUsed: 0,
+        causePairUsed: 0,
+      },
+    },
+  });
+
+  assert.equal(spec.fallbackUsed, true);
+  assert.equal(spec.taskType, "target_vocab");
+  assert.ok(spec.prompt.includes("library") || spec.prompt.includes("borrow"));
+
+  if (original) process.env.OPENAI_API_KEY = original;
+});

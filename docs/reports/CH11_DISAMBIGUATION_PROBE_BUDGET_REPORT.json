@@ -1,0 +1,24 @@
+{
+  "generatedAt": "2026-02-18T04:11:23.827Z",
+  "window": {
+    "days": 30,
+    "from": "2026-01-19T04:11:23.738Z"
+  },
+  "sampleSize": {
+    "taskInstances": 198,
+    "tasksWithProbeField": 0,
+    "enabledProbeTasks": 0
+  },
+  "reasonCounts": {},
+  "metrics": {
+    "enabledProbeRate": 0,
+    "sessionBudgetViolationRate": 0,
+    "skillBudgetViolationRate": 0,
+    "causePairBudgetViolationRate": 0
+  },
+  "violations": {
+    "sessionBudgetViolations": 0,
+    "skillBudgetViolations": 0,
+    "causePairBudgetViolations": 0
+  }
+}

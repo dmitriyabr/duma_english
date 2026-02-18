@@ -3,6 +3,7 @@ import { buildTaskTemplate } from "./taskTemplates";
 import { extractReferenceText, extractRequiredWords } from "./taskText";
 import { chatJson } from "./llm";
 import { config } from "./config";
+import { buildDisambiguationPromptGuidance, type DisambiguationProbePlan } from "./causal/disambiguationProbe";
 
 const generatedTaskSchema = z.object({
   task_type: z.string().min(2),
@@ -36,6 +37,7 @@ type GenerateTaskSpecInput = {
     vocab?: string;
     grammar?: string;
   };
+  disambiguationProbe?: DisambiguationProbePlan;
 };
 
 export type GeneratedTaskSpec = {
@@ -53,8 +55,16 @@ export type GeneratedTaskSpec = {
   model?: string;
 };
 
+function effectiveTaskType(input: GenerateTaskSpecInput) {
+  if (input.disambiguationProbe?.enabled && input.disambiguationProbe.selectedTaskType) {
+    return input.disambiguationProbe.selectedTaskType;
+  }
+  return input.taskType;
+}
+
 function fallbackTaskSpec(input: GenerateTaskSpecInput): GeneratedTaskSpec {
-  const template = buildTaskTemplate(input.taskType, {
+  const taskType = effectiveTaskType(input);
+  const template = buildTaskTemplate(taskType, {
     targetWords: input.targetWords,
     stage: input.stage,
     reason: input.plannerReason,
@@ -97,7 +107,7 @@ function fallbackTaskSpec(input: GenerateTaskSpecInput): GeneratedTaskSpec {
       "Speak in 4 steps: topic, idea, example, ending.",
     ],
   };
-  const variants = fallbackVariants[input.taskType] || [];
+  const variants = fallbackVariants[taskType] || [];
   const selectedPrompt = variants.find((candidate) => !isTooSimilarPrompt(candidate, input.recentPrompts || []));
   const prompt = selectedPrompt || template.prompt;
   return {
@@ -200,7 +210,8 @@ function isTooSimilarPrompt(prompt: string, recentPrompts: string[]) {
 }
 
 function taskTypeQualityGuidance(input: GenerateTaskSpecInput) {
-  if (input.taskType === "read_aloud") {
+  const taskType = effectiveTaskType(input);
+  if (taskType === "read_aloud") {
     return [
       "Task quality rules for read_aloud:",
       "1) Instruction must contain one exact sentence in quotes.",
@@ -209,7 +220,7 @@ function taskTypeQualityGuidance(input: GenerateTaskSpecInput) {
       "4) Format exactly: Read this aloud clearly: '...'.",
     ];
   }
-  if (input.taskType === "target_vocab") {
+  if (taskType === "target_vocab") {
     return [
       "Task quality rules for target_vocab:",
       "1) Include explicit word list in instruction.",
@@ -217,7 +228,7 @@ function taskTypeQualityGuidance(input: GenerateTaskSpecInput) {
       "3) Keep task concrete and child-friendly.",
     ];
   }
-  if (input.taskType === "speech_builder") {
+  if (taskType === "speech_builder") {
     return [
       "Task quality rules for speech_builder:",
       "1) Use child wording: topic, main idea, one example, clear ending.",
@@ -232,12 +243,13 @@ function taskTypeQualityGuidance(input: GenerateTaskSpecInput) {
 }
 
 function validatePromptQuality(spec: GeneratedTaskSpec, input: GenerateTaskSpecInput) {
+  const taskType = effectiveTaskType(input);
   const prompt = (spec.prompt || "").trim();
   if (!prompt) return { ok: false, reason: "empty_prompt" };
   if (includesBannedPhrase(prompt)) return { ok: false, reason: "banned_generic_phrase" };
   if (countWords(prompt) < 6) return { ok: false, reason: "prompt_too_short" };
 
-  if (input.taskType === "read_aloud") {
+  if (taskType === "read_aloud") {
     const reference = extractReferenceText(prompt);
     if (!reference) return { ok: false, reason: "missing_reference_text" };
     const words = countWords(reference);
@@ -247,7 +259,7 @@ function validatePromptQuality(spec: GeneratedTaskSpec, input: GenerateTaskSpecI
     }
   }
 
-  if (input.taskType === "target_vocab" && input.targetWords.length >= 2) {
+  if (taskType === "target_vocab" && input.targetWords.length >= 2) {
     const parsedWords = extractRequiredWords(prompt);
     const provided = new Set(input.targetWords.map((w) => w.toLowerCase().trim()));
     const overlap = parsedWords.filter((w) => provided.has(w)).length;
@@ -264,7 +276,7 @@ function normalizeGeneratedPayload(
 ): GeneratedTaskSpec | null {
   if (!payload || typeof payload !== "object") return null;
   const row = payload as Record<string, unknown>;
-  const taskType = input.taskType;
+  const taskType = effectiveTaskType(input);
   const instruction =
     typeof row.instruction === "string" && row.instruction.trim().length >= 20
       ? row.instruction.trim()
@@ -302,8 +314,9 @@ export async function generateTaskSpec(input: GenerateTaskSpecInput): Promise<Ge
   const apiKey = config.openai.apiKey;
   const model = config.openai.model;
   const fallback = fallbackTaskSpec(input);
+  const taskType = effectiveTaskType(input);
   if (!apiKey) {
-    console.warn(JSON.stringify({ event: "task_gen_fallback", reason: "no_openai_api_key", taskType: input.taskType }));
+    console.warn(JSON.stringify({ event: "task_gen_fallback", reason: "no_openai_api_key", taskType }));
     return fallback;
   }
 
@@ -346,7 +359,7 @@ export async function generateTaskSpec(input: GenerateTaskSpecInput): Promise<Ge
     "Keep instruction under 45 words.",
     `Stage: ${input.stage}`,
     `Age band: ${input.ageBand}`,
-    `Task type required: ${input.taskType}`,
+    `Task type required: ${taskType}`,
     `Primary goal: ${input.primaryGoal}`,
     ...domainLevelLines,
     ...(wordsLine ? [wordsLine] : []),
@@ -354,10 +367,27 @@ export async function generateTaskSpec(input: GenerateTaskSpecInput): Promise<Ge
     `Focus skills: ${input.focusSkills.join(", ") || "speaking"}`,
     `Planner reason: ${input.plannerReason}`,
     `Avoid repeating recent prompts: ${(input.recentPrompts || []).slice(0, 5).join(" || ") || "none"}`,
-    input.taskType === "read_aloud"
+    taskType === "read_aloud"
       ? "For read_aloud: instruction MUST include exact text to read in quotes, e.g. Read this aloud clearly: '...'."
       : "For non-read_aloud: do not ask learner to read a reference sentence.",
     ...taskTypeQualityGuidance(input),
+    ...buildDisambiguationPromptGuidance(input.disambiguationProbe || {
+      enabled: false,
+      reasonCode: "not_triggered",
+      selectedTaskType: null,
+      probeSkill: null,
+      templateKey: null,
+      topCauseLabels: ["unknown", "unknown"],
+      budget: {
+        sessionWindowMinutes: 0,
+        maxPerSession: 0,
+        maxPerSkillPerSession: 0,
+        maxPerCausePairPerSession: 0,
+        sessionUsed: 0,
+        skillUsed: 0,
+        causePairUsed: 0,
+      },
+    }),
   ].join("\n");
 
   const systemContent =
@@ -371,27 +401,27 @@ export async function generateTaskSpec(input: GenerateTaskSpecInput): Promise<Ge
       maxTokens: 420,
     });
     if (!content || !content.trim()) {
-      console.warn(JSON.stringify({ event: "task_gen_fallback", reason: "openai_empty_content", taskType: input.taskType }));
+      console.warn(JSON.stringify({ event: "task_gen_fallback", reason: "openai_empty_content", taskType }));
       return { ...fallback, fallbackReason: "openai_empty_content" };
     }
     const json = JSON.parse(content);
     const normalized = normalizeGeneratedPayload(json, input, fallback);
     if (!normalized) {
-      console.warn(JSON.stringify({ event: "task_gen_fallback", reason: "openai_invalid_payload", taskType: input.taskType }));
+      console.warn(JSON.stringify({ event: "task_gen_fallback", reason: "openai_invalid_payload", taskType }));
       return { ...fallback, fallbackReason: "openai_invalid_payload" };
     }
     if (normalized.taskType === "read_aloud" && !extractReferenceText(normalized.prompt)) {
-      console.warn(JSON.stringify({ event: "task_gen_fallback", reason: "openai_missing_read_aloud_reference", taskType: input.taskType }));
+      console.warn(JSON.stringify({ event: "task_gen_fallback", reason: "openai_missing_read_aloud_reference", taskType }));
       return { ...fallback, fallbackReason: "openai_missing_read_aloud_reference" };
     }
     if (isTooSimilarPrompt(normalized.prompt, input.recentPrompts || [])) {
-      console.warn(JSON.stringify({ event: "task_gen_fallback", reason: "openai_repeated_prompt", taskType: input.taskType }));
+      console.warn(JSON.stringify({ event: "task_gen_fallback", reason: "openai_repeated_prompt", taskType }));
       return { ...fallback, fallbackReason: "openai_repeated_prompt" };
     }
     const quality = validatePromptQuality(normalized, input);
     if (!quality.ok) {
       const reason = `openai_low_quality_${quality.reason || "prompt"}`;
-      console.warn(JSON.stringify({ event: "task_gen_fallback", reason, taskType: input.taskType }));
+      console.warn(JSON.stringify({ event: "task_gen_fallback", reason, taskType }));
       return { ...fallback, fallbackReason: reason };
     }
     const parsed = generatedTaskSchema.parse({
@@ -421,7 +451,7 @@ export async function generateTaskSpec(input: GenerateTaskSpecInput): Promise<Ge
     console.warn(JSON.stringify({
       event: "task_gen_fallback",
       reason: "openai_exception",
-      taskType: input.taskType,
+      taskType,
       error: err instanceof Error ? err.message : String(err),
     }));
     return { ...fallback, fallbackReason: "openai_exception" };

@@ -81,6 +81,8 @@ As of 2026-02-14:
 - Planner now applies causal ambiguity trigger (`entropy/margin/action-gap`) and surfaces `causalAmbiguityTrigger` in task planning responses.
 - `GET /api/quality/transfer-verdict` audits CH-15 difficulty matching protocol and flags transfer-fail validation violations.
 - `GET /api/quality/ood-budget` reports per-learner CH-16 OOD budget telemetry (realized injection rate vs target 10-20% band).
+- `npm run replay:dataset` builds CH-20 offline replay dataset artifact (`context -> action -> delayed outcome`) and completeness report.
+- `GET /api/quality/replay-dataset-completeness` exposes CH-20 completeness stats for replay eligibility monitoring.
 
 ## Placement Architecture (Current)
 

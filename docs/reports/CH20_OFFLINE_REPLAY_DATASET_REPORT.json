@@ -1,0 +1,24 @@
+{
+  "generatedAt": "2026-02-18T04:45:02.704Z",
+  "datasetVersion": "offline-replay-dataset-v1",
+  "windowDays": 30,
+  "eventLimit": 50000,
+  "decisionLimit": 5000,
+  "summary": {
+    "totalEvents": 0,
+    "totalDecisionGroups": 0,
+    "completeRows": 0,
+    "incompleteRows": 0,
+    "completenessRate": 0,
+    "eventTypeCounts": {},
+    "missing": {
+      "missingDecisionEvent": 0,
+      "missingTaskInstanceEvent": 0,
+      "missingAttemptEvent": 0,
+      "missingDelayedOutcomeEvent": 0,
+      "missingOutcomePayload": 0,
+      "missingLinkage": 0
+    }
+  },
+  "incompleteSamples": []
+}

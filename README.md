@@ -84,6 +84,9 @@ As of 2026-02-14:
 - `GET /api/quality/shadow-policy` reports CH-22 shadow value-model disagreement/safety telemetry without affecting learner-facing policy decisions.
 - `npm run replay:dataset` builds CH-20 offline replay dataset artifact (`context -> action -> delayed outcome`) and completeness report.
 - `GET /api/quality/replay-dataset-completeness` exposes CH-20 completeness stats for replay eligibility monitoring.
+- `GET /api/task/next` now includes CH-24 `fastLane` trace and applies fast-lane throttling (lower diagnostic density + reduced OOD budget rate for eligible learners).
+- `GET /api/quality/fast-lane-cohort` and `npm run fast-lane:cohort` provide CH-24 velocity-vs-safety cohort telemetry.
+- `GET /api/quality/self-repair-immediate-loop` and `npm run self-repair:immediate:report` provide CH-25 immediate self-repair loop completion telemetry.
 
 ## Placement Architecture (Current)
 

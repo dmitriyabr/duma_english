@@ -1,0 +1,38 @@
+{
+  "generatedAt": "2026-02-18T04:59:38.846Z",
+  "protocolVersion": "fast-lane-progression-v1",
+  "windowDays": 30,
+  "totalLearners": 6,
+  "totalTasks": 198,
+  "cohorts": [
+    {
+      "cohort": "fast_lane",
+      "learners": 0,
+      "tasks": 0,
+      "tasksPerLearnerPerDay": 0,
+      "medianInterTaskHours": null,
+      "diagnosticTaskRate": 0,
+      "oodInjectionRate": 0,
+      "transferFailRate": null,
+      "needsRetryRate": null
+    },
+    {
+      "cohort": "standard",
+      "learners": 6,
+      "tasks": 198,
+      "tasksPerLearnerPerDay": 1.1,
+      "medianInterTaskHours": 0.0345,
+      "diagnosticTaskRate": 0.207071,
+      "oodInjectionRate": 0,
+      "transferFailRate": null,
+      "needsRetryRate": 0.008696
+    }
+  ],
+  "deltas": {
+    "velocityLiftVsStandard": -1,
+    "diagnosticRateDelta": -0.207071,
+    "oodInjectionRateDelta": 0,
+    "transferFailRateDelta": null,
+    "needsRetryRateDelta": null
+  }
+}

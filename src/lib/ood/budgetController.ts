@@ -17,6 +17,8 @@ export type OodBudgetDecision = {
   shouldInject: boolean;
   milestonePressure: boolean;
   overfitRisk: boolean;
+  fastLaneApplied: boolean;
+  fastLaneProtocolVersion: string | null;
   reasons: string[];
   recentStats: {
     evaluatedOodCount: number;
@@ -57,6 +59,11 @@ export function computeOodBudgetDecision(params: {
   selectionReasonType: string;
   primaryGoal?: string | null;
   recentSignals?: OodBudgetSignal[];
+  fastLane?: {
+    eligible: boolean;
+    oodBudgetRateDelta: number;
+    protocolVersion?: string | null;
+  } | null;
 }): OodBudgetDecision {
   const recentSignals = params.recentSignals || [];
   let passCount = 0;
@@ -96,6 +103,13 @@ export function computeOodBudgetDecision(params: {
     reasons.push("overfit_risk");
   }
 
+  let fastLaneApplied = false;
+  if (params.fastLane?.eligible === true && Number.isFinite(params.fastLane.oodBudgetRateDelta)) {
+    budgetRate += params.fastLane.oodBudgetRateDelta;
+    fastLaneApplied = true;
+    reasons.push("fast_lane");
+  }
+
   budgetRate = clamp(budgetRate, OOD_BUDGET_MIN_RATE, OOD_BUDGET_MAX_RATE);
   const interval = Math.max(5, Math.min(10, Math.round(1 / budgetRate)));
   const shouldInject = params.taskOrdinal > 0 && params.taskOrdinal % interval === 0;
@@ -108,6 +122,8 @@ export function computeOodBudgetDecision(params: {
     shouldInject,
     milestonePressure,
     overfitRisk,
+    fastLaneApplied,
+    fastLaneProtocolVersion: params.fastLane?.protocolVersion || null,
     reasons,
     recentStats: {
       evaluatedOodCount,

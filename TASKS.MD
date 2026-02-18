@@ -174,3 +174,4 @@ Authoritative docs are in:
 11. `docs/CH15_DIFFICULTY_MATCHING_PROTOCOL.md` (OOD transfer fail validation via matched in-domain control + transfer verdict audit endpoint)
 12. `docs/CH16_POLICY_OOD_BUDGET_CONTROLLER.md` (dynamic OOD budget controller + per-learner budget telemetry endpoint/report)
 13. `docs/CH20_OFFLINE_REPLAY_DATASET_BUILDER.md` (offline replay dataset builder + completeness contract/report endpoint)
+14. `docs/CH24_FAST_LANE_PROGRESSION_PROTOCOL.md` (fast-lane progression protocol + velocity/safety cohort telemetry)

@@ -25,6 +25,8 @@
     "reward:registry": "tsx src/scripts/ch19_reward_config_registry_report.ts",
     "replay:dataset": "tsx src/scripts/ch20_offline_replay_dataset_report.ts",
     "shadow:dashboard": "tsx src/scripts/ch22_shadow_policy_dashboard_report.ts",
+    "fast-lane:cohort": "tsx src/scripts/ch24_fast_lane_cohort_report.ts",
+    "self-repair:immediate:report": "tsx src/scripts/ch25_self_repair_immediate_loop_report.ts",
     "policy-log:validate": "tsx src/scripts/ch04_policy_decision_log_validator.ts",
     "transfer:verdict:audit": "tsx src/scripts/ch15_transfer_verdict_audit.ts"
   },

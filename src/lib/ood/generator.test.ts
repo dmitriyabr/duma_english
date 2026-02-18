@@ -60,6 +60,8 @@ test("OOD candidate uses budget interval from controller decision", () => {
       shouldInject: true,
       milestonePressure: true,
       overfitRisk: false,
+      fastLaneApplied: false,
+      fastLaneProtocolVersion: null,
       reasons: ["base", "milestone_pressure"],
       recentStats: {
         evaluatedOodCount: 0,

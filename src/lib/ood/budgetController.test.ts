@@ -59,3 +59,23 @@ test("computeOodBudgetDecision clamps at max budget when both risk signals are a
   assert.equal(decision.interval, 5);
   assert.equal(decision.shouldInject, true);
 });
+
+test("computeOodBudgetDecision reduces budget when fast-lane is eligible", () => {
+  const decision = computeOodBudgetDecision({
+    taskOrdinal: 8,
+    selectionReasonType: "weakness",
+    primaryGoal: "lift_weak_nodes",
+    recentSignals: [],
+    fastLane: {
+      eligible: true,
+      oodBudgetRateDelta: -0.02,
+      protocolVersion: "fast-lane-progression-v1",
+    },
+  });
+
+  assert.equal(decision.fastLaneApplied, true);
+  assert.equal(decision.fastLaneProtocolVersion, "fast-lane-progression-v1");
+  assert.equal(decision.budgetRate, 0.12);
+  assert.equal(decision.interval, 8);
+  assert.equal(decision.shouldInject, true);
+});

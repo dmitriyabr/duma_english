@@ -17,6 +17,15 @@ import { buildGseQualityReport } from "@/lib/gse/quality";
 import { buildOodTaskSpecCandidate, buildOodTaskSpecMetadataJson } from "@/lib/ood/generator";
 import { buildDisambiguationProbePlan } from "@/lib/causal/disambiguationProbe";
 import { computeOodBudgetDecision } from "@/lib/ood/budgetController";
+import {
+  applyFastLaneToDiagnosticMode,
+  evaluateFastLaneDecision,
+} from "@/lib/policy/fastLane";
+import {
+  buildImmediateSelfRepairPrompt,
+  findPendingImmediateSelfRepairCycle,
+  SELF_REPAIR_IMMEDIATE_LOOP_VERSION,
+} from "@/lib/selfRepair/immediateLoop";
 
 const ALL_TASK_TYPES = [
   "read_aloud",
@@ -77,6 +86,7 @@ export async function GET(req: Request) {
     },
   });
   const projection = await projectLearnerStageFromGse(student.studentId);
+  const pendingImmediateSelfRepair = await findPendingImmediateSelfRepairCycle(student.studentId);
   const latestCausalDiagnosis = await prisma.causalDiagnosis.findFirst({
     where: { studentId: student.studentId },
     orderBy: { createdAt: "desc" },
@@ -110,8 +120,18 @@ export async function GET(req: Request) {
   const targetWords = vocabDue.map((item) => item.lemma.toLowerCase());
 
   const coldStartActive = Boolean(profile?.coldStartActive ?? true);
+  const fastLaneDecision = evaluateFastLaneDecision({
+    projectionConfidence: projection.confidence,
+    placementConfidence: projection.placementConfidence,
+    placementUncertainty: projection.placementUncertainty,
+    promotionReady: projection.promotionReady,
+    stressGateRequired: projection.stressGate.required,
+    targetStageCoverage70: projection.targetStageStats.coverage70,
+    coldStartActive,
+    placementFresh: Boolean(profile?.placementFresh),
+  });
   let qualityDiagnosticOverride: "vocab" | "grammar" | "lo" | null = null;
-  if (Math.random() < 0.2) {
+  if (!fastLaneDecision.reduceDiagnosticDensity && Math.random() < 0.2) {
     try {
       const quality = await buildGseQualityReport();
       if (quality.correctivePolicy.active) {
@@ -121,8 +141,13 @@ export async function GET(req: Request) {
       // keep runtime path resilient even if quality report fails
     }
   }
-  const diagnosticMode =
+  const baseDiagnosticMode =
     coldStartActive || Boolean(profile?.placementFresh) || projection.placementUncertainty > 0.38;
+  const effectiveRequestedType = pendingImmediateSelfRepair?.sourceTaskType || requestedType;
+  const diagnosticMode = applyFastLaneToDiagnosticMode(
+    baseDiagnosticMode || Boolean(qualityDiagnosticOverride),
+    fastLaneDecision
+  );
   const plannerStartedAt = Date.now();
   const domainStages = {
     vocab: projection.domainStages.vocab.stage,
@@ -134,10 +159,17 @@ export async function GET(req: Request) {
     stage: projection.promotionStage,
     ageBand: profile?.ageBand || "9-11",
     candidateTaskTypes:
-      requestedType && requestedType.length > 0 ? [requestedType, ...ALL_TASK_TYPES] : ALL_TASK_TYPES,
-    requestedType,
-    diagnosticMode: diagnosticMode || Boolean(qualityDiagnosticOverride),
-    preferredNodeIds: profile?.placementFresh ? placementUncertainNodes : undefined,
+      effectiveRequestedType && effectiveRequestedType.length > 0
+        ? [effectiveRequestedType, ...ALL_TASK_TYPES]
+        : ALL_TASK_TYPES,
+    requestedType: effectiveRequestedType,
+    diagnosticMode,
+    preferredNodeIds:
+      pendingImmediateSelfRepair?.sourceTargetNodeIds && pendingImmediateSelfRepair.sourceTargetNodeIds.length > 0
+        ? pendingImmediateSelfRepair.sourceTargetNodeIds
+        : profile?.placementFresh
+        ? placementUncertainNodes
+        : undefined,
     qualityDomainFocus: qualityDiagnosticOverride,
     domainStages,
     causalSnapshot: latestCausalDiagnosis
@@ -178,12 +210,17 @@ export async function GET(req: Request) {
     selectionReasonType: decision.selectionReasonType,
     primaryGoal: decision.primaryGoal,
     recentSignals: recentOodSignals,
+    fastLane: {
+      eligible: fastLaneDecision.eligible,
+      oodBudgetRateDelta: fastLaneDecision.oodBudgetRateDelta,
+      protocolVersion: fastLaneDecision.protocolVersion,
+    },
   });
   const recentPrompts = recentTaskInstances
     .map((item) => item.task?.prompt || "")
     .filter((value) => value.length > 0);
   const disambiguationProbePlan = buildDisambiguationProbePlan({
-    shouldTrigger: decision.ambiguityTrigger.shouldTrigger,
+    shouldTrigger: pendingImmediateSelfRepair ? false : decision.ambiguityTrigger.shouldTrigger,
     topCauseLabels: decision.ambiguityTrigger.topCauseLabels,
     recentTasks: recentTaskInstances.map((row) => ({
       taskType: row.taskType,
@@ -191,10 +228,11 @@ export async function GET(req: Request) {
       metaJson: row.task?.metaJson || null,
     })),
   });
-  const selectedTaskType =
-    disambiguationProbePlan.enabled && disambiguationProbePlan.selectedTaskType
-      ? disambiguationProbePlan.selectedTaskType
-      : decision.chosenTaskType;
+  const selectedTaskType = pendingImmediateSelfRepair
+    ? pendingImmediateSelfRepair.sourceTaskType
+    : disambiguationProbePlan.enabled && disambiguationProbePlan.selectedTaskType
+    ? disambiguationProbePlan.selectedTaskType
+    : decision.chosenTaskType;
 
   // For target_vocab, words in the prompt MUST match planner target nodes — otherwise we penalize for words we never asked for.
   // Only use GSE_VOCAB descriptors as words; LO/grammar descriptors are sentences, not words.
@@ -224,8 +262,10 @@ export async function GET(req: Request) {
     targetNodeLabels: decision.targetNodeDescriptors,
     targetNodeTypes: decision.targetNodeTypes,
     focusSkills: weakestSkills,
-    plannerReason: decision.selectionReason,
-    primaryGoal: decision.primaryGoal,
+    plannerReason: pendingImmediateSelfRepair
+      ? `Immediate self-repair retry for attempt ${pendingImmediateSelfRepair.sourceAttemptId}`
+      : decision.selectionReason,
+    primaryGoal: pendingImmediateSelfRepair ? "mandatory_immediate_self_repair" : decision.primaryGoal,
     recentPrompts,
     domainStages: {
       vocab: domainStages.vocab,
@@ -245,6 +285,13 @@ export async function GET(req: Request) {
   };
 
   let prompt = generated.prompt;
+  if (pendingImmediateSelfRepair) {
+    prompt = buildImmediateSelfRepairPrompt({
+      sourcePrompt: pendingImmediateSelfRepair.sourcePrompt,
+      causeLabel: pendingImmediateSelfRepair.causeLabel,
+      feedback: pendingImmediateSelfRepair.feedback,
+    });
+  }
   let promptTargetWords = selectedTaskType === "target_vocab" ? extractRequiredWords(prompt) : [];
   if (selectedTaskType === "target_vocab" && promptTargetWords.length < 2) {
     const fallbackWords = targetWordsForPrompt.length >= 2 ? targetWordsForPrompt : targetWords.slice(0, 6);
@@ -292,7 +339,21 @@ export async function GET(req: Request) {
           createdAt: latestCausalDiagnosis.createdAt.toISOString(),
         }
       : null,
+    hybridPolicy: decision.hybridPolicy,
     shadowPolicy: decision.shadowPolicy,
+    selfRepair: pendingImmediateSelfRepair
+      ? {
+          mode: "immediate_retry",
+          protocolVersion: SELF_REPAIR_IMMEDIATE_LOOP_VERSION,
+          cycleId: pendingImmediateSelfRepair.cycleId,
+          sourceAttemptId: pendingImmediateSelfRepair.sourceAttemptId,
+          sourceTaskType: pendingImmediateSelfRepair.sourceTaskType,
+          sourceTaskScore: pendingImmediateSelfRepair.sourceTaskScore,
+          sourceTaskInstanceId: pendingImmediateSelfRepair.sourceTaskInstanceId,
+          causeLabel: pendingImmediateSelfRepair.causeLabel,
+        }
+      : null,
+    fastLane: fastLaneDecision,
     oodBudgetController: oodBudgetDecision,
   };
 
@@ -436,7 +497,9 @@ export async function GET(req: Request) {
     selectionReasonType: decision.selectionReasonType,
     causalRemediation: decision.causalRemediation,
     causalAmbiguityTrigger: decision.ambiguityTrigger,
+    hybridPolicy: decision.hybridPolicy,
     shadowPolicy: decision.shadowPolicy,
+    selfRepair: taskMeta.selfRepair ?? null,
     verificationTargetNodeIds: decision.verificationTargetNodeIds,
     domainsTargeted: decision.domainsTargeted,
     rotationApplied: decision.rotationApplied,
@@ -448,6 +511,7 @@ export async function GET(req: Request) {
     fallbackReason: generated.fallbackReason || null,
     correctivePolicyDomain: qualityDiagnosticOverride,
     disambiguationProbe: disambiguationProbePlan,
+    fastLane: fastLaneDecision,
     oodBudget: oodBudgetDecision,
     targetNodeIds: gseSelection.targetNodeIds,
     targetNodeLabels,

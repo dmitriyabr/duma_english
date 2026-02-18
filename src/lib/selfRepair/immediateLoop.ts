@@ -1,5 +1,11 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import {
+  SELF_REPAIR_BUDGET_GUARDRAILS_VERSION,
+  SELF_REPAIR_ESCALATION_QUEUE_TYPE,
+  computeSelfRepairBudgetUsage,
+  type SelfRepairBudgetUsage,
+} from "@/lib/selfRepair/budgetGuardrails";
 
 export const SELF_REPAIR_IMMEDIATE_LOOP_VERSION = "self-repair-immediate-v1" as const;
 export const IMMEDIATE_SELF_REPAIR_TASK_SCORE_THRESHOLD = 70;
@@ -15,6 +21,15 @@ export type PendingImmediateSelfRepairCycle = {
   sourceTaskInstanceId: string | null;
   causeLabel: string | null;
   feedback: unknown;
+};
+
+export type CreateImmediateSelfRepairCycleResult = {
+  cycleId: string;
+  created: boolean;
+  status: string;
+  budgetExhausted: boolean;
+  escalationQueueItemId: string | null;
+  budget: SelfRepairBudgetUsage | null;
 };
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -134,7 +149,7 @@ export async function createImmediateSelfRepairCycle(params: {
   causeLabel: string | null;
   sourceTargetNodeIds: string[];
   sourceTaskInstanceId: string | null;
-}): Promise<{ cycleId: string; created: boolean } | null> {
+}): Promise<CreateImmediateSelfRepairCycleResult | null> {
   if (
     !shouldTriggerImmediateSelfRepair({
       taskType: params.taskType,
@@ -152,13 +167,113 @@ export async function createImmediateSelfRepairCycle(params: {
         loopIndex: 1,
       },
     },
-    select: { id: true },
+    select: {
+      id: true,
+      status: true,
+      metadataJson: true,
+    },
   });
   if (existing) {
-    return { cycleId: existing.id, created: false };
+    const existingMetadata = asRecord(existing.metadataJson);
+    const existingBudget = asRecord(existingMetadata.budgetGuardrails);
+    const budgetExhausted = existing.status === "escalated" || existingBudget.exhausted === true;
+    return {
+      cycleId: existing.id,
+      created: false,
+      status: existing.status,
+      budgetExhausted,
+      escalationQueueItemId: asString(existingMetadata.escalationQueueItemId),
+      budget: (existingBudget as unknown as SelfRepairBudgetUsage) || null,
+    };
   }
 
   const taskScore = parseTaskScore(params.taskEvaluation);
+  const budget = await computeSelfRepairBudgetUsage({
+    studentId: params.studentId,
+    sourceTaskType: params.taskType,
+    sourceAttemptId: params.attemptId,
+  });
+  const commonMetadata: Record<string, unknown> = {
+    protocolVersion: SELF_REPAIR_IMMEDIATE_LOOP_VERSION,
+    guardrailsVersion: SELF_REPAIR_BUDGET_GUARDRAILS_VERSION,
+    sourceTaskId: params.taskId,
+    sourceTaskType: params.taskType,
+    sourcePrompt: params.taskPrompt,
+    sourceTaskScore: taskScore,
+    sourceTargetNodeIds: params.sourceTargetNodeIds,
+    sourceTaskInstanceId: params.sourceTaskInstanceId,
+    immediateRepairTaskType: params.taskType,
+    budgetGuardrails: budget,
+  };
+
+  if (budget.exhausted) {
+    const now = new Date();
+    let escalationQueueItemId: string | null = null;
+    const escalationNodeId = params.sourceTargetNodeIds[0] || null;
+    if (escalationNodeId) {
+      try {
+        const queueItem = await prisma.reviewQueueItem.create({
+          data: {
+            studentId: params.studentId,
+            nodeId: escalationNodeId,
+            queueType: SELF_REPAIR_ESCALATION_QUEUE_TYPE,
+            status: "pending",
+            reasonCode: budget.reasons[0] || "budget_exhausted",
+            priority: 15,
+            dueAt: now,
+            taskInstanceId: params.sourceTaskInstanceId || null,
+            attemptId: params.attemptId,
+            metadataJson: {
+              protocolVersion: SELF_REPAIR_BUDGET_GUARDRAILS_VERSION,
+              sourceTaskType: params.taskType,
+              budgetGuardrails: budget,
+            } as Prisma.InputJsonValue,
+          },
+          select: { id: true },
+        });
+        escalationQueueItemId = queueItem.id;
+      } catch (error) {
+        console.warn(
+          JSON.stringify({
+            event: "self_repair_escalation_queue_create_failed",
+            studentId: params.studentId,
+            attemptId: params.attemptId,
+            taskType: params.taskType,
+            error: error instanceof Error ? error.message : String(error),
+          })
+        );
+      }
+    }
+
+    const escalatedCycle = await prisma.selfRepairCycle.create({
+      data: {
+        studentId: params.studentId,
+        sourceAttemptId: params.attemptId,
+        nodeId: params.sourceTargetNodeIds[0] || null,
+        loopIndex: 1,
+        status: "escalated",
+        causeLabel: params.causeLabel || null,
+        feedbackJson: ((params.feedback as Prisma.InputJsonValue) ?? Prisma.JsonNull) as Prisma.InputJsonValue,
+        metadataJson: {
+          ...commonMetadata,
+          escalationReason: budget.reasons[0] || "budget_exhausted",
+          escalationQueueItemId,
+          escalatedAt: now.toISOString(),
+        } as Prisma.InputJsonValue,
+      },
+      select: { id: true, status: true },
+    });
+
+    return {
+      cycleId: escalatedCycle.id,
+      created: true,
+      status: escalatedCycle.status,
+      budgetExhausted: true,
+      escalationQueueItemId,
+      budget,
+    };
+  }
+
   const cycle = await prisma.selfRepairCycle.create({
     data: {
       studentId: params.studentId,
@@ -168,23 +283,18 @@ export async function createImmediateSelfRepairCycle(params: {
       status: "pending_immediate_retry",
       causeLabel: params.causeLabel || null,
       feedbackJson: ((params.feedback as Prisma.InputJsonValue) ?? Prisma.JsonNull) as Prisma.InputJsonValue,
-      metadataJson: {
-        protocolVersion: SELF_REPAIR_IMMEDIATE_LOOP_VERSION,
-        sourceTaskId: params.taskId,
-        sourceTaskType: params.taskType,
-        sourcePrompt: params.taskPrompt,
-        sourceTaskScore: taskScore,
-        sourceTargetNodeIds: params.sourceTargetNodeIds,
-        sourceTaskInstanceId: params.sourceTaskInstanceId,
-        immediateRepairTaskType: params.taskType,
-      } as Prisma.InputJsonValue,
+      metadataJson: commonMetadata as Prisma.InputJsonValue,
     },
-    select: { id: true },
+    select: { id: true, status: true },
   });
 
   return {
     cycleId: cycle.id,
     created: true,
+    status: cycle.status,
+    budgetExhausted: false,
+    escalationQueueItemId: null,
+    budget,
   };
 }
 

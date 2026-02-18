@@ -175,3 +175,5 @@ Authoritative docs are in:
 12. `docs/CH16_POLICY_OOD_BUDGET_CONTROLLER.md` (dynamic OOD budget controller + per-learner budget telemetry endpoint/report)
 13. `docs/CH20_OFFLINE_REPLAY_DATASET_BUILDER.md` (offline replay dataset builder + completeness contract/report endpoint)
 14. `docs/CH24_FAST_LANE_PROGRESSION_PROTOCOL.md` (fast-lane progression protocol + velocity/safety cohort telemetry)
+15. `docs/CH25_MANDATORY_IMMEDIATE_SELF_REPAIR_LOOP.md` (mandatory immediate self-repair loop runtime + completion telemetry)
+16. `docs/CH27_REPAIR_BUDGET_GUARDRAILS_ESCALATION.md` (self-repair budget guardrails + automatic escalation path + budget telemetry)

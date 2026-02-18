@@ -1,0 +1,15 @@
+{
+  "generatedAt": "2026-02-18T05:15:11.360Z",
+  "guardrailsVersion": "self-repair-budget-guardrails-v1",
+  "windowDays": 30,
+  "totalCycles": 0,
+  "budgetExhaustedCount": 0,
+  "budgetExhaustedRate": 0,
+  "escalatedCount": 0,
+  "escalationQueueOpenCount": 0,
+  "escalationQueueCompletedCount": 0,
+  "averageProjectedImmediateShare": null,
+  "maxProjectedImmediateShare": null,
+  "averageLoopsUsedPerSkillSession": null,
+  "reasons": []
+}

@@ -87,6 +87,7 @@ As of 2026-02-14:
 - `GET /api/task/next` now includes CH-24 `fastLane` trace and applies fast-lane throttling (lower diagnostic density + reduced OOD budget rate for eligible learners).
 - `GET /api/quality/fast-lane-cohort` and `npm run fast-lane:cohort` provide CH-24 velocity-vs-safety cohort telemetry.
 - `GET /api/quality/self-repair-immediate-loop` and `npm run self-repair:immediate:report` provide CH-25 immediate self-repair loop completion telemetry.
+- `GET /api/quality/self-repair-budget` and `npm run self-repair:budget` provide CH-27 budget-exhaustion/escalation telemetry for immediate self-repair loops.
 
 ## Placement Architecture (Current)
 

@@ -103,7 +103,7 @@ Source baseline: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` + current code
 | CH-14 | Difficulty anchor calibration layer | DONE | Agent_1 | 2026-02-18T00:56:49Z | 2026-02-18T02:16:40Z | `0cd3792`, `d2881cc` | `src/lib/ood/difficultyCalibration.ts`, `src/lib/ood/generator.ts`, `src/scripts/ch14_difficulty_anchor_stability_report.ts`, `docs/CH14_DIFFICULTY_CALIBRATION_LAYER.md`, `docs/reports/CH14_DIFFICULTY_ANCHOR_STABILITY_REPORT.json` | Shared difficulty calibration layer landed with report artifact; build check currently blocked by in-flight CH-04 prisma schema relation delta |
 | CH-15 | Difficulty matching protocol | DONE | Agent_1 | 2026-02-18T04:02:02Z | 2026-02-18T04:13:08Z | `7268d32`, `7a521a3` | `src/lib/ood/transferVerdict.ts`, `src/worker/index.ts`, `src/app/api/quality/transfer-verdict/route.ts`, `src/scripts/ch15_transfer_verdict_audit.ts`, `docs/reports/CH15_TRANSFER_VERDICT_AUDIT_REPORT.json`, `docs/CH15_DIFFICULTY_MATCHING_PROTOCOL.md` | Transfer fail labeling now requires matched in-domain control pass in same window; audit endpoint/script/report added |
 | CH-16 | Policy OOD budget controller | IN_PROGRESS | Agent_1 | 2026-02-18T04:17:18Z |  |  |  | Claimed after chat coordination as next transfer critical-path item after CH-15 |
-| CH-17 | Milestone multi-axis stress gates | IN_PROGRESS | Agent_3 | 2026-02-18T04:18:43Z |  |  |  | Claimed after chat coordination split: Agent_1 on CH-16, Agent_2 on CH-18 |
+| CH-17 | Milestone multi-axis stress gates | DONE | Agent_3 | 2026-02-18T04:18:43Z | 2026-02-18T04:25:29Z | `2f89d3f`, `f9bb429` | `src/lib/ood/stressGate.ts`, `src/lib/ood/stressGate.test.ts`, `src/lib/gse/stageProjection.ts`, `src/lib/progress.ts`, `src/lib/placement.ts`, `src/lib/adaptive.ts`, `docs/CH17_MILESTONE_MULTI_AXIS_STRESS_GATES.md` | Milestone promotion readiness now requires multi-axis stress-set pass (2 pairwise combos, worst-case floor) with stress-gate details persisted in promotion audit |
 | CH-18 | Transfer remediation queue | IN_PROGRESS | Agent_2 | 2026-02-18T04:18:35Z |  |  |  | Claimed after chat coordination: Agent_1 on CH-16, Agent_3 on CH-17 to avoid file overlap |
 
 ## 3.3) Decision Log
@@ -127,6 +127,7 @@ Source baseline: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` + current code
 | 2026-02-17 | CH-13 | OOD generator v1 добавлен в `task/next`: deterministic cadence, axis tags по task family, запись `OODTaskSpec` на каждую OOD-инъекцию и additive `oodTaskSpec` поле в API ответе |
 | 2026-02-18 | CH-14 | Введён shared difficulty calibration layer: task-family профили переводят raw difficulty в общую шкалу (mean=50/std=15), OOD generator пишет calibrated anchor + calibration metadata в `OODTaskSpec`, добавлен periodic stability report script и артефакт мониторинга `docs/reports/CH14_DIFFICULTY_ANCHOR_STABILITY_REPORT.json` |
 | 2026-02-18 | CH-15 | Добавлен transfer verdict protocol `transfer-difficulty-match-v1`: OOD fail маркируется как `transfer_fail_validated` только при matched in-domain control pass (`|difficulty delta|<=8`, окно 72h, taskScore>=70), иначе verdict переводится в `inconclusive_control_missing`; worker пишет verdict metadata в `OODTaskSpec`, добавлены `/api/quality/transfer-verdict` и audit script/report |
+| 2026-02-18 | CH-17 | Добавлен milestone stress gate (`milestone-stress-gate-v1`): для target stage >= B1 promotion readiness требует multi-axis stress set (>=2 pairwise axis combinations) и worst-case floor >=70; trace `stressGate` добавлен в stage projection/progress и в `PromotionAudit.reasonsJson` |
 
 ## 4) Execution Board (обособленные изменения)
 
@@ -200,7 +201,7 @@ Source baseline: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` + current code
   Done: OOD инъекции идут по бюджету (база 10-20%, повышается у milestone/overfit cases).  
   Артефакт: per-learner OOD budget telemetry.
 
-- [ ] **CH-17 — Milestone multi-axis stress gates**  
+- [x] **CH-17 — Milestone multi-axis stress gates**  
   Done: промоушен milestone требует pass multi-axis stress set (worst-case floor, не среднее).  
   Артефакт: promotion audit содержит stress gate details.
 

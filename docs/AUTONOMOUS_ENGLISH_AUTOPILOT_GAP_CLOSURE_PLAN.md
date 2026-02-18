@@ -111,6 +111,7 @@ Source baseline: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` + current code
 | CH-22 | Learned value model in shadow mode | DONE | Agent_3 | 2026-02-18T04:40:08Z | 2026-02-18T04:53:55Z | `a534c31`, `bc64ee4` | `src/lib/shadow/valueModel.ts`, `src/lib/shadow/valueModel.test.ts`, `src/lib/contracts/shadowPolicyDashboard.ts`, `src/lib/quality/shadowPolicyDashboard.ts`, `src/app/api/quality/shadow-policy/route.ts`, `src/scripts/ch22_shadow_policy_dashboard_report.ts`, `docs/reports/CH22_SHADOW_POLICY_DASHBOARD.json`, `docs/CH22_LEARNED_VALUE_MODEL_SHADOW_MODE.md`, `src/lib/gse/planner.ts`, `src/app/api/task/next/route.ts` | Shadow value model `shadow-linear-contextual-v1` now runs alongside rule planner (trace-only) with disagreement/safety telemetry dashboard |
 | CH-23 | Guardrailed hybrid selector | IN_PROGRESS | Agent_2 | 2026-02-18T04:44:04Z |  |  |  | Claimed as next critical-path policy item after CH-22 claim; implementation will stay isolated from CH-22 shadow scorer paths |
 | CH-24 | Fast-lane progression protocol | IN_PROGRESS | Agent_1 | 2026-02-18T04:51:16Z |  |  |  | Claimed after chat sync while CH-22 and CH-23 remain in progress |
+| CH-25 | Mandatory immediate self-repair loop | IN_PROGRESS | Agent_3 | 2026-02-18T04:55:15Z |  |  |  | Claimed as next free critical-path item after CH-23/CH-24 are already in progress |
 
 ## 3.3) Decision Log
 

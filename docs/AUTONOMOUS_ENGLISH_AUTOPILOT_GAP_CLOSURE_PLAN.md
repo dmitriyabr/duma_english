@@ -105,7 +105,7 @@ Source baseline: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` + current code
 | CH-16 | Policy OOD budget controller | DONE | Agent_1 | 2026-02-18T04:17:18Z | 2026-02-18T04:26:54Z | `1f68f1a`, `174b939` | `src/lib/ood/budgetController.ts`, `src/lib/ood/generator.ts`, `src/app/api/task/next/route.ts`, `src/lib/quality/oodBudgetTelemetry.ts`, `src/app/api/quality/ood-budget/route.ts`, `src/scripts/ch16_ood_budget_telemetry_report.ts`, `docs/reports/CH16_OOD_BUDGET_TELEMETRY_REPORT.json`, `docs/CH16_POLICY_OOD_BUDGET_CONTROLLER.md` | OOD budget controller now enforces dynamic 10-20% injection band with milestone/overfit escalation + per-learner telemetry endpoint/report |
 | CH-17 | Milestone multi-axis stress gates | DONE | Agent_3 | 2026-02-18T04:18:43Z | 2026-02-18T04:25:29Z | `2f89d3f`, `f9bb429` | `src/lib/ood/stressGate.ts`, `src/lib/ood/stressGate.test.ts`, `src/lib/gse/stageProjection.ts`, `src/lib/progress.ts`, `src/lib/placement.ts`, `src/lib/adaptive.ts`, `docs/CH17_MILESTONE_MULTI_AXIS_STRESS_GATES.md` | Milestone promotion readiness now requires multi-axis stress-set pass (2 pairwise combos, worst-case floor) with stress-gate details persisted in promotion audit |
 | CH-18 | Transfer remediation queue | DONE | Agent_2 | 2026-02-18T04:18:35Z | 2026-02-18T04:26:52Z | `2f89d3f`, `c3098eb` | `src/lib/ood/transferRemediationQueue.ts`, `src/worker/index.ts`, `src/lib/contracts/transferRemediationQueueDashboard.ts`, `src/lib/quality/transferRemediationQueueDashboard.ts`, `src/app/api/quality/transfer-remediation-queue/route.ts`, `src/scripts/ch18_transfer_remediation_queue_report.ts`, `docs/reports/CH18_TRANSFER_REMEDIATION_QUEUE_DASHBOARD.json`, `docs/CH18_TRANSFER_REMEDIATION_QUEUE.md` | OOD fail signals now enqueue transfer remediation queue items with SLA tracking; repeat transfer pass resolves queue and feeds recovery metrics/dashboard |
-| CH-19 | Reward function v1 (versioned) | IN_PROGRESS | Agent_3 | 2026-02-18T04:28:12Z |  |  |  | Claimed as next critical-path item after transfer block (CH-16..CH-18) completion |
+| CH-19 | Reward function v1 (versioned) | DONE | Agent_3 | 2026-02-18T04:28:12Z | 2026-02-18T04:36:18Z | `0d0a433`, `0eb1565` | `src/lib/reward/function.ts`, `src/lib/reward/function.test.ts`, `src/worker/index.ts`, `src/scripts/ch19_reward_config_registry_report.ts`, `docs/reports/CH19_REWARD_CONFIG_REGISTRY_REPORT.json`, `docs/CH19_REWARD_FUNCTION_V1.md` | Versioned reward contract `reward-composite-v1` with deterministic same-session `RewardTrace` write-path and registry/report artifact |
 | CH-20 | Offline replay dataset builder | IN_PROGRESS | Agent_1 | 2026-02-18T04:29:42Z |  |  |  | Claimed after CH-19 split: Agent_3 on CH-19, Agent_1 on CH-20 |
 | CH-21 | Off-policy evaluation pipeline | IN_PROGRESS | Agent_2 | 2026-02-18T04:32:28Z |  |  |  | Claimed after chat coordination: Agent_3 on CH-19 reward path, Agent_1 on CH-20 dataset builder |
 
@@ -133,6 +133,7 @@ Source baseline: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` + current code
 | 2026-02-18 | CH-16 | Добавлен policy OOD budget controller `ood-budget-controller-v1`: базовый budget rate 14% (в band 10-20%), escalation +3pp при milestone pressure и +3pp при overfit risk (clamped до 20%), dynamic interval 5..10 задач; telemetry пишется в task meta/ood metadata и доступен через `/api/quality/ood-budget` + report script |
 | 2026-02-18 | CH-17 | Добавлен milestone stress gate (`milestone-stress-gate-v1`): для target stage >= B1 promotion readiness требует multi-axis stress set (>=2 pairwise axis combinations) и worst-case floor >=70; trace `stressGate` добавлен в stage projection/progress и в `PromotionAudit.reasonsJson` |
 | 2026-02-18 | CH-18 | Введён transfer remediation queue protocol (`transfer-remediation-queue-v1`): verdict `transfer_fail_validated`/`inconclusive_control_missing` ставит learner в `ReviewQueueItem` (`queueType=transfer_remediation`, SLA 72h), а последующий `transfer_pass` закрывает открытый remediation item; добавлен dashboard `/api/quality/transfer-remediation-queue` и report script с recovery-rate/SLA метриками |
+| 2026-02-18 | CH-19 | Зафиксирован versioned reward contract `reward-composite-v1`: deterministic equation (`masteryDelta + transfer + retention - friction`) и trace contract пишутся в `RewardTrace` per decision/window/version с idempotent upsert; добавлены registry report script и replay reproducibility tests |
 
 ## 4) Execution Board (обособленные изменения)
 
@@ -216,7 +217,7 @@ Source baseline: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` + current code
 
 ### D. Learning Policy (Hybrid -> Learned)
 
-- [ ] **CH-19 — Reward function v1 (versioned)**  
+- [x] **CH-19 — Reward function v1 (versioned)**  
   Done: формализован reward = mastery delta + transfer + retention - friction, версия хранится в trace.  
   Артефакт: reward config registry + replay reproducibility test.
 

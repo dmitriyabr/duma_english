@@ -98,7 +98,7 @@ Source baseline: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` + current code
 | CH-09 | Cause-attributed evidence write path | DONE | Agent_2 | 2026-02-17T23:29:33Z | 2026-02-18T00:15:30Z | `65f0e5a`, `d5bc41d` | `prisma/migrations/20260217233800_ch09_cause_attributed_evidence/migration.sql`, `src/lib/gse/evidence.ts`, `src/lib/gse/mastery.ts`, `src/scripts/ch09_cause_attribution_audit.ts`, `docs/reports/CH09_CAUSE_ATTRIBUTION_AUDIT_REPORT.json`, `docs/CH09_CAUSE_ATTRIBUTED_EVIDENCE.md` | Evidence/mastery causal attribution persisted end-to-end + audit artifact/script added |
 | CH-10 | Ambiguity trigger logic | DONE | Agent_2 | 2026-02-18T00:21:26Z | 2026-02-18T01:35:46Z | `d2e43f5`, `5971d52` | `src/lib/causal/ambiguityTrigger.ts`, `src/lib/causal/ambiguityTrigger.test.ts`, `src/lib/gse/planner.ts`, `src/app/api/task/next/route.ts`, `src/app/api/planner/simulate/route.ts`, `docs/CH10_AMBIGUITY_TRIGGER_LOGIC.md` | Entropy/margin/action-instability trigger integrated into planner with causal snapshot gating and test matrix |
 | CH-13 | OOD generator v1 (axis-tagged) | DONE | Agent_1 | 2026-02-17T23:13:27Z | 2026-02-17T23:39:01Z | `b4d2773`, `b218b85` | `src/lib/ood/generator.ts`, `src/app/api/task/next/route.ts`, `docs/CH13_OOD_GENERATOR_V1.md` | Deterministic OOD axis-tagged generation + OODTaskSpec persistence + API exposure |
-| CH-14 | Difficulty anchor calibration layer | IN_PROGRESS | Agent_1 | 2026-02-18T00:56:49Z |  |  |  | Claimed as next transfer-track item after CH-13 completion (independent from CH-10 files) |
+| CH-14 | Difficulty anchor calibration layer | DONE | Agent_1 | 2026-02-18T00:56:49Z | 2026-02-18T02:16:40Z | `0cd3792`, `d2881cc` | `src/lib/ood/difficultyCalibration.ts`, `src/lib/ood/generator.ts`, `src/scripts/ch14_difficulty_anchor_stability_report.ts`, `docs/CH14_DIFFICULTY_CALIBRATION_LAYER.md`, `docs/reports/CH14_DIFFICULTY_ANCHOR_STABILITY_REPORT.json` | Shared difficulty calibration layer landed with report artifact; build check currently blocked by in-flight CH-04 prisma schema relation delta |
 
 ## 3.3) Decision Log
 
@@ -116,6 +116,7 @@ Source baseline: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` + current code
 | 2026-02-18 | CH-09 | Cause-attributed write-path привязан к `CausalDiagnosis`: `AttemptGseEvidence` и `StudentGseMastery` сохраняют top cause/probability/distribution/modelVersion; добавлен audit script `src/scripts/ch09_cause_attribution_audit.ts` с отчётом покрытия/контрактных нарушений |
 | 2026-02-18 | CH-10 | В planner добавлен ambiguity trigger по blueprint (`entropy > H_max` или `topMargin < M_min` + material action instability по utility gap): disambiguation probe включается только если реально меняет выбор действия; trigger trace пишется в `utilityJson` и отдаётся в planning API |
 | 2026-02-17 | CH-13 | OOD generator v1 добавлен в `task/next`: deterministic cadence, axis tags по task family, запись `OODTaskSpec` на каждую OOD-инъекцию и additive `oodTaskSpec` поле в API ответе |
+| 2026-02-18 | CH-14 | Введён shared difficulty calibration layer: task-family профили переводят raw difficulty в общую шкалу (mean=50/std=15), OOD generator пишет calibrated anchor + calibration metadata в `OODTaskSpec`, добавлен periodic stability report script и артефакт мониторинга `docs/reports/CH14_DIFFICULTY_ANCHOR_STABILITY_REPORT.json` |
 
 ## 4) Execution Board (обособленные изменения)
 
@@ -177,7 +178,7 @@ Source baseline: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` + current code
   Done: OOD задачи генерируются с явными осями shift (`topic/register/interlocutor/goal/format`).  
   Артефакт: `OODTaskSpec` rows + API exposure.
 
-- [ ] **CH-14 — Difficulty anchor calibration layer**  
+- [x] **CH-14 — Difficulty anchor calibration layer**  
   Done: введены anchor sets и общая шкала сложности между task families.  
   Артефакт: periodic calibration job + anchor stability report.
 

@@ -185,3 +185,5 @@ Last updated: 2026-02-17
 `[2026-02-18T02:13:05Z] Agent_2 | EXIT | На сегодня закончил работу. CH-09 и CH-10 завершены и запушены; выхожу из цикла.`
 
 `[2026-02-18T02:14:33Z] Agent_1 | CH-14 | Implementation commit готов: d2881cc (difficulty calibration core, OOD generator integration, calibration report script/artifact, CH-14 doc). Перехожу к board closeout + handoff.`
+
+`[2026-02-18T02:17:10Z] Agent_1 | CH-14 | Board closeout внесён: CH-14 -> DONE в registry (End/Commits/Artifacts), checkbox отмечен, Decision Log обновлён. Дальше коммит closeout + push + финальный handoff/exit на сегодня.`

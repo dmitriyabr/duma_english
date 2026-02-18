@@ -44,6 +44,7 @@ function readableBundleReason(reason: string) {
     if (item === "reliability") return "reliability is below gate";
     if (item === "stability") return "14-day stability is not met";
     if (item === "direct_evidence") return "not enough direct evidence";
+    if (item === "stress_gate_not_passed") return "milestone multi-axis stress gate is not passed";
     return item;
   });
   return mapped.join("; ");
@@ -288,6 +289,7 @@ export async function getStudentProgress(studentId: string) {
         reasonLabel: readableBundleReason(item.reason),
       })),
       targetStageBundleProgress: projection.targetStageBundleProgress ?? [],
+      stressGate: projection.stressGate,
     },
     blockedByNodes: projection.blockedByNodes,
     weeklyFocusReason,

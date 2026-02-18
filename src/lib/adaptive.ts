@@ -339,6 +339,7 @@ export async function recomputeMastery(studentId: string) {
         confidence: projection.confidence,
         currentStageStats: projection.currentStageStats,
         targetStageStats: projection.targetStageStats,
+        stressGate: projection.stressGate,
       } as Prisma.InputJsonValue,
       readinessScore: projection.score,
     },

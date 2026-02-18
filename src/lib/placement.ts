@@ -881,6 +881,7 @@ export async function finishPlacement(sessionId: string) {
         promotionStage: stageProjection.promotionStage,
         currentStageStats: stageProjection.currentStageStats,
         targetStageStats: stageProjection.targetStageStats,
+        stressGate: stageProjection.stressGate,
         carryoverApplied: carryover.carryoverApplied,
       },
       readinessScore: stageProjection.score,

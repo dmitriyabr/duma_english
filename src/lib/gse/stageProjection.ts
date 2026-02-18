@@ -1,6 +1,8 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { CEFRStage, SkillKey } from "@/lib/curriculum";
+import type { MilestoneStressGateResult } from "@/lib/ood/stressGate";
+import { evaluateStudentMilestoneStressGate } from "@/lib/ood/stressGate";
 import { computeStageBundleReadiness } from "./bundles";
 
 const STAGE_ORDER: CEFRStage[] = ["A0", "A1", "A2", "B1", "B2", "C1", "C2"];
@@ -49,6 +51,7 @@ export type StageProjection = {
   currentStageStats: StageBandStats;
   targetStage: CEFRStage;
   targetStageStats: StageBandStats;
+  stressGate: MilestoneStressGateResult;
   blockedByNodes: string[];
   blockedByNodeDescriptors: string[];
   blockedBundles: Array<{
@@ -394,6 +397,10 @@ export async function projectLearnerStageFromGse(
     (row) => row.stage === (promotionStage === "A0" ? "A1" : promotionStage)
   );
   const targetStageRow = bundleReadiness.stageRows.find((row) => row.stage === targetStage);
+  const stressGate = await evaluateStudentMilestoneStressGate({
+    studentId,
+    targetStage,
+  });
   const toStats = (stage: CEFRStage, row?: (typeof bundleReadiness.stageRows)[number]): StageBandStats => ({
     stage,
     total: row?.bundleRows.reduce((sum, item) => sum + item.totalRequired, 0) || 0,
@@ -426,11 +433,29 @@ export async function projectLearnerStageFromGse(
   });
   const currentStats = toStats(promotionStage === "A0" ? "A1" : promotionStage, currentStageRow);
   const targetStats = toStats(targetStage, targetStageRow);
-  const promotionReady =
+  const bundlePromotionReady =
     toStageIndex(targetStage) === toStageIndex(promotionStage) ||
     Boolean(targetStageRow?.ready);
+  const stressGateBlocksPromotion =
+    stressGate.required && bundlePromotionReady && !stressGate.passed;
+  const promotionReady = bundlePromotionReady && !stressGateBlocksPromotion;
 
-  const blockedBundles = targetStageRow?.blockedBundles || [];
+  const blockedBundles = [...(targetStageRow?.blockedBundles || [])];
+  if (stressGateBlocksPromotion) {
+    blockedBundles.push({
+      bundleKey: `stage:${targetStage}:stress_gate`,
+      title: `${targetStage} multi-axis stress gate`,
+      domain: "lo",
+      reason: "stress_gate_not_passed",
+      blockers: [
+        {
+          nodeId: `stress_gate:${targetStage}`,
+          descriptor: `Needs ${stressGate.requiredPairwiseCombinations} recent multi-axis pair combinations with worst-case score >= ${stressGate.floorScore}.`,
+          value: stressGate.worstCaseScore ?? 0,
+        },
+      ],
+    });
+  }
   const blockedByNodes = blockedBundles.flatMap((bundle) => bundle.blockers.map((item) => item.nodeId));
   const blockedByNodeDescriptors = blockedBundles.flatMap((bundle) =>
     bundle.blockers.map((item) => item.descriptor)
@@ -487,6 +512,7 @@ export async function projectLearnerStageFromGse(
     currentStageStats: currentStats,
     targetStage,
     targetStageStats: targetStats,
+    stressGate,
     blockedByNodes,
     blockedByNodeDescriptors,
     blockedBundles,
@@ -537,6 +563,7 @@ export async function refreshLearnerProfileFromGse(params: {
     promotionStage: projection.promotionStage,
     currentStageStats: projection.currentStageStats,
     targetStageStats: projection.targetStageStats,
+    stressGate: projection.stressGate,
     domainStages: projection.domainStages,
     pronunciationScore: projection.pronunciationScore,
   };
@@ -585,6 +612,7 @@ export async function refreshLearnerProfileFromGse(params: {
         promotionStage: projection.promotionStage,
         currentStageStats: projection.currentStageStats,
         targetStageStats: projection.targetStageStats,
+        stressGate: projection.stressGate,
         blockedByNodes: projection.blockedByNodes,
         blockedBundles: projection.blockedBundles,
         domainStages: projection.domainStages,

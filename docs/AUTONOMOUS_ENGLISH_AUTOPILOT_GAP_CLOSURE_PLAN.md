@@ -102,9 +102,9 @@ Source baseline: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` + current code
 | CH-13 | OOD generator v1 (axis-tagged) | DONE | Agent_1 | 2026-02-17T23:13:27Z | 2026-02-17T23:39:01Z | `b4d2773`, `b218b85` | `src/lib/ood/generator.ts`, `src/app/api/task/next/route.ts`, `docs/CH13_OOD_GENERATOR_V1.md` | Deterministic OOD axis-tagged generation + OODTaskSpec persistence + API exposure |
 | CH-14 | Difficulty anchor calibration layer | DONE | Agent_1 | 2026-02-18T00:56:49Z | 2026-02-18T02:16:40Z | `0cd3792`, `d2881cc` | `src/lib/ood/difficultyCalibration.ts`, `src/lib/ood/generator.ts`, `src/scripts/ch14_difficulty_anchor_stability_report.ts`, `docs/CH14_DIFFICULTY_CALIBRATION_LAYER.md`, `docs/reports/CH14_DIFFICULTY_ANCHOR_STABILITY_REPORT.json` | Shared difficulty calibration layer landed with report artifact; build check currently blocked by in-flight CH-04 prisma schema relation delta |
 | CH-15 | Difficulty matching protocol | DONE | Agent_1 | 2026-02-18T04:02:02Z | 2026-02-18T04:13:08Z | `7268d32`, `7a521a3` | `src/lib/ood/transferVerdict.ts`, `src/worker/index.ts`, `src/app/api/quality/transfer-verdict/route.ts`, `src/scripts/ch15_transfer_verdict_audit.ts`, `docs/reports/CH15_TRANSFER_VERDICT_AUDIT_REPORT.json`, `docs/CH15_DIFFICULTY_MATCHING_PROTOCOL.md` | Transfer fail labeling now requires matched in-domain control pass in same window; audit endpoint/script/report added |
-| CH-16 | Policy OOD budget controller | IN_PROGRESS | Agent_1 | 2026-02-18T04:17:18Z |  |  |  | Claimed after chat coordination as next transfer critical-path item after CH-15 |
+| CH-16 | Policy OOD budget controller | DONE | Agent_1 | 2026-02-18T04:17:18Z | 2026-02-18T04:26:54Z | `1f68f1a`, `174b939` | `src/lib/ood/budgetController.ts`, `src/lib/ood/generator.ts`, `src/app/api/task/next/route.ts`, `src/lib/quality/oodBudgetTelemetry.ts`, `src/app/api/quality/ood-budget/route.ts`, `src/scripts/ch16_ood_budget_telemetry_report.ts`, `docs/reports/CH16_OOD_BUDGET_TELEMETRY_REPORT.json`, `docs/CH16_POLICY_OOD_BUDGET_CONTROLLER.md` | OOD budget controller now enforces dynamic 10-20% injection band with milestone/overfit escalation + per-learner telemetry endpoint/report |
 | CH-17 | Milestone multi-axis stress gates | DONE | Agent_3 | 2026-02-18T04:18:43Z | 2026-02-18T04:25:29Z | `2f89d3f`, `f9bb429` | `src/lib/ood/stressGate.ts`, `src/lib/ood/stressGate.test.ts`, `src/lib/gse/stageProjection.ts`, `src/lib/progress.ts`, `src/lib/placement.ts`, `src/lib/adaptive.ts`, `docs/CH17_MILESTONE_MULTI_AXIS_STRESS_GATES.md` | Milestone promotion readiness now requires multi-axis stress-set pass (2 pairwise combos, worst-case floor) with stress-gate details persisted in promotion audit |
-| CH-18 | Transfer remediation queue | IN_PROGRESS | Agent_2 | 2026-02-18T04:18:35Z |  |  |  | Claimed after chat coordination: Agent_1 on CH-16, Agent_3 on CH-17 to avoid file overlap |
+| CH-18 | Transfer remediation queue | DONE | Agent_2 | 2026-02-18T04:18:35Z | 2026-02-18T04:26:52Z | `2f89d3f`, `c3098eb` | `src/lib/ood/transferRemediationQueue.ts`, `src/worker/index.ts`, `src/lib/contracts/transferRemediationQueueDashboard.ts`, `src/lib/quality/transferRemediationQueueDashboard.ts`, `src/app/api/quality/transfer-remediation-queue/route.ts`, `src/scripts/ch18_transfer_remediation_queue_report.ts`, `docs/reports/CH18_TRANSFER_REMEDIATION_QUEUE_DASHBOARD.json`, `docs/CH18_TRANSFER_REMEDIATION_QUEUE.md` | OOD fail signals now enqueue transfer remediation queue items with SLA tracking; repeat transfer pass resolves queue and feeds recovery metrics/dashboard |
 
 ## 3.3) Decision Log
 
@@ -127,7 +127,9 @@ Source baseline: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` + current code
 | 2026-02-17 | CH-13 | OOD generator v1 добавлен в `task/next`: deterministic cadence, axis tags по task family, запись `OODTaskSpec` на каждую OOD-инъекцию и additive `oodTaskSpec` поле в API ответе |
 | 2026-02-18 | CH-14 | Введён shared difficulty calibration layer: task-family профили переводят raw difficulty в общую шкалу (mean=50/std=15), OOD generator пишет calibrated anchor + calibration metadata в `OODTaskSpec`, добавлен periodic stability report script и артефакт мониторинга `docs/reports/CH14_DIFFICULTY_ANCHOR_STABILITY_REPORT.json` |
 | 2026-02-18 | CH-15 | Добавлен transfer verdict protocol `transfer-difficulty-match-v1`: OOD fail маркируется как `transfer_fail_validated` только при matched in-domain control pass (`|difficulty delta|<=8`, окно 72h, taskScore>=70), иначе verdict переводится в `inconclusive_control_missing`; worker пишет verdict metadata в `OODTaskSpec`, добавлены `/api/quality/transfer-verdict` и audit script/report |
+| 2026-02-18 | CH-16 | Добавлен policy OOD budget controller `ood-budget-controller-v1`: базовый budget rate 14% (в band 10-20%), escalation +3pp при milestone pressure и +3pp при overfit risk (clamped до 20%), dynamic interval 5..10 задач; telemetry пишется в task meta/ood metadata и доступен через `/api/quality/ood-budget` + report script |
 | 2026-02-18 | CH-17 | Добавлен milestone stress gate (`milestone-stress-gate-v1`): для target stage >= B1 promotion readiness требует multi-axis stress set (>=2 pairwise axis combinations) и worst-case floor >=70; trace `stressGate` добавлен в stage projection/progress и в `PromotionAudit.reasonsJson` |
+| 2026-02-18 | CH-18 | Введён transfer remediation queue protocol (`transfer-remediation-queue-v1`): verdict `transfer_fail_validated`/`inconclusive_control_missing` ставит learner в `ReviewQueueItem` (`queueType=transfer_remediation`, SLA 72h), а последующий `transfer_pass` закрывает открытый remediation item; добавлен dashboard `/api/quality/transfer-remediation-queue` и report script с recovery-rate/SLA метриками |
 
 ## 4) Execution Board (обособленные изменения)
 
@@ -197,7 +199,7 @@ Source baseline: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` + current code
   Done: transfer fail валиден только при pass на matched in-domain control в том же окне.  
   Артефакт: transfer verdict audit endpoint.
 
-- [ ] **CH-16 — Policy OOD budget controller**  
+- [x] **CH-16 — Policy OOD budget controller**  
   Done: OOD инъекции идут по бюджету (база 10-20%, повышается у milestone/overfit cases).  
   Артефакт: per-learner OOD budget telemetry.
 
@@ -205,7 +207,7 @@ Source baseline: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` + current code
   Done: промоушен milestone требует pass multi-axis stress set (worst-case floor, не среднее).  
   Артефакт: promotion audit содержит stress gate details.
 
-- [ ] **CH-18 — Transfer remediation queue**  
+- [x] **CH-18 — Transfer remediation queue**  
   Done: при OOD fail learner уходит в targeted remediation path и повторную transfer verification.  
   Артефакт: queue SLA dashboard + recovery rate metric.
 

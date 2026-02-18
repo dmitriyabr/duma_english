@@ -177,3 +177,4 @@ Authoritative docs are in:
 14. `docs/CH24_FAST_LANE_PROGRESSION_PROTOCOL.md` (fast-lane progression protocol + velocity/safety cohort telemetry)
 15. `docs/CH25_MANDATORY_IMMEDIATE_SELF_REPAIR_LOOP.md` (mandatory immediate self-repair loop runtime + completion telemetry)
 16. `docs/CH27_REPAIR_BUDGET_GUARDRAILS_ESCALATION.md` (self-repair budget guardrails + automatic escalation path + budget telemetry)
+17. `docs/CH31_PERCEPTION_LANGUAGE_ID_CODE_SWITCH_SIGNALS.md` (perception language-id + code-switch signals + telemetry/report endpoint)

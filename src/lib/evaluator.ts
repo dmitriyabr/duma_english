@@ -5,6 +5,7 @@ import { chatJson } from "./llm";
 import { buildSemanticEvaluationContext } from "./gse/semanticAssessor";
 import { buildVocabEvaluationContext } from "./gse/vocabRetrieval";
 import { config } from "./config";
+import { inferPerceptionLanguageSignals } from "./perception/languageSignals";
 
 export type RubricCheck = {
   name: string;
@@ -199,6 +200,18 @@ function attachStructuredChecks(taskEvaluation: TaskEvaluation, transcript: stri
     loChecks: deriveLoChecks(taskEvaluation, transcript),
     grammarChecks: deriveGrammarChecks(taskEvaluation),
     vocabChecks: deriveVocabChecks(taskEvaluation),
+  };
+}
+
+function withPerceptionLanguageSignals(taskEvaluation: TaskEvaluation, transcript: string): TaskEvaluation {
+  const artifacts =
+    taskEvaluation.artifacts && typeof taskEvaluation.artifacts === "object" ? taskEvaluation.artifacts : {};
+  return {
+    ...taskEvaluation,
+    artifacts: {
+      ...artifacts,
+      languageSignals: inferPerceptionLanguageSignals({ transcript }),
+    },
   };
 }
 
@@ -1318,7 +1331,10 @@ export async function evaluateTaskQuality(input: EvaluationInput) {
       grammarChecks: fromModel.parsed.taskEvaluation.grammarChecks || [],
       vocabChecks: fromModel.parsed.taskEvaluation.vocabChecks || [],
     };
-    const modelTaskEvaluation = attachStructuredChecks(baseTaskEvaluation, input.transcript);
+    const modelTaskEvaluation = withPerceptionLanguageSignals(
+      attachStructuredChecks(baseTaskEvaluation, input.transcript),
+      input.transcript
+    );
     const normalizedFeedback = {
       ...fromModel.parsed.feedback,
       exampleBetterAnswer: selectExampleBetterAnswer(
@@ -1340,7 +1356,10 @@ export async function evaluateTaskQuality(input: EvaluationInput) {
 
   const fallback = evaluateDeterministic(input);
   const normalizedFallback = {
-    taskEvaluation: attachStructuredChecks(fallback.taskEvaluation, input.transcript),
+    taskEvaluation: withPerceptionLanguageSignals(
+      attachStructuredChecks(fallback.taskEvaluation, input.transcript),
+      input.transcript
+    ),
     feedback: fallback.feedback,
   };
   console.log(JSON.stringify({ event: "fallback_used", taskType: input.taskType, reason: fromModel.debug.openai.reason }));

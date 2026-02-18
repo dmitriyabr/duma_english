@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { evaluateTaskQuality } from "./evaluator";
+import { PERCEPTION_LANGUAGE_SIGNALS_VERSION } from "./perception/languageSignals";
 
 test("target_vocab evaluation checks required words and reports missing words", async () => {
   const originalKey = process.env.OPENAI_API_KEY;
@@ -156,6 +157,33 @@ test("evaluateTaskQuality falls back to rules when OPENAI_API_KEY is missing", a
   assert.ok(Array.isArray(result.taskEvaluation.grammarChecks));
   assert.ok(Array.isArray(result.taskEvaluation.vocabChecks));
   assert.ok(typeof result.feedback.summary === "string");
+
+  if (originalKey) process.env.OPENAI_API_KEY = originalKey;
+});
+
+test("evaluateTaskQuality attaches perception language and code-switch signals", async () => {
+  const originalKey = process.env.OPENAI_API_KEY;
+  delete process.env.OPENAI_API_KEY;
+
+  const result = await evaluateTaskQuality({
+    taskType: "qa_prompt",
+    taskPrompt: "Tell me about your day.",
+    transcript: "I am happy lakini leo niko sawa manze and my msee is here.",
+    speechMetrics: { speechRate: 118, fillerCount: 0 },
+  });
+
+  const artifacts = result.taskEvaluation.artifacts as {
+    languageSignals?: {
+      version?: string;
+      primaryTag?: string;
+      codeSwitch?: {
+        detected?: boolean;
+      };
+    };
+  };
+  assert.equal(artifacts.languageSignals?.version, PERCEPTION_LANGUAGE_SIGNALS_VERSION);
+  assert.equal(artifacts.languageSignals?.primaryTag, "english");
+  assert.equal(artifacts.languageSignals?.codeSwitch?.detected, true);
 
   if (originalKey) process.env.OPENAI_API_KEY = originalKey;
 });

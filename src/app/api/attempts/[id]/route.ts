@@ -113,6 +113,12 @@ export async function GET(_: Request, context: AttemptRouteContext) {
     typeof taskEvaluation?.artifacts?.argumentScore === "number"
       ? taskEvaluation.artifacts.argumentScore
       : undefined;
+  const perceptionLanguageSignals =
+    taskEvaluation?.artifacts &&
+    typeof taskEvaluation.artifacts.languageSignals === "object" &&
+    taskEvaluation.artifacts.languageSignals !== null
+      ? (taskEvaluation.artifacts.languageSignals as Record<string, unknown>)
+      : null;
 
   const visibleMetrics = [
     {
@@ -303,6 +309,7 @@ export async function GET(_: Request, context: AttemptRouteContext) {
     ? "inconsistent_lo_signal_repaired"
     : null;
   const language = {
+    perception: perceptionLanguageSignals,
     grammar: {
       grammarAccuracy,
       errorCountByType:

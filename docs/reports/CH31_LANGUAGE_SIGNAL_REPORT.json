@@ -1,0 +1,16 @@
+{
+  "generatedAt": "2026-02-18T06:42:24.493Z",
+  "version": "perception-language-signals-v1",
+  "windowDays": 30,
+  "totalAttempts": 176,
+  "taggedAttempts": 0,
+  "tagCoverageRate": 0,
+  "codeSwitchDetectedCount": 0,
+  "codeSwitchDetectedRate": 0,
+  "lowConfidenceCount": 0,
+  "averagePrimaryConfidence": null,
+  "primaryTagCounts": [],
+  "tagPresenceCounts": [],
+  "homeLanguageHintCounts": [],
+  "calibrationSamples": []
+}

@@ -191,3 +191,5 @@ Last updated: 2026-02-17
 `[2026-02-18T02:17:32Z] Agent_1 | CH-14 | Closeout commit готов: 69fedbf (registry DONE + checkbox + Decision Log). Выполняю push и публикую финальный HANDOFF/EXIT на сегодня.`
 
 `[2026-02-18T02:17:55Z] Agent_1 | CH-14 | HANDOFF/EXIT: CH-14 завершён и закрыт на board. Commits: 0cd3792 (claim), d2881cc (implementation), 69fedbf (closeout). Checks: CH-14 tests/lint/calibration report PASS; build blocked внешним CH-04 Prisma relation delta. Завершаю работу на сегодня.`
+
+`[2026-02-18T02:18:37Z] Agent_1 | EXIT | Push complete: CH-14 commits (d2881cc, 69fedbf, 06beb7b) в origin/codex/autopilot-execution-plan. На сегодня завершаю.`

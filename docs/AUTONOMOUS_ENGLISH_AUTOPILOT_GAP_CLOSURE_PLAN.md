@@ -101,6 +101,7 @@ Source baseline: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` + current code
 | CH-12 | Cause-driven remediation policy rules | IN_PROGRESS | Agent_3 | 2026-02-18T04:00:20Z |  |  |  | Claimed after cross-agent chat coordination: Agent_2 on CH-11, Agent_1 on CH-15 |
 | CH-13 | OOD generator v1 (axis-tagged) | DONE | Agent_1 | 2026-02-17T23:13:27Z | 2026-02-17T23:39:01Z | `b4d2773`, `b218b85` | `src/lib/ood/generator.ts`, `src/app/api/task/next/route.ts`, `docs/CH13_OOD_GENERATOR_V1.md` | Deterministic OOD axis-tagged generation + OODTaskSpec persistence + API exposure |
 | CH-14 | Difficulty anchor calibration layer | DONE | Agent_1 | 2026-02-18T00:56:49Z | 2026-02-18T02:16:40Z | `0cd3792`, `d2881cc` | `src/lib/ood/difficultyCalibration.ts`, `src/lib/ood/generator.ts`, `src/scripts/ch14_difficulty_anchor_stability_report.ts`, `docs/CH14_DIFFICULTY_CALIBRATION_LAYER.md`, `docs/reports/CH14_DIFFICULTY_ANCHOR_STABILITY_REPORT.json` | Shared difficulty calibration layer landed with report artifact; build check currently blocked by in-flight CH-04 prisma schema relation delta |
+| CH-15 | Difficulty matching protocol | IN_PROGRESS | Agent_1 | 2026-02-18T04:02:02Z |  |  |  | Claimed after cross-agent chat coordination: Agent_2 on CH-11, Agent_3 on CH-12 |
 
 ## 3.3) Decision Log
 

@@ -107,7 +107,7 @@ Source baseline: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` + current code
 | CH-18 | Transfer remediation queue | DONE | Agent_2 | 2026-02-18T04:18:35Z | 2026-02-18T04:26:52Z | `2f89d3f`, `c3098eb` | `src/lib/ood/transferRemediationQueue.ts`, `src/worker/index.ts`, `src/lib/contracts/transferRemediationQueueDashboard.ts`, `src/lib/quality/transferRemediationQueueDashboard.ts`, `src/app/api/quality/transfer-remediation-queue/route.ts`, `src/scripts/ch18_transfer_remediation_queue_report.ts`, `docs/reports/CH18_TRANSFER_REMEDIATION_QUEUE_DASHBOARD.json`, `docs/CH18_TRANSFER_REMEDIATION_QUEUE.md` | OOD fail signals now enqueue transfer remediation queue items with SLA tracking; repeat transfer pass resolves queue and feeds recovery metrics/dashboard |
 | CH-19 | Reward function v1 (versioned) | DONE | Agent_3 | 2026-02-18T04:28:12Z | 2026-02-18T04:36:18Z | `0d0a433`, `0eb1565` | `src/lib/reward/function.ts`, `src/lib/reward/function.test.ts`, `src/worker/index.ts`, `src/scripts/ch19_reward_config_registry_report.ts`, `docs/reports/CH19_REWARD_CONFIG_REGISTRY_REPORT.json`, `docs/CH19_REWARD_FUNCTION_V1.md` | Versioned reward contract `reward-composite-v1` with deterministic same-session `RewardTrace` write-path and registry/report artifact |
 | CH-20 | Offline replay dataset builder | IN_PROGRESS | Agent_1 | 2026-02-18T04:29:42Z |  |  |  | Claimed after CH-19 split: Agent_3 on CH-19, Agent_1 on CH-20 |
-| CH-21 | Off-policy evaluation pipeline | IN_PROGRESS | Agent_2 | 2026-02-18T04:32:28Z |  |  |  | Claimed after chat coordination: Agent_3 on CH-19 reward path, Agent_1 on CH-20 dataset builder |
+| CH-21 | Off-policy evaluation pipeline | DONE | Agent_2 | 2026-02-18T04:32:28Z | 2026-02-18T04:41:51Z | `d6bf67b`, `3abc2b1` | `src/lib/ope/offPolicyEvaluation.ts`, `src/lib/ope/offPolicyEvaluation.test.ts`, `src/lib/contracts/opeReport.ts`, `src/app/api/quality/ope/route.ts`, `src/scripts/ch21_ope_report.ts`, `.github/workflows/ope-promotion-gate.yml`, `docs/reports/CH21_OPE_REPORT.json`, `docs/CH21_OFF_POLICY_EVALUATION_PIPELINE.md` | OPE SNIPS pipeline computes lift + bootstrap confidence bounds while excluding incomplete logs with reason counters; CI promotion-gate workflow uploads report artifact |
 | CH-22 | Learned value model in shadow mode | IN_PROGRESS | Agent_3 | 2026-02-18T04:40:08Z |  |  |  | Claimed after CH-19 closeout; CH-20 and CH-21 already in progress |
 
 ## 3.3) Decision Log
@@ -135,6 +135,7 @@ Source baseline: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` + current code
 | 2026-02-18 | CH-17 | Добавлен milestone stress gate (`milestone-stress-gate-v1`): для target stage >= B1 promotion readiness требует multi-axis stress set (>=2 pairwise axis combinations) и worst-case floor >=70; trace `stressGate` добавлен в stage projection/progress и в `PromotionAudit.reasonsJson` |
 | 2026-02-18 | CH-18 | Введён transfer remediation queue protocol (`transfer-remediation-queue-v1`): verdict `transfer_fail_validated`/`inconclusive_control_missing` ставит learner в `ReviewQueueItem` (`queueType=transfer_remediation`, SLA 72h), а последующий `transfer_pass` закрывает открытый remediation item; добавлен dashboard `/api/quality/transfer-remediation-queue` и report script с recovery-rate/SLA метриками |
 | 2026-02-18 | CH-19 | Зафиксирован versioned reward contract `reward-composite-v1`: deterministic equation (`masteryDelta + transfer + retention - friction`) и trace contract пишутся в `RewardTrace` per decision/window/version с idempotent upsert; добавлены registry report script и replay reproducibility tests |
+| 2026-02-18 | CH-21 | Добавлен OPE pipeline `ope-snips-v1`: policy lift считается через SNIPS (target greedy action по `preActionScores` против production baseline) с bootstrap CI bounds; incomplete logs автоматически исключаются по reason-категориям (`missing linkage`, `invalid propensity`, `missing outcome`, etc); добавлены `/api/quality/ope`, report script и CI gate workflow c артефактом `CH21_OPE_REPORT.json` |
 
 ## 4) Execution Board (обособленные изменения)
 
@@ -226,7 +227,7 @@ Source baseline: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` + current code
   Done: строится обучающий набор `context -> action -> delayed outcome` из event log.  
   Артефакт: replay dataset job + completeness stats.
 
-- [ ] **CH-21 — Off-policy evaluation pipeline**  
+- [x] **CH-21 — Off-policy evaluation pipeline**  
   Done: OPE считает lift и confidence bounds; incomplete logs автоматически исключаются.  
   Артефакт: OPE report в CI/CD promotion gate.
 

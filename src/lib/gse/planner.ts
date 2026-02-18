@@ -2,6 +2,11 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import type { CEFRStage } from "@/lib/curriculum";
 import { appendAutopilotEvent } from "@/lib/autopilot/eventLog";
+import {
+  evaluateAmbiguityTrigger,
+  type AmbiguityTriggerEvaluation,
+  type CausalSnapshot,
+} from "@/lib/causal/ambiguityTrigger";
 import { getBundleNodeIdsForStageAndDomain } from "./bundles";
 import { computeDecayedMastery } from "./mastery";
 import { mapStageToGseRange } from "./utils";
@@ -163,6 +168,26 @@ type CandidateScore = {
   selectionReasonType: "weakness" | "overdue" | "uncertainty" | "verification";
 };
 
+type PlannerAmbiguityTrigger = Pick<
+  AmbiguityTriggerEvaluation,
+  | "evaluated"
+  | "posteriorAmbiguous"
+  | "materialInstability"
+  | "shouldTrigger"
+  | "triggered"
+  | "wouldChangeDecision"
+  | "recommendedProbeTaskType"
+  | "recommendedProbeUtility"
+  | "topCauseLabels"
+  | "topCauseActionFamilies"
+  | "actionValueGap"
+  | "thresholds"
+  | "metrics"
+  | "reasonCodes"
+> & {
+  applied: boolean;
+};
+
 export type PlannerDecision = {
   decisionId: string;
   chosenTaskType: string;
@@ -180,6 +205,7 @@ export type PlannerDecision = {
   verificationTargetNodeIds: string[];
   primaryGoal: string;
   candidateScores: CandidateScore[];
+  ambiguityTrigger: PlannerAmbiguityTrigger;
 };
 
 export async function assignTaskTargetsFromCatalog(params: {
@@ -878,6 +904,7 @@ export async function planNextTaskDecision(params: {
     grammar?: string;
     communication?: string;
   };
+  causalSnapshot?: CausalSnapshot | null;
 }) : Promise<PlannerDecision> {
   const startedAt = Date.now();
   const candidateTaskTypes = dedupe(
@@ -1067,6 +1094,47 @@ export async function planNextTaskDecision(params: {
     );
   }
 
+  const ambiguityTrigger = evaluateAmbiguityTrigger({
+    chosenTaskType: chosen.taskType,
+    candidates: scored.map((row) => ({
+      taskType: row.taskType,
+      utility: row.utility,
+    })),
+    causalSnapshot: params.causalSnapshot ?? null,
+  });
+  let ambiguityTriggerApplied = false;
+  if (ambiguityTrigger.triggered && ambiguityTrigger.recommendedProbeTaskType) {
+    const probeCandidate = scored.find((row) => row.taskType === ambiguityTrigger.recommendedProbeTaskType);
+    if (probeCandidate && probeCandidate.taskType !== chosen.taskType) {
+      chosen = probeCandidate;
+      ambiguityTriggerApplied = true;
+      console.log(
+        JSON.stringify({
+          event: "planner_ambiguity_trigger_applied",
+          studentId: params.studentId,
+          previousTaskType: ambiguityTrigger.chosenTaskType,
+          chosenTaskType: chosen.taskType,
+          actionValueGap: ambiguityTrigger.actionValueGap,
+          entropy: ambiguityTrigger.metrics.entropy,
+          topMargin: ambiguityTrigger.metrics.topMargin,
+          topCauseLabels: ambiguityTrigger.topCauseLabels,
+        })
+      );
+    }
+  }
+
+  const ambiguityTriggerSummary: PlannerAmbiguityTrigger = {
+    ...ambiguityTrigger,
+    applied: ambiguityTriggerApplied,
+  };
+  const effectiveDiagnosticMode = Boolean(params.diagnosticMode) || ambiguityTriggerApplied;
+  const finalSelectionReason = ambiguityTriggerApplied
+    ? `${chosen.selectionReason} Causal ambiguity trigger selected a diagnostic probe.`
+    : chosen.selectionReason;
+  const finalSelectionReasonType: CandidateScore["selectionReasonType"] = ambiguityTriggerApplied
+    ? "uncertainty"
+    : chosen.selectionReasonType;
+
   const overdueCount = nodeStates.filter((node) => node.daysSinceEvidence > node.halfLifeDays).length;
   const weakCount = nodeStates.filter((node) => node.decayedMastery < 55).length;
   const uncertainCount = nodeStates.filter((node) => node.masterySigma >= 22).length;
@@ -1093,14 +1161,24 @@ export async function planNextTaskDecision(params: {
         rotationApplied,
         rotationReason,
         qualityDomainFocus: params.qualityDomainFocus || null,
+        ambiguityTrigger: ambiguityTriggerSummary,
+        causalSnapshotUsed: params.causalSnapshot
+          ? {
+              attemptId: params.causalSnapshot.attemptId || null,
+              modelVersion: params.causalSnapshot.modelVersion || null,
+              topLabel: params.causalSnapshot.topLabel || null,
+              entropy: params.causalSnapshot.entropy ?? null,
+              topMargin: params.causalSnapshot.topMargin ?? null,
+            }
+          : null,
       } as Prisma.InputJsonValue,
       fallbackUsed: false,
       latencyMs: Date.now() - startedAt,
       expectedGain: chosen.expectedGain,
       targetNodeIds: chosen.targetNodeIds,
       domainsTargeted: chosen.domainsTargeted,
-      diagnosticMode: Boolean(params.diagnosticMode),
-      selectionReason: chosen.selectionReason,
+      diagnosticMode: effectiveDiagnosticMode,
+      selectionReason: finalSelectionReason,
       primaryGoal,
       estimatedDifficulty: chosen.estimatedDifficulty,
     },
@@ -1112,8 +1190,9 @@ export async function planNextTaskDecision(params: {
     payload: {
       chosenTaskType: chosen.taskType,
       targetNodeIds: chosen.targetNodeIds,
-      selectionReason: chosen.selectionReason,
+      selectionReason: finalSelectionReason,
       primaryGoal,
+      ambiguityTriggerApplied,
     } as Prisma.InputJsonValue,
   });
 
@@ -1124,16 +1203,17 @@ export async function planNextTaskDecision(params: {
     targetNodeDescriptors: chosen.targetNodeDescriptors,
     targetNodeTypes: chosen.targetNodeTypes,
     domainsTargeted: chosen.domainsTargeted,
-    diagnosticMode: Boolean(params.diagnosticMode),
+    diagnosticMode: effectiveDiagnosticMode,
     rotationApplied,
     rotationReason,
     expectedGain: chosen.expectedGain,
     estimatedDifficulty: chosen.estimatedDifficulty,
-    selectionReason: chosen.selectionReason,
-    selectionReasonType: chosen.selectionReasonType,
+    selectionReason: finalSelectionReason,
+    selectionReasonType: finalSelectionReasonType,
     verificationTargetNodeIds,
     primaryGoal,
     candidateScores: scored,
+    ambiguityTrigger: ambiguityTriggerSummary,
   };
 }
 

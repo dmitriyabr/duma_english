@@ -75,6 +75,19 @@ export async function GET(req: Request) {
     },
   });
   const projection = await projectLearnerStageFromGse(student.studentId);
+  const latestCausalDiagnosis = await prisma.causalDiagnosis.findFirst({
+    where: { studentId: student.studentId },
+    orderBy: { createdAt: "desc" },
+    select: {
+      attemptId: true,
+      modelVersion: true,
+      topLabel: true,
+      entropy: true,
+      topMargin: true,
+      distributionJson: true,
+      createdAt: true,
+    },
+  });
   const placementUncertainNodes = profile?.placementUncertainNodeIds || [];
 
   const weakestSkills = projection.derivedSkills
@@ -125,6 +138,16 @@ export async function GET(req: Request) {
     preferredNodeIds: profile?.placementFresh ? placementUncertainNodes : undefined,
     qualityDomainFocus: qualityDiagnosticOverride,
     domainStages,
+    causalSnapshot: latestCausalDiagnosis
+      ? {
+          attemptId: latestCausalDiagnosis.attemptId,
+          modelVersion: latestCausalDiagnosis.modelVersion,
+          topLabel: latestCausalDiagnosis.topLabel,
+          entropy: latestCausalDiagnosis.entropy,
+          topMargin: latestCausalDiagnosis.topMargin,
+          distributionJson: latestCausalDiagnosis.distributionJson,
+        }
+      : null,
   });
 
   const [recentTaskInstances, historicalTaskCount] = await Promise.all([
@@ -229,6 +252,14 @@ export async function GET(req: Request) {
     supportsPronAssessment: selectedTaskType === "read_aloud",
     assessmentMode: effectiveAssessmentMode,
     maxDurationSec: effectiveMaxDurationSec,
+    ambiguityTrigger: decision.ambiguityTrigger,
+    causalSnapshotRef: latestCausalDiagnosis
+      ? {
+          attemptId: latestCausalDiagnosis.attemptId,
+          modelVersion: latestCausalDiagnosis.modelVersion,
+          createdAt: latestCausalDiagnosis.createdAt.toISOString(),
+        }
+      : null,
   };
 
   const oodCandidate = buildOodTaskSpecCandidate({
@@ -364,10 +395,11 @@ export async function GET(req: Request) {
     coldStartAttempts: profile?.coldStartAttempts || 0,
     placementUncertainNodes,
     carryoverSummary: profile?.placementCarryoverJson || null,
-    diagnosticMode,
+    diagnosticMode: decision.diagnosticMode,
     decisionId: decision.decisionId,
     primaryGoal: decision.primaryGoal,
     selectionReasonType: decision.selectionReasonType,
+    causalAmbiguityTrigger: decision.ambiguityTrigger,
     verificationTargetNodeIds: decision.verificationTargetNodeIds,
     domainsTargeted: decision.domainsTargeted,
     rotationApplied: decision.rotationApplied,

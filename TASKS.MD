@@ -170,3 +170,4 @@ Authoritative docs are in:
 7. `docs/GRAPH_QUALITY_GATES.md` (graph governance release blockers + drift report)
 8. `docs/CH08_CAUSAL_INFERENCE_PIPELINE.md` (causal diagnosis inference write-path + API + calibration report)
 9. `docs/CH09_CAUSE_ATTRIBUTED_EVIDENCE.md` (cause-attributed evidence/mastery write path + audit contract)
+10. `docs/CH10_AMBIGUITY_TRIGGER_LOGIC.md` (entropy/margin/action-instability trigger rules + planner integration)

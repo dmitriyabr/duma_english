@@ -37,6 +37,18 @@ export async function POST(req: NextRequest) {
     select: { ageBand: true, coldStartActive: true, placementFresh: true },
   });
   const projection = await projectLearnerStageFromGse(student.studentId);
+  const latestCausalDiagnosis = await prisma.causalDiagnosis.findFirst({
+    where: { studentId: student.studentId },
+    orderBy: { createdAt: "desc" },
+    select: {
+      attemptId: true,
+      modelVersion: true,
+      topLabel: true,
+      entropy: true,
+      topMargin: true,
+      distributionJson: true,
+    },
+  });
   const decision = await planNextTaskDecision({
     studentId: student.studentId,
     stage: projection.promotionStage,
@@ -50,6 +62,16 @@ export async function POST(req: NextRequest) {
       typeof body.data.diagnosticMode === "boolean"
         ? body.data.diagnosticMode
         : Boolean(profile?.coldStartActive) || Boolean(profile?.placementFresh),
+    causalSnapshot: latestCausalDiagnosis
+      ? {
+          attemptId: latestCausalDiagnosis.attemptId,
+          modelVersion: latestCausalDiagnosis.modelVersion,
+          topLabel: latestCausalDiagnosis.topLabel,
+          entropy: latestCausalDiagnosis.entropy,
+          topMargin: latestCausalDiagnosis.topMargin,
+          distributionJson: latestCausalDiagnosis.distributionJson,
+        }
+      : null,
   });
 
   return NextResponse.json({
@@ -64,5 +86,6 @@ export async function POST(req: NextRequest) {
     diagnosticMode: decision.diagnosticMode,
     primaryGoal: decision.primaryGoal,
     candidateScores: decision.candidateScores,
+    ambiguityTrigger: decision.ambiguityTrigger,
   });
 }

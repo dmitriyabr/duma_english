@@ -30,6 +30,9 @@ test("OOD candidate uses axis tags and metadata on cadence", () => {
   assert.ok(candidate);
   assert.equal(candidate?.status, "planned");
   assert.equal(candidate?.axisTags.length, 2);
-  assert.equal(candidate?.difficultyAnchor, 52);
+  assert.ok(typeof candidate?.difficultyAnchor === "number");
   assert.equal((candidate?.metadata as Record<string, unknown>).generatorVersion, "ood-generator-v1");
+  const calibration = (candidate?.metadata as { difficultyCalibration?: { sharedScaleDifficulty?: number } })
+    .difficultyCalibration;
+  assert.ok(typeof calibration?.sharedScaleDifficulty === "number");
 });

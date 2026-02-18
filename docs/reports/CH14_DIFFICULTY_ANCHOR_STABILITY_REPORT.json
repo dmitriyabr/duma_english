@@ -1,0 +1,137 @@
+{
+  "report": {
+    "generatedAt": "2026-02-18T02:01:24.834Z",
+    "calibrationVersion": "difficulty-calibration-v1",
+    "windowDays": 30,
+    "totalSamples": 198,
+    "sharedScaleStats": {
+      "mean": 50,
+      "std": 15,
+      "min": 0.1326,
+      "max": 77.3201
+    },
+    "profiles": [
+      {
+        "taskType": "read_aloud",
+        "mean": 19.0909,
+        "std": 22.3422,
+        "sampleSize": 33,
+        "baselineMean": 42,
+        "baselineStd": 11,
+        "deltaFromBaselineMean": 22.9091,
+        "calibrationHealth": "unstable"
+      },
+      {
+        "taskType": "target_vocab",
+        "mean": 40.4727,
+        "std": 18.6799,
+        "sampleSize": 55,
+        "baselineMean": 48,
+        "baselineStd": 12,
+        "deltaFromBaselineMean": 7.5273,
+        "calibrationHealth": "watch"
+      },
+      {
+        "taskType": "qa_prompt",
+        "mean": 45.5778,
+        "std": 13.4089,
+        "sampleSize": 45,
+        "baselineMean": 50,
+        "baselineStd": 12,
+        "deltaFromBaselineMean": 4.4222,
+        "calibrationHealth": "watch"
+      },
+      {
+        "taskType": "role_play",
+        "mean": 42,
+        "std": 19.0563,
+        "sampleSize": 7,
+        "baselineMean": 56,
+        "baselineStd": 13,
+        "deltaFromBaselineMean": 14,
+        "calibrationHealth": "unstable"
+      },
+      {
+        "taskType": "topic_talk",
+        "mean": 40.8824,
+        "std": 17.2316,
+        "sampleSize": 34,
+        "baselineMean": 58,
+        "baselineStd": 14,
+        "deltaFromBaselineMean": 17.1176,
+        "calibrationHealth": "unstable"
+      },
+      {
+        "taskType": "filler_control",
+        "mean": 42.4667,
+        "std": 24.8136,
+        "sampleSize": 15,
+        "baselineMean": 46,
+        "baselineStd": 10,
+        "deltaFromBaselineMean": 3.5333,
+        "calibrationHealth": "stable"
+      },
+      {
+        "taskType": "speech_builder",
+        "mean": 31.3333,
+        "std": 10.3709,
+        "sampleSize": 9,
+        "baselineMean": 54,
+        "baselineStd": 13,
+        "deltaFromBaselineMean": 22.6667,
+        "calibrationHealth": "unstable"
+      }
+    ],
+    "notes": [
+      "4 task families are unstable versus baseline mean (>8 points drift)."
+    ]
+  },
+  "calibrationSet": {
+    "version": "difficulty-calibration-v1",
+    "generatedAt": "2026-02-18T02:01:24.834Z",
+    "profiles": {
+      "read_aloud": {
+        "taskType": "read_aloud",
+        "mean": 19.0909,
+        "std": 22.3422,
+        "sampleSize": 33
+      },
+      "target_vocab": {
+        "taskType": "target_vocab",
+        "mean": 40.4727,
+        "std": 18.6799,
+        "sampleSize": 55
+      },
+      "qa_prompt": {
+        "taskType": "qa_prompt",
+        "mean": 45.5778,
+        "std": 13.4089,
+        "sampleSize": 45
+      },
+      "role_play": {
+        "taskType": "role_play",
+        "mean": 42,
+        "std": 19.0563,
+        "sampleSize": 7
+      },
+      "topic_talk": {
+        "taskType": "topic_talk",
+        "mean": 40.8824,
+        "std": 17.2316,
+        "sampleSize": 34
+      },
+      "filler_control": {
+        "taskType": "filler_control",
+        "mean": 42.4667,
+        "std": 24.8136,
+        "sampleSize": 15
+      },
+      "speech_builder": {
+        "taskType": "speech_builder",
+        "mean": 31.3333,
+        "std": 10.3709,
+        "sampleSize": 9
+      }
+    }
+  }
+}

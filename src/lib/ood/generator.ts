@@ -1,4 +1,5 @@
 import { oodAxisTags, oodTaskSpecContractSchema, type OODTaskSpecContract } from "@/lib/db/types";
+import { buildDifficultyAnchorMetadata } from "@/lib/ood/difficultyCalibration";
 
 const OOD_GENERATOR_VERSION = "ood-generator-v1";
 const OOD_INJECTION_INTERVAL = 6; // ~16.7% default OOD frequency until CH-16 budget controller
@@ -50,12 +51,19 @@ export function buildOodTaskSpecCandidate(params: {
       : [primaryAxis];
 
   const difficulty = typeof params.estimatedDifficulty === "number" ? params.estimatedDifficulty : null;
+  const difficultyMetadata =
+    difficulty !== null
+      ? buildDifficultyAnchorMetadata({
+          taskType: params.taskType,
+          estimatedDifficulty: difficulty,
+        })
+      : null;
   const payload = oodTaskSpecContractSchema.parse({
     studentId: params.studentId,
     decisionLogId: params.decisionLogId,
     axisTags,
-    difficultyAnchor: difficulty ?? undefined,
-    inDomainDifficulty: difficulty ?? undefined,
+    difficultyAnchor: difficultyMetadata?.sharedScaleDifficulty,
+    inDomainDifficulty: difficultyMetadata?.sharedScaleDifficulty,
     difficultyDelta: 0,
     status: "planned",
     metadata: {
@@ -64,6 +72,7 @@ export function buildOodTaskSpecCandidate(params: {
       taskOrdinal: params.taskOrdinal,
       interval: OOD_INJECTION_INTERVAL,
       taskType: params.taskType,
+      difficultyCalibration: difficultyMetadata,
     },
   });
 

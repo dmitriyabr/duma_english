@@ -1,0 +1,117 @@
+{
+  "generatedAt": "2026-02-18T00:11:24.360Z",
+  "window": {
+    "days": 30,
+    "from": "2026-01-19T00:11:22.095Z"
+  },
+  "sampleSize": {
+    "diagnoses": 0,
+    "attemptEvidenceRows": 0,
+    "masteryRows": 0
+  },
+  "diagnosisSnapshot": {
+    "modelVersions": [],
+    "topLabelCounts": {
+      "rule_confusion": 0,
+      "l1_interference": 0,
+      "retrieval_failure": 0,
+      "instruction_misread": 0,
+      "attention_loss": 0,
+      "production_constraint": 0,
+      "mixed": 0,
+      "unknown": 0
+    },
+    "topLabelRates": {
+      "rule_confusion": 0,
+      "l1_interference": 0,
+      "retrieval_failure": 0,
+      "instruction_misread": 0,
+      "attention_loss": 0,
+      "production_constraint": 0,
+      "mixed": 0,
+      "unknown": 0
+    }
+  },
+  "evidenceAudit": {
+    "attemptsWithDiagnosis": 0,
+    "attemptsWithEvidenceRows": 0,
+    "attemptsWithoutEvidenceRows": 0,
+    "attemptsFullyAttributed": 0,
+    "attemptsPartiallyAttributed": 0,
+    "attemptFullAttributionRate": 0,
+    "rowsTotal": 0,
+    "rowsWithCompleteAttribution": 0,
+    "rowCompleteAttributionRate": 0,
+    "missingFieldCounts": {
+      "label": 0,
+      "distribution": 0,
+      "modelVersion": 0
+    },
+    "contractViolations": {
+      "invalidProbabilityRows": 0,
+      "invalidDistributionRows": 0,
+      "distributionTopMismatchRows": 0,
+      "distributionMassDriftRows": 0,
+      "labelMismatchVsDiagnosisRows": 0,
+      "modelVersionMismatchVsDiagnosisRows": 0
+    },
+    "topLabelCounts": {
+      "rule_confusion": 0,
+      "l1_interference": 0,
+      "retrieval_failure": 0,
+      "instruction_misread": 0,
+      "attention_loss": 0,
+      "production_constraint": 0,
+      "mixed": 0,
+      "unknown": 0
+    },
+    "topLabelRates": {
+      "rule_confusion": 0,
+      "l1_interference": 0,
+      "retrieval_failure": 0,
+      "instruction_misread": 0,
+      "attention_loss": 0,
+      "production_constraint": 0,
+      "mixed": 0,
+      "unknown": 0
+    },
+    "partialAttemptSamples": []
+  },
+  "masteryAudit": {
+    "rowsScanned": 0,
+    "rowsWithAnyCauseField": 0,
+    "rowsWithCompleteAttribution": 0,
+    "completeAttributionRate": 0,
+    "missingFieldCounts": {
+      "label": 0,
+      "distribution": 0,
+      "modelVersion": 0
+    },
+    "contractViolations": {
+      "invalidProbabilityRows": 0,
+      "invalidDistributionRows": 0,
+      "distributionTopMismatchRows": 0,
+      "distributionMassDriftRows": 0
+    },
+    "topLabelCounts": {
+      "rule_confusion": 0,
+      "l1_interference": 0,
+      "retrieval_failure": 0,
+      "instruction_misread": 0,
+      "attention_loss": 0,
+      "production_constraint": 0,
+      "mixed": 0,
+      "unknown": 0
+    },
+    "topLabelRates": {
+      "rule_confusion": 0,
+      "l1_interference": 0,
+      "retrieval_failure": 0,
+      "instruction_misread": 0,
+      "attention_loss": 0,
+      "production_constraint": 0,
+      "mixed": 0,
+      "unknown": 0
+    }
+  }
+}

@@ -1,4 +1,6 @@
 import { prisma } from "@/lib/db";
+import { normalizeCausalLabel } from "@/lib/db/types";
+import { Prisma } from "@prisma/client";
 
 export type GseReliability = "high" | "medium" | "low";
 export type GseEvidenceKind = "direct" | "supporting" | "negative";
@@ -18,6 +20,10 @@ export type MasteryEvidence = {
   taskType?: string;
   targeted?: boolean;
   placementMode?: string | null;
+  causeTopLabel?: string | null;
+  causeTopProbability?: number | null;
+  causeDistributionJson?: unknown;
+  causeModelVersion?: string | null;
 };
 
 export type NodeMasteryOutcome = {
@@ -349,6 +355,21 @@ export async function applyEvidenceToStudentMastery(params: {
     let activationStateAfter: NodeActivationState = activationStateBefore;
     let activationImpact: EvidenceActivationImpact = "none";
     let verificationDueAt: Date | null = existing?.verificationDueAt ?? null;
+    const hasCauseAttribution = typeof evidence.causeModelVersion === "string" && evidence.causeModelVersion.length > 0;
+    const dominantCauseLabel = hasCauseAttribution
+      ? normalizeCausalLabel(evidence.causeTopLabel || "unknown")
+      : undefined;
+    const dominantCauseProbability =
+      hasCauseAttribution && typeof evidence.causeTopProbability === "number"
+        ? clamp01(evidence.causeTopProbability)
+        : undefined;
+    const dominantCauseDistributionJson =
+      hasCauseAttribution && evidence.causeDistributionJson !== undefined
+        ? evidence.causeDistributionJson === null
+          ? Prisma.DbNull
+          : (evidence.causeDistributionJson as Prisma.InputJsonValue)
+        : undefined;
+    const dominantCauseModelVersion = hasCauseAttribution ? evidence.causeModelVersion : undefined;
 
     const verificationPass =
       kind === "direct" &&
@@ -415,6 +436,14 @@ export async function applyEvidenceToStudentMastery(params: {
         activationState: activationStateAfter,
         verificationDueAt,
         lastEvidenceAt: now,
+        ...(hasCauseAttribution
+          ? {
+              dominantCauseLabel,
+              dominantCauseProbability,
+              dominantCauseDistributionJson,
+              dominantCauseModelVersion,
+            }
+          : {}),
         spacingStateJson: {
           incidentalTaskTypes: nextIncidentalTaskTypes,
           incidentalConfidences: nextIncidentalConfidences,
@@ -443,6 +472,10 @@ export async function applyEvidenceToStudentMastery(params: {
         activationState: activationStateAfter,
         verificationDueAt,
         lastEvidenceAt: now,
+        dominantCauseLabel: dominantCauseLabel ?? null,
+        dominantCauseProbability: dominantCauseProbability ?? null,
+        dominantCauseDistributionJson: dominantCauseDistributionJson ?? Prisma.DbNull,
+        dominantCauseModelVersion: dominantCauseModelVersion ?? null,
         spacingStateJson: {
           incidentalTaskTypes: nextIncidentalTaskTypes,
           incidentalConfidences: nextIncidentalConfidences,

@@ -169,3 +169,4 @@ Authoritative docs are in:
 6. `docs/LAST_ATTEMPT_TRACE.md` (разбор последней попытки по шагам: транскрипт → парсер → retrieval → evaluator → evidence)
 7. `docs/GRAPH_QUALITY_GATES.md` (graph governance release blockers + drift report)
 8. `docs/CH08_CAUSAL_INFERENCE_PIPELINE.md` (causal diagnosis inference write-path + API + calibration report)
+9. `docs/CH09_CAUSE_ATTRIBUTED_EVIDENCE.md` (cause-attributed evidence/mastery write path + audit contract)

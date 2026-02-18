@@ -401,6 +401,10 @@ model AttemptGseEvidence {
   usedForPromotion Boolean  @default(false)
   activationImpact String   @default("none")
   targeted         Boolean  @default(true)
+  causeTopLabel    String?
+  causeTopProbability Float?
+  causeDistributionJson Json?
+  causeModelVersion String?
   attempt          Attempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)
   node             GseNode  @relation(fields: [nodeId], references: [nodeId], onDelete: Cascade)
   student          Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
@@ -409,6 +413,7 @@ model AttemptGseEvidence {
   @@index([attemptId])
   @@index([studentId, nodeId])
   @@index([studentId, nodeId, usedForPromotion])
+  @@index([causeTopLabel, createdAt])
 }
 
 model StudentGseMastery {
@@ -438,12 +443,17 @@ model StudentGseMastery {
   supportingEvidenceCount Int       @default(0)
   incidentalTaskTypeCount Int       @default(0)
   verificationDueAt       DateTime?
+  dominantCauseLabel      String?
+  dominantCauseProbability Float?
+  dominantCauseDistributionJson Json?
+  dominantCauseModelVersion String?
   node                    GseNode   @relation(fields: [nodeId], references: [nodeId], onDelete: Cascade)
   student                 Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@unique([studentId, nodeId])
   @@index([studentId, masteryScore])
   @@index([studentId, activationState, verificationDueAt])
+  @@index([studentId, dominantCauseLabel])
 }
 
 model GseStageProjection {

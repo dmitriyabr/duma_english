@@ -77,6 +77,7 @@ As of 2026-02-14:
 - `npm run build` passes.
 - `npm run graph:quality` provides release-blocking graph governance checks + drift report output.
 - `GET /api/attempts/[id]` now includes causal diagnosis payload (`results.causal`) for completed attempts.
+- `npm run cause:audit -- --days 30` audits causal attribution coverage/contract integrity in evidence + mastery write-path.
 
 ## Placement Architecture (Current)
 

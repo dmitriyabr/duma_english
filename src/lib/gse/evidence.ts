@@ -80,6 +80,10 @@ type EvidenceDraft = {
   evidenceText?: string;
   reliability: "high" | "medium" | "low";
   metadataJson?: Record<string, unknown> | null;
+  causeTopLabel?: string | null;
+  causeTopProbability?: number | null;
+  causeDistributionJson?: unknown;
+  causeModelVersion?: string | null;
 };
 
 export type BuildAttemptEvidenceInput = {
@@ -392,6 +396,10 @@ function makeEvidence(params: {
   ageBand?: string | null;
   evidenceText?: string;
   metadataJson?: Record<string, unknown> | null;
+  causeTopLabel?: string | null;
+  causeTopProbability?: number | null;
+  causeDistributionJson?: unknown;
+  causeModelVersion?: string | null;
 }): EvidenceDraft {
   return {
     nodeId: params.nodeId,
@@ -408,6 +416,10 @@ function makeEvidence(params: {
     evidenceText: params.evidenceText,
     reliability: params.reliability,
     metadataJson: params.metadataJson ?? null,
+    causeTopLabel: params.causeTopLabel ?? null,
+    causeTopProbability: typeof params.causeTopProbability === "number" ? params.causeTopProbability : null,
+    causeDistributionJson: params.causeDistributionJson ?? null,
+    causeModelVersion: params.causeModelVersion ?? null,
   };
 }
 
@@ -1030,7 +1042,7 @@ export async function persistAttemptGseEvidence(input: BuildAttemptEvidenceInput
     return { evidenceCount: 0, nodeOutcomes: [] as NodeMasteryOutcome[] };
   }
 
-  const [taskInstance, existingAttemptEvidenceRows] = await Promise.all([
+  const [taskInstance, existingAttemptEvidenceRows, causalDiagnosis] = await Promise.all([
     prisma.taskInstance.findUnique({
       where: { taskId: input.taskId },
       select: { id: true, decisionLogId: true },
@@ -1039,8 +1051,30 @@ export async function persistAttemptGseEvidence(input: BuildAttemptEvidenceInput
       where: { attemptId: input.attemptId },
       select: { id: true },
     }),
+    prisma.causalDiagnosis.findUnique({
+      where: { attemptId: input.attemptId },
+      select: {
+        topLabel: true,
+        topProbability: true,
+        distributionJson: true,
+        modelVersion: true,
+      },
+    }),
   ]);
   const existingEvidenceIds = new Set(existingAttemptEvidenceRows.map((row) => row.id));
+  const causeAttribution =
+    causalDiagnosis && typeof causalDiagnosis.topLabel === "string"
+      ? {
+          topLabel: causalDiagnosis.topLabel,
+          topProbability: causalDiagnosis.topProbability,
+          distributionJson: causalDiagnosis.distributionJson,
+          modelVersion: causalDiagnosis.modelVersion,
+        }
+      : null;
+  const toNullableJsonInput = (
+    value: unknown
+  ): Prisma.InputJsonValue | Prisma.NullableJsonNullValueInput =>
+    value === null || value === undefined ? Prisma.DbNull : (value as Prisma.InputJsonValue);
 
   await prisma.attemptGseEvidence.createMany({
     data: rows.map((row) => ({
@@ -1060,6 +1094,15 @@ export async function persistAttemptGseEvidence(input: BuildAttemptEvidenceInput
       activationImpact: row.activationImpact,
       evidenceText: row.evidenceText || null,
       metadataJson: ((row.metadataJson || {}) as Prisma.InputJsonValue),
+      causeTopLabel: row.causeTopLabel ?? causeAttribution?.topLabel ?? null,
+      causeTopProbability:
+        typeof row.causeTopProbability === "number"
+          ? row.causeTopProbability
+          : causeAttribution?.topProbability ?? null,
+      causeDistributionJson: toNullableJsonInput(
+        row.causeDistributionJson ?? causeAttribution?.distributionJson
+      ),
+      causeModelVersion: row.causeModelVersion ?? causeAttribution?.modelVersion ?? null,
     })),
   });
 
@@ -1074,6 +1117,13 @@ export async function persistAttemptGseEvidence(input: BuildAttemptEvidenceInput
     taskType: input.taskType,
     targeted: row.targeted,
     placementMode: typeof row.metadataJson?.placementMode === "string" ? row.metadataJson.placementMode : null,
+    causeTopLabel: row.causeTopLabel ?? causeAttribution?.topLabel ?? null,
+    causeTopProbability:
+      typeof row.causeTopProbability === "number"
+        ? row.causeTopProbability
+        : causeAttribution?.topProbability ?? null,
+    causeDistributionJson: row.causeDistributionJson ?? causeAttribution?.distributionJson ?? null,
+    causeModelVersion: row.causeModelVersion ?? causeAttribution?.modelVersion ?? null,
   }));
 
   const nodeOutcomes = await applyEvidenceToStudentMastery({

@@ -19,6 +19,10 @@ import {
   type ShadowValueCandidateInput,
 } from "@/lib/shadow/valueModel";
 import type { ShadowPolicyTrace } from "@/lib/contracts/shadowPolicyDashboard";
+import {
+  runGuardrailedHybridSelector,
+  type HybridSelectorResult,
+} from "@/lib/policy/hybridSelector";
 import { getBundleNodeIdsForStageAndDomain } from "./bundles";
 import { computeDecayedMastery } from "./mastery";
 import { mapStageToGseRange } from "./utils";
@@ -144,6 +148,49 @@ function clusterCountInRecent(recentTaskTypes: string[], cluster: string, window
   return recent.filter((type) => taskCluster(type) === cluster).length;
 }
 
+function buildHardConstraintReasons(params: {
+  candidate: Pick<
+    CandidateScore,
+    "taskType" | "targetNodeIds" | "verificationGain" | "engagementRisk" | "latencyRisk" | "successProbability"
+  >;
+  recentTaskTypes: string[];
+  verificationRequired: boolean;
+}) {
+  const reasons: string[] = [];
+
+  if (!params.candidate.targetNodeIds || params.candidate.targetNodeIds.length === 0) {
+    reasons.push("target_nodes_required");
+  }
+
+  const typeStreak = sameTypeStreak(params.recentTaskTypes, params.candidate.taskType);
+  const clusterStreak = clusterCountInRecent(
+    params.recentTaskTypes,
+    taskCluster(params.candidate.taskType),
+    5
+  );
+  if (typeStreak >= 2) {
+    reasons.push(`task_type_streak_${typeStreak}`);
+  } else if (clusterStreak >= 2) {
+    reasons.push(`thematic_cluster_streak_${clusterStreak}`);
+  }
+
+  if (params.verificationRequired && params.candidate.verificationGain <= 0) {
+    reasons.push("verification_sla");
+  }
+
+  if (params.candidate.successProbability < 0.35) {
+    reasons.push("low_success_probability");
+  }
+  if (params.candidate.engagementRisk >= 0.28) {
+    reasons.push("high_engagement_risk");
+  }
+  if (params.candidate.latencyRisk >= 0.22) {
+    reasons.push("high_latency_risk");
+  }
+
+  return dedupe(reasons);
+}
+
 type NodeState = {
   nodeId: string;
   descriptor: string;
@@ -179,6 +226,11 @@ type CandidateScore = {
   causalRemediationAdjustment: number;
   causalRemediationAlignment: CausalRemediationAlignment;
   utility: number;
+  ruleUtility?: number;
+  learnedValue?: number;
+  propensity?: number;
+  hardConstraintReasons?: string[];
+  blockedByHardConstraints?: boolean;
   estimatedDifficulty: number;
   selectionReason: string;
   selectionReasonType: "weakness" | "overdue" | "uncertainty" | "verification";
@@ -215,6 +267,12 @@ type PlannerAmbiguityTrigger = Pick<
   applied: boolean;
 };
 
+type PlannerHybridPolicyTrace = HybridSelectorResult & {
+  chosenActionBeforeAmbiguity: string;
+  chosenActionAfterAmbiguity: string;
+  ambiguityOverrideApplied: boolean;
+};
+
 export type PlannerDecision = {
   decisionId: string;
   chosenTaskType: string;
@@ -234,6 +292,7 @@ export type PlannerDecision = {
   candidateScores: CandidateScore[];
   causalRemediation: PlannerCausalRemediation;
   ambiguityTrigger: PlannerAmbiguityTrigger;
+  hybridPolicy: PlannerHybridPolicyTrace;
   shadowPolicy: ShadowPolicyTrace | null;
 };
 
@@ -1086,7 +1145,7 @@ export async function planNextTaskDecision(params: {
   const remediationByTaskType = new Map(
     remediationPolicy.adjustments.map((row) => [row.taskType, row] as const)
   );
-  const scored = baseScored.map((row) => {
+  const ruleScored = baseScored.map((row) => {
     const remediation = remediationByTaskType.get(row.taskType);
     const adjustment = remediation?.adjustment ?? 0;
     return {
@@ -1096,49 +1155,106 @@ export async function planNextTaskDecision(params: {
       utility: round(row.baseUtility + adjustment),
     };
   });
-  const topByBaseUtility = [...scored].sort((a, b) => b.baseUtility - a.baseUtility)[0] || null;
-  scored.sort((a, b) => b.utility - a.utility);
-  const topByPolicyUtility = scored[0] || null;
+  const topByBaseUtility = [...ruleScored].sort((a, b) => b.baseUtility - a.baseUtility)[0] || null;
+  const scoredByRuleUtility = [...ruleScored].sort((a, b) => b.utility - a.utility);
+  const topByPolicyUtility = scoredByRuleUtility[0] || null;
   const policyChangedTopChoice = Boolean(
     topByBaseUtility &&
       topByPolicyUtility &&
       topByBaseUtility.taskType !== topByPolicyUtility.taskType
   );
-  const topCandidate = scored[0];
-  let chosen = topCandidate;
-  let rotationApplied = false;
-  let rotationReason: string | null = null;
-  if (topCandidate) {
-    const topTypeStreak = sameTypeStreak(recentTaskTypes, topCandidate.taskType);
-    const topCluster = taskCluster(topCandidate.taskType);
-    const topClusterCount = clusterCountInRecent(recentTaskTypes, topCluster, 5);
-    const violatesRotation = topTypeStreak >= 2 || topClusterCount >= 2;
-    if (violatesRotation) {
-      const alternative = scored.find((candidate) => {
-        const typeStreak = sameTypeStreak(recentTaskTypes, candidate.taskType);
-        const cluster = taskCluster(candidate.taskType);
-        const clusterCount = clusterCountInRecent(recentTaskTypes, cluster, 5);
-        return typeStreak < 2 && clusterCount < 2;
-      });
-      if (alternative) {
-        chosen = alternative;
-        rotationApplied = true;
-        rotationReason =
-          topTypeStreak >= 2
-            ? `task_type_streak_${topTypeStreak}`
-            : `thematic_cluster_streak_${topClusterCount}`;
-      }
-    }
+  const verificationRequired = verificationTargetNodeIds.length > 0 && !recentVerificationHit;
+  const shadowCandidates: ShadowValueCandidateInput[] = ruleScored.map((row) => ({
+    taskType: row.taskType,
+    actionFamily: row.actionFamily,
+    expectedGain: row.expectedGain,
+    successProbability: row.successProbability,
+    engagementRisk: row.engagementRisk,
+    latencyRisk: row.latencyRisk,
+    explorationBonus: row.explorationBonus,
+    verificationGain: row.verificationGain,
+    causalRemediationAdjustment: row.causalRemediationAdjustment,
+    baseUtility: row.baseUtility,
+    utility: row.utility,
+  }));
+  let shadowPolicyForSelection: ShadowPolicyTrace | null = null;
+  try {
+    shadowPolicyForSelection = await evaluateShadowValueDecision({
+      candidates: shadowCandidates,
+      rulesChosenTaskType:
+        topByPolicyUtility?.taskType || shadowCandidates[0]?.taskType || "target_vocab",
+      requiresVerificationCoverage: verificationRequired,
+    });
+  } catch (error) {
+    console.error(
+      JSON.stringify({
+        event: "planner_shadow_policy_selection_error",
+        studentId: params.studentId,
+        message: error instanceof Error ? error.message : String(error),
+      })
+    );
   }
+  const learnedValueByTaskType = new Map<string, number>();
+  for (const row of shadowPolicyForSelection?.candidateScores || []) {
+    learnedValueByTaskType.set(row.taskType, row.shadowValue);
+  }
+
+  const hybridSelection = runGuardrailedHybridSelector({
+    candidates: ruleScored.map((row) => ({
+      actionId: row.taskType,
+      ruleUtility: row.utility,
+      learnedValue: learnedValueByTaskType.get(row.taskType) ?? row.utility,
+      hardConstraintReasons: buildHardConstraintReasons({
+        candidate: row,
+        recentTaskTypes,
+        verificationRequired,
+      }),
+    })),
+  });
+  const scoredWithHybrid = ruleScored
+    .map((row) => {
+      const hardConstraintReasons = hybridSelection.constraintMask[row.taskType] || [];
+      const loggedUtility = hybridSelection.preActionScores[row.taskType];
+      return {
+        ...row,
+        ruleUtility: row.utility,
+        learnedValue: learnedValueByTaskType.get(row.taskType) ?? row.utility,
+        utility: typeof loggedUtility === "number" ? loggedUtility : row.utility,
+        propensity: hybridSelection.propensityByAction[row.taskType],
+        hardConstraintReasons,
+        blockedByHardConstraints:
+          hardConstraintReasons.length > 0 &&
+          !hybridSelection.candidateActionSet.includes(row.taskType),
+      };
+    })
+    .sort((a, b) => b.utility - a.utility);
+  const scoredForLogging = scoredWithHybrid.filter((row) =>
+    hybridSelection.candidateActionSet.includes(row.taskType)
+  );
+  const scoringUniverse = scoredForLogging.length > 0 ? scoredForLogging : scoredWithHybrid;
+  let chosen =
+    scoredWithHybrid.find((row) => row.taskType === hybridSelection.chosenAction) ||
+    scoredWithHybrid[0] ||
+    null;
   if (!chosen || chosen.targetNodeIds.length === 0) {
     throw new Error("Planner decision failed: no GSE targets resolved.");
   }
-  if (verificationTargetNodeIds.length > 0 && !recentVerificationHit && chosen.verificationGain <= 0) {
-    const verificationCandidate = scored.find((row) => row.verificationGain > 0);
-    if (verificationCandidate) {
-      chosen = verificationCandidate;
-    }
-  }
+
+  const topCandidate = topByPolicyUtility;
+  const topConstraintReasons = topCandidate
+    ? hybridSelection.constraintMask[topCandidate.taskType] || []
+    : [];
+  const rotationReason =
+    topConstraintReasons.find(
+      (reason) =>
+        reason.startsWith("task_type_streak_") || reason.startsWith("thematic_cluster_streak_")
+    ) || null;
+  const rotationApplied = Boolean(
+    rotationReason &&
+      topCandidate &&
+      chosen &&
+      topCandidate.taskType !== chosen.taskType
+  );
   if (rotationApplied) {
     console.log(
       JSON.stringify({
@@ -1153,7 +1269,7 @@ export async function planNextTaskDecision(params: {
 
   const ambiguityTrigger = evaluateAmbiguityTrigger({
     chosenTaskType: chosen.taskType,
-    candidates: scored.map((row) => ({
+    candidates: scoringUniverse.map((row) => ({
       taskType: row.taskType,
       utility: row.utility,
     })),
@@ -1161,7 +1277,9 @@ export async function planNextTaskDecision(params: {
   });
   let ambiguityTriggerApplied = false;
   if (ambiguityTrigger.triggered && ambiguityTrigger.recommendedProbeTaskType) {
-    const probeCandidate = scored.find((row) => row.taskType === ambiguityTrigger.recommendedProbeTaskType);
+    const probeCandidate = scoringUniverse.find(
+      (row) => row.taskType === ambiguityTrigger.recommendedProbeTaskType
+    );
     if (probeCandidate && probeCandidate.taskType !== chosen.taskType) {
       chosen = probeCandidate;
       ambiguityTriggerApplied = true;
@@ -1184,25 +1302,18 @@ export async function planNextTaskDecision(params: {
     ...ambiguityTrigger,
     applied: ambiguityTriggerApplied,
   };
-  let shadowPolicy: ShadowPolicyTrace | null = null;
+  const hybridPolicy: PlannerHybridPolicyTrace = {
+    ...hybridSelection,
+    chosenActionBeforeAmbiguity: hybridSelection.chosenAction,
+    chosenActionAfterAmbiguity: chosen.taskType,
+    ambiguityOverrideApplied: ambiguityTriggerApplied,
+  };
+  let shadowPolicy: ShadowPolicyTrace | null = shadowPolicyForSelection;
   try {
-    const shadowCandidates: ShadowValueCandidateInput[] = scored.map((row) => ({
-      taskType: row.taskType,
-      actionFamily: row.actionFamily,
-      expectedGain: row.expectedGain,
-      successProbability: row.successProbability,
-      engagementRisk: row.engagementRisk,
-      latencyRisk: row.latencyRisk,
-      explorationBonus: row.explorationBonus,
-      verificationGain: row.verificationGain,
-      causalRemediationAdjustment: row.causalRemediationAdjustment,
-      baseUtility: row.baseUtility,
-      utility: row.utility,
-    }));
     shadowPolicy = await evaluateShadowValueDecision({
       candidates: shadowCandidates,
       rulesChosenTaskType: chosen.taskType,
-      requiresVerificationCoverage: verificationTargetNodeIds.length > 0 && !recentVerificationHit,
+      requiresVerificationCoverage: verificationRequired,
     });
   } catch (error) {
     console.error(
@@ -1244,16 +1355,29 @@ export async function planNextTaskDecision(params: {
   const uncertainCount = nodeStates.filter((node) => node.masterySigma >= 22).length;
   const primaryGoal = recoveryTriggered
     ? "auto_recovery_path"
-    : verificationTargetNodeIds.length > 0 && !recentVerificationHit
+    : verificationRequired
     ? "verify_candidate_nodes"
     : buildPrimaryGoal({ overdueCount, weakCount, uncertainCount });
+  const chosenPropensity =
+    hybridPolicy.propensityByAction[chosen.taskType] ?? hybridPolicy.propensity;
+  const activeConstraints = ambiguityTriggerApplied
+    ? dedupe([...hybridPolicy.activeConstraints, "ambiguity_trigger"])
+    : hybridPolicy.activeConstraints;
+  const candidateSetForLogging =
+    scoredForLogging.length > 0 ? scoredForLogging : [chosen];
 
   const decision = await prisma.plannerDecisionLog.create({
     data: {
       studentId: params.studentId,
-      candidateSetJson: scored as unknown as Prisma.InputJsonValue,
+      candidateSetJson: candidateSetForLogging as unknown as Prisma.InputJsonValue,
       chosenTaskType: chosen.taskType,
       utilityJson: {
+        policyVersion: hybridPolicy.policyVersion,
+        propensity: chosenPropensity,
+        candidateActionSet: hybridPolicy.candidateActionSet,
+        preActionScores: hybridPolicy.preActionScores,
+        activeConstraints,
+        constraintMask: hybridPolicy.constraintMask,
         expectedGain: chosen.expectedGain,
         successProbability: chosen.successProbability,
         engagementRisk: chosen.engagementRisk,
@@ -1276,6 +1400,7 @@ export async function planNextTaskDecision(params: {
               topMargin: params.causalSnapshot.topMargin ?? null,
             }
           : null,
+        hybridPolicy,
         shadowPolicy,
       } as Prisma.InputJsonValue,
       fallbackUsed: false,
@@ -1302,6 +1427,8 @@ export async function planNextTaskDecision(params: {
       causalRemediationApplied: causalRemediationSummary.applied,
       causalRemediationTopCause: causalRemediationSummary.topCauseLabel,
       causalRemediationChosenAdjustment: chosen.causalRemediationAdjustment,
+      chosenPropensity,
+      activeConstraints,
       shadowPolicyEvaluated: Boolean(shadowPolicy),
       shadowPolicyDisagreement: shadowPolicy?.disagreement ?? null,
       shadowPolicyBlockedBySafetyGuard: shadowPolicy?.blockedBySafetyGuard ?? null,
@@ -1324,9 +1451,10 @@ export async function planNextTaskDecision(params: {
     selectionReasonType: finalSelectionReasonType,
     verificationTargetNodeIds,
     primaryGoal,
-    candidateScores: scored,
+    candidateScores: scoredWithHybrid,
     causalRemediation: causalRemediationSummary,
     ambiguityTrigger: ambiguityTriggerSummary,
+    hybridPolicy,
     shadowPolicy,
   };
 }

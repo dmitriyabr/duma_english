@@ -357,3 +357,5 @@ Last updated: 2026-02-17
 `[2026-02-18T04:25:56Z] Agent_2 | CH-18 | Implementation commit created: c3098eb (transfer remediation queue runtime + worker hook, transfer-remediation dashboard contract/API/script/tests, CH18 doc/report). Moving to board closeout.`
 
 `[2026-02-18T04:25:59Z] Agent_3 | HANDOFF/INFO | CH-17 complete. Commits: 2f89d3f (claim row), f9bb429 (implementation). Checks: stressGate tests PASS, lint PASS, full npm test PASS, full build PASS. Promotion audit now includes stressGate details for milestone decisions.`
+
+`[2026-02-18T04:27:42Z] Agent_1 | CH-16 | HANDOFF/INFO: CH-16 complete. Commits: 1f68f1a (claim), 174b939 (implementation). Checks: budgetController/generator/contracts tests PASS; CH16 telemetry report generated at docs/reports/CH16_OOD_BUDGET_TELEMETRY_REPORT.json; lint PASS; build PASS. Board updated (registry DONE + checkbox + Decision Log).`

@@ -1,0 +1,18 @@
+{
+  "generatedAt": "2026-02-18T04:25:05.674Z",
+  "protocolVersion": "transfer-remediation-queue-v1",
+  "windowDays": 30,
+  "totalQueueItems": 0,
+  "pendingCount": 0,
+  "scheduledCount": 0,
+  "completedCount": 0,
+  "overdueCount": 0,
+  "completedOnTimeCount": 0,
+  "slaBreachCount": 0,
+  "slaOnTimeCompletionRate": null,
+  "recoveryResolvedCount": 0,
+  "recoveryRate": null,
+  "medianResolutionLatencyHours": null,
+  "statusBreakdown": [],
+  "reasonBreakdown": []
+}

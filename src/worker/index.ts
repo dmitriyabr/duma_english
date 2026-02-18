@@ -14,6 +14,7 @@ import { evaluateSpeechRetryGate } from "../lib/speechRetryGate";
 import { evaluateTopicRetryGate } from "../lib/topicRetryGate";
 import { inferCausalDiagnosis } from "../lib/causal/inference";
 import { evaluateAndPersistOodTransferVerdict } from "../lib/ood/transferVerdict";
+import { syncTransferRemediationQueueForVerdict } from "../lib/ood/transferRemediationQueue";
 
 const POLL_INTERVAL_MS = config.worker.pollIntervalMs;
 const SCORE_VERSION = "score-v3";
@@ -553,6 +554,12 @@ async function processAttempt(attemptId: string) {
         typeof evaluated.taskEvaluation.taskScore === "number" ? evaluated.taskEvaluation.taskScore : null,
     });
     if (oodTransferVerdict) {
+      const remediationQueueSync = await syncTransferRemediationQueueForVerdict({
+        studentId: attempt.studentId,
+        attemptId: attempt.id,
+        oodTaskSpecId: oodTransferVerdict.oodTaskSpecId,
+        verdict: oodTransferVerdict.verdict,
+      });
       console.log(
         JSON.stringify({
           event: "ood_transfer_verdict_evaluated",
@@ -560,6 +567,9 @@ async function processAttempt(attemptId: string) {
           oodTaskSpecId: oodTransferVerdict.oodTaskSpecId,
           verdict: oodTransferVerdict.verdict,
           matchedControlPass: oodTransferVerdict.matchedControlPass,
+          transferRemediationQueueAction: remediationQueueSync.action,
+          transferRemediationQueueItemId: remediationQueueSync.queueItemId,
+          transferRemediationQueueReason: remediationQueueSync.reason,
         })
       );
     }

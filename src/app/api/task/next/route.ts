@@ -16,6 +16,7 @@ import { extractReferenceText, extractRequiredWords } from "@/lib/taskText";
 import { buildGseQualityReport } from "@/lib/gse/quality";
 import { buildOodTaskSpecCandidate, buildOodTaskSpecMetadataJson } from "@/lib/ood/generator";
 import { buildDisambiguationProbePlan } from "@/lib/causal/disambiguationProbe";
+import { computeOodBudgetDecision } from "@/lib/ood/budgetController";
 
 const ALL_TASK_TYPES = [
   "read_aloud",
@@ -151,7 +152,7 @@ export async function GET(req: Request) {
       : null,
   });
 
-  const [recentTaskInstances, historicalTaskCount] = await Promise.all([
+  const [recentTaskInstances, historicalTaskCount, recentOodSignals] = await Promise.all([
     prisma.taskInstance.findMany({
       where: { studentId: student.studentId },
       include: { task: { select: { prompt: true, metaJson: true } } },
@@ -161,7 +162,23 @@ export async function GET(req: Request) {
     prisma.taskInstance.count({
       where: { studentId: student.studentId },
     }),
+    prisma.oODTaskSpec.findMany({
+      where: { studentId: student.studentId },
+      orderBy: { createdAt: "desc" },
+      take: 30,
+      select: {
+        verdict: true,
+        status: true,
+        createdAt: true,
+      },
+    }),
   ]);
+  const oodBudgetDecision = computeOodBudgetDecision({
+    taskOrdinal: historicalTaskCount + 1,
+    selectionReasonType: decision.selectionReasonType,
+    primaryGoal: decision.primaryGoal,
+    recentSignals: recentOodSignals,
+  });
   const recentPrompts = recentTaskInstances
     .map((item) => item.task?.prompt || "")
     .filter((value) => value.length > 0);
@@ -275,6 +292,7 @@ export async function GET(req: Request) {
           createdAt: latestCausalDiagnosis.createdAt.toISOString(),
         }
       : null,
+    oodBudgetController: oodBudgetDecision,
   };
 
   const oodCandidate = buildOodTaskSpecCandidate({
@@ -283,6 +301,7 @@ export async function GET(req: Request) {
     taskOrdinal: historicalTaskCount + 1,
     decisionLogId: decision.decisionId,
     estimatedDifficulty: generated.estimatedDifficulty ?? decision.estimatedDifficulty,
+    budgetDecision: oodBudgetDecision,
   });
   if (oodCandidate) {
     taskMeta.oodAxisTags = oodCandidate.axisTags;
@@ -427,6 +446,7 @@ export async function GET(req: Request) {
     fallbackReason: generated.fallbackReason || null,
     correctivePolicyDomain: qualityDiagnosticOverride,
     disambiguationProbe: disambiguationProbePlan,
+    oodBudget: oodBudgetDecision,
     targetNodeIds: gseSelection.targetNodeIds,
     targetNodeLabels,
     selectionReason: decision.selectionReason || gseSelection.selectionReason,

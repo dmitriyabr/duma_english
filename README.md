@@ -80,6 +80,7 @@ As of 2026-02-14:
 - `npm run cause:audit -- --days 30` audits causal attribution coverage/contract integrity in evidence + mastery write-path.
 - Planner now applies causal ambiguity trigger (`entropy/margin/action-gap`) and surfaces `causalAmbiguityTrigger` in task planning responses.
 - `GET /api/quality/transfer-verdict` audits CH-15 difficulty matching protocol and flags transfer-fail validation violations.
+- `GET /api/quality/ood-budget` reports per-learner CH-16 OOD budget telemetry (realized injection rate vs target 10-20% band).
 
 ## Placement Architecture (Current)
 

@@ -1,0 +1,102 @@
+{
+  "generatedAt": "2026-02-18T04:24:24.170Z",
+  "controllerVersion": "ood-budget-controller-v1",
+  "targetBudgetBand": {
+    "minRate": 0.1,
+    "maxRate": 0.2
+  },
+  "windowDays": 30,
+  "totalLearners": 6,
+  "summary": {
+    "totalTasks": 198,
+    "totalOodInjectedTasks": 0,
+    "realizedOodRate": 0,
+    "learnersOutsideBudgetBand": 0
+  },
+  "learners": [
+    {
+      "studentId": "cmlcqevgt00065x5vhpk2476n",
+      "totalTasks": 99,
+      "oodInjectedTasks": 0,
+      "realizedOodRate": 0,
+      "averageBudgetRate": null,
+      "averageBudgetInterval": null,
+      "milestonePressureTasks": 0,
+      "overfitRiskTasks": 0,
+      "evaluatedOodCount": 0,
+      "oodPassCount": 0,
+      "oodFailCount": 0,
+      "outsideBudgetBand": false
+    },
+    {
+      "studentId": "cmlbmuuqd001i5xmlfc0w9716",
+      "totalTasks": 73,
+      "oodInjectedTasks": 0,
+      "realizedOodRate": 0,
+      "averageBudgetRate": null,
+      "averageBudgetInterval": null,
+      "milestonePressureTasks": 0,
+      "overfitRiskTasks": 0,
+      "evaluatedOodCount": 0,
+      "oodPassCount": 0,
+      "oodFailCount": 0,
+      "outsideBudgetBand": false
+    },
+    {
+      "studentId": "cmli48lmn000v5xl93228e7ad",
+      "totalTasks": 16,
+      "oodInjectedTasks": 0,
+      "realizedOodRate": 0,
+      "averageBudgetRate": null,
+      "averageBudgetInterval": null,
+      "milestonePressureTasks": 0,
+      "overfitRiskTasks": 0,
+      "evaluatedOodCount": 0,
+      "oodPassCount": 0,
+      "oodFailCount": 0,
+      "outsideBudgetBand": false
+    },
+    {
+      "studentId": "cmlm63u9d000r5xmn9l2jdran",
+      "totalTasks": 5,
+      "oodInjectedTasks": 0,
+      "realizedOodRate": 0,
+      "averageBudgetRate": null,
+      "averageBudgetInterval": null,
+      "milestonePressureTasks": 0,
+      "overfitRiskTasks": 0,
+      "evaluatedOodCount": 0,
+      "oodPassCount": 0,
+      "oodFailCount": 0,
+      "outsideBudgetBand": false
+    },
+    {
+      "studentId": "cmlblllvk000l5xxjfeoj3354",
+      "totalTasks": 4,
+      "oodInjectedTasks": 0,
+      "realizedOodRate": 0,
+      "averageBudgetRate": null,
+      "averageBudgetInterval": null,
+      "milestonePressureTasks": 0,
+      "overfitRiskTasks": 0,
+      "evaluatedOodCount": 0,
+      "oodPassCount": 0,
+      "oodFailCount": 0,
+      "outsideBudgetBand": false
+    },
+    {
+      "studentId": "cmlfgivpa00015x592gwmql2k",
+      "totalTasks": 1,
+      "oodInjectedTasks": 0,
+      "realizedOodRate": 0,
+      "averageBudgetRate": null,
+      "averageBudgetInterval": null,
+      "milestonePressureTasks": 0,
+      "overfitRiskTasks": 0,
+      "evaluatedOodCount": 0,
+      "oodPassCount": 0,
+      "oodFailCount": 0,
+      "outsideBudgetBand": false
+    }
+  ]
+}

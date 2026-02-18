@@ -1,8 +1,9 @@
 import { oodAxisTags, oodTaskSpecContractSchema, type OODTaskSpecContract } from "@/lib/db/types";
 import { buildDifficultyAnchorMetadata } from "@/lib/ood/difficultyCalibration";
+import { type OodBudgetDecision } from "@/lib/ood/budgetController";
 
 const OOD_GENERATOR_VERSION = "ood-generator-v1";
-const OOD_INJECTION_INTERVAL = 6; // ~16.7% default OOD frequency until CH-16 budget controller
+const LEGACY_OOD_INJECTION_INTERVAL = 6; // backward-compatible fallback when no budget decision is available
 const TASK_TYPE_PRIMARY_AXIS: Record<string, (typeof oodAxisTags)[number]> = {
   read_aloud: "format",
   target_vocab: "topic",
@@ -29,7 +30,12 @@ function pickSecondaryAxis(primaryAxis: (typeof oodAxisTags)[number], seed: stri
 }
 
 export function shouldInjectOodTask(taskOrdinal: number) {
-  return taskOrdinal > 0 && taskOrdinal % OOD_INJECTION_INTERVAL === 0;
+  return shouldInjectOodTaskWithInterval(taskOrdinal, LEGACY_OOD_INJECTION_INTERVAL);
+}
+
+export function shouldInjectOodTaskWithInterval(taskOrdinal: number, interval: number) {
+  const safeInterval = Math.max(1, Math.round(interval));
+  return taskOrdinal > 0 && taskOrdinal % safeInterval === 0;
 }
 
 export function buildOodTaskSpecCandidate(params: {
@@ -38,8 +44,10 @@ export function buildOodTaskSpecCandidate(params: {
   taskOrdinal: number;
   decisionLogId: string;
   estimatedDifficulty?: number | null;
+  budgetDecision?: OodBudgetDecision;
 }) {
-  if (!shouldInjectOodTask(params.taskOrdinal)) return null;
+  const injectionInterval = params.budgetDecision?.interval || LEGACY_OOD_INJECTION_INTERVAL;
+  if (!shouldInjectOodTaskWithInterval(params.taskOrdinal, injectionInterval)) return null;
 
   const primaryAxis =
     TASK_TYPE_PRIMARY_AXIS[params.taskType] ||
@@ -70,7 +78,14 @@ export function buildOodTaskSpecCandidate(params: {
       generatorVersion: OOD_GENERATOR_VERSION,
       source: "task_next",
       taskOrdinal: params.taskOrdinal,
-      interval: OOD_INJECTION_INTERVAL,
+      interval: injectionInterval,
+      budgetController:
+        params.budgetDecision || {
+          controllerVersion: "legacy-fixed-interval-v1",
+          budgetRate: Number((1 / injectionInterval).toFixed(4)),
+          interval: injectionInterval,
+          reasons: ["legacy_fixed_interval"],
+        },
       taskType: params.taskType,
       difficultyCalibration: difficultyMetadata,
     },

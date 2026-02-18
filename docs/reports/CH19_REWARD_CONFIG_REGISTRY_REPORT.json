@@ -1,0 +1,228 @@
+{
+  "generatedAt": "2026-02-18T04:33:13.385Z",
+  "rewardVersion": "reward-composite-v1",
+  "rewardConfig": {
+    "mastery": {
+      "scale": 0.12,
+      "clampMin": -1.5,
+      "clampMax": 1.5
+    },
+    "transfer": {
+      "transfer_pass": 0.9,
+      "transfer_fail_validated": -0.9,
+      "inconclusive_control_missing": -0.2,
+      "inconclusive_missing_ood_score": -0.25,
+      "none": 0
+    },
+    "retention": {
+      "same_session": {
+        "pass": 0,
+        "fail": 0,
+        "none": 0
+      },
+      "day_7": {
+        "pass": 0.6,
+        "fail": -0.6,
+        "none": 0
+      },
+      "day_30": {
+        "pass": 0.9,
+        "fail": -0.9,
+        "none": 0
+      }
+    },
+    "friction": {
+      "recoveryTriggeredPenalty": 0.35,
+      "lowTaskScoreThreshold": 55,
+      "lowTaskScorePenalty": 0.25,
+      "lowConfidenceThreshold": 0.6,
+      "lowConfidencePenalty": 0.15,
+      "maxPenalty": 1
+    }
+  },
+  "replaySampleCount": 3,
+  "reproducibility": {
+    "deterministic": true,
+    "firstHash": "754206a3e276d35731cd46af2f5fc05ddef57c85fec15f4d39987a8b0cffea77",
+    "secondHash": "754206a3e276d35731cd46af2f5fc05ddef57c85fec15f4d39987a8b0cffea77"
+  },
+  "replayRewards": [
+    {
+      "rewardVersion": "reward-composite-v1",
+      "rewardWindow": "same_session",
+      "masteryDelta": 0.384,
+      "transferReward": 0.9,
+      "retentionReward": 0,
+      "frictionPenalty": 0,
+      "totalReward": 1.284,
+      "components": {
+        "configVersion": "reward-composite-v1",
+        "signals": {
+          "masteryDeltaTotal": 3.2,
+          "transferVerdict": "transfer_pass",
+          "retentionOutcome": "none",
+          "taskScore": 81,
+          "transcriptConfidence": 0.86,
+          "recoveryTriggered": false
+        },
+        "config": {
+          "mastery": {
+            "scale": 0.12,
+            "clampMin": -1.5,
+            "clampMax": 1.5
+          },
+          "transfer": {
+            "transfer_pass": 0.9,
+            "transfer_fail_validated": -0.9,
+            "inconclusive_control_missing": -0.2,
+            "inconclusive_missing_ood_score": -0.25,
+            "none": 0
+          },
+          "retention": {
+            "same_session": {
+              "pass": 0,
+              "fail": 0,
+              "none": 0
+            },
+            "day_7": {
+              "pass": 0.6,
+              "fail": -0.6,
+              "none": 0
+            },
+            "day_30": {
+              "pass": 0.9,
+              "fail": -0.9,
+              "none": 0
+            }
+          },
+          "friction": {
+            "recoveryTriggeredPenalty": 0.35,
+            "lowTaskScoreThreshold": 55,
+            "lowTaskScorePenalty": 0.25,
+            "lowConfidenceThreshold": 0.6,
+            "lowConfidencePenalty": 0.15,
+            "maxPenalty": 1
+          }
+        }
+      }
+    },
+    {
+      "rewardVersion": "reward-composite-v1",
+      "rewardWindow": "same_session",
+      "masteryDelta": -0.132,
+      "transferReward": -0.9,
+      "retentionReward": 0,
+      "frictionPenalty": 0.75,
+      "totalReward": -1.782,
+      "components": {
+        "configVersion": "reward-composite-v1",
+        "signals": {
+          "masteryDeltaTotal": -1.1,
+          "transferVerdict": "transfer_fail_validated",
+          "retentionOutcome": "none",
+          "taskScore": 49,
+          "transcriptConfidence": 0.54,
+          "recoveryTriggered": true
+        },
+        "config": {
+          "mastery": {
+            "scale": 0.12,
+            "clampMin": -1.5,
+            "clampMax": 1.5
+          },
+          "transfer": {
+            "transfer_pass": 0.9,
+            "transfer_fail_validated": -0.9,
+            "inconclusive_control_missing": -0.2,
+            "inconclusive_missing_ood_score": -0.25,
+            "none": 0
+          },
+          "retention": {
+            "same_session": {
+              "pass": 0,
+              "fail": 0,
+              "none": 0
+            },
+            "day_7": {
+              "pass": 0.6,
+              "fail": -0.6,
+              "none": 0
+            },
+            "day_30": {
+              "pass": 0.9,
+              "fail": -0.9,
+              "none": 0
+            }
+          },
+          "friction": {
+            "recoveryTriggeredPenalty": 0.35,
+            "lowTaskScoreThreshold": 55,
+            "lowTaskScorePenalty": 0.25,
+            "lowConfidenceThreshold": 0.6,
+            "lowConfidencePenalty": 0.15,
+            "maxPenalty": 1
+          }
+        }
+      }
+    },
+    {
+      "rewardVersion": "reward-composite-v1",
+      "rewardWindow": "same_session",
+      "masteryDelta": 0.096,
+      "transferReward": 0,
+      "retentionReward": 0,
+      "frictionPenalty": 0,
+      "totalReward": 0.096,
+      "components": {
+        "configVersion": "reward-composite-v1",
+        "signals": {
+          "masteryDeltaTotal": 0.8,
+          "transferVerdict": "none",
+          "retentionOutcome": "none",
+          "taskScore": 68,
+          "transcriptConfidence": 0.73,
+          "recoveryTriggered": false
+        },
+        "config": {
+          "mastery": {
+            "scale": 0.12,
+            "clampMin": -1.5,
+            "clampMax": 1.5
+          },
+          "transfer": {
+            "transfer_pass": 0.9,
+            "transfer_fail_validated": -0.9,
+            "inconclusive_control_missing": -0.2,
+            "inconclusive_missing_ood_score": -0.25,
+            "none": 0
+          },
+          "retention": {
+            "same_session": {
+              "pass": 0,
+              "fail": 0,
+              "none": 0
+            },
+            "day_7": {
+              "pass": 0.6,
+              "fail": -0.6,
+              "none": 0
+            },
+            "day_30": {
+              "pass": 0.9,
+              "fail": -0.9,
+              "none": 0
+            }
+          },
+          "friction": {
+            "recoveryTriggeredPenalty": 0.35,
+            "lowTaskScoreThreshold": 55,
+            "lowTaskScorePenalty": 0.25,
+            "lowConfidenceThreshold": 0.6,
+            "lowConfidencePenalty": 0.15,
+            "maxPenalty": 1
+          }
+        }
+      }
+    }
+  ]
+}

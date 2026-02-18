@@ -22,6 +22,7 @@
     "cause:audit": "tsx src/scripts/ch09_cause_attribution_audit.ts",
     "disambiguation:budget": "tsx src/scripts/ch11_disambiguation_probe_budget_report.ts",
     "difficulty:calibration": "tsx src/scripts/ch14_difficulty_anchor_stability_report.ts",
+    "reward:registry": "tsx src/scripts/ch19_reward_config_registry_report.ts",
     "policy-log:validate": "tsx src/scripts/ch04_policy_decision_log_validator.ts",
     "transfer:verdict:audit": "tsx src/scripts/ch15_transfer_verdict_audit.ts"
   },

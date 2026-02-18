@@ -15,6 +15,7 @@ import { evaluateTopicRetryGate } from "../lib/topicRetryGate";
 import { inferCausalDiagnosis } from "../lib/causal/inference";
 import { evaluateAndPersistOodTransferVerdict } from "../lib/ood/transferVerdict";
 import { syncTransferRemediationQueueForVerdict } from "../lib/ood/transferRemediationQueue";
+import { upsertSameSessionRewardTrace } from "../lib/reward/function";
 
 const POLL_INTERVAL_MS = config.worker.pollIntervalMs;
 const SCORE_VERSION = "score-v3";
@@ -291,6 +292,10 @@ async function processAttempt(attemptId: string) {
   });
 
   if (!attempt || !attempt.audioObjectKey || attempt.status !== ATTEMPT_STATUS.PROCESSING) return;
+  const taskInstance = await prisma.taskInstance.findUnique({
+    where: { taskId: attempt.taskId },
+    select: { id: true, decisionLogId: true },
+  });
 
   console.log(
     JSON.stringify({
@@ -603,6 +608,40 @@ async function processAttempt(attemptId: string) {
         recoveryTriggered,
       },
     });
+    if (taskInstance?.decisionLogId) {
+      const masteryDeltaTotal = Number(
+        gseEvidence.nodeOutcomes.reduce((sum, row) => sum + row.deltaMastery, 0).toFixed(6)
+      );
+      const rewardTrace = await upsertSameSessionRewardTrace({
+        studentId: attempt.studentId,
+        decisionLogId: taskInstance.decisionLogId,
+        taskInstanceId: taskInstance.id,
+        attemptId: attempt.id,
+        signals: {
+          masteryDeltaTotal,
+          transferVerdict: oodTransferVerdict?.verdict || null,
+          retentionOutcome: "none",
+          taskScore:
+            typeof evaluated.taskEvaluation.taskScore === "number"
+              ? evaluated.taskEvaluation.taskScore
+              : null,
+          transcriptConfidence:
+            typeof derivedMetrics.confidence === "number" ? derivedMetrics.confidence : null,
+          recoveryTriggered,
+        },
+      });
+      console.log(
+        JSON.stringify({
+          event: "reward_trace_written",
+          attemptId: attempt.id,
+          decisionLogId: taskInstance.decisionLogId,
+          rewardTraceId: rewardTrace.id,
+          rewardVersion: rewardTrace.rewardVersion,
+          rewardWindow: rewardTrace.rewardWindow,
+          totalReward: rewardTrace.totalReward,
+        })
+      );
+    }
     await updatePlacementFromAttempt({
       taskMeta,
       attemptId: attempt.id,

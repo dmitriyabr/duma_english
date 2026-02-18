@@ -1,0 +1,16 @@
+{
+  "generatedAt": "2026-02-18T05:15:20.496Z",
+  "protocolVersion": "self-repair-delayed-verification-v1",
+  "windowDays": 30,
+  "staleThresholdHours": 72,
+  "totalCycles": 0,
+  "pendingDelayedCount": 0,
+  "delayedAttemptLinkedCount": 0,
+  "validVerificationCount": 0,
+  "invalidVerificationCount": 0,
+  "invalidDuplicateTaskFamilyCount": 0,
+  "invalidDuplicatePromptCount": 0,
+  "missingDelayedVerificationCount": 0,
+  "invalidRate": 0,
+  "reasonCounts": []
+}

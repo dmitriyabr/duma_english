@@ -26,6 +26,12 @@ import {
   findPendingImmediateSelfRepairCycle,
   SELF_REPAIR_IMMEDIATE_LOOP_VERSION,
 } from "@/lib/selfRepair/immediateLoop";
+import {
+  attachDelayedVerificationTaskInstance,
+  buildDelayedVerificationPrompt,
+  findPendingDelayedSelfRepairCycle,
+  SELF_REPAIR_DELAYED_VERIFICATION_VERSION,
+} from "@/lib/selfRepair/delayedVerification";
 
 const ALL_TASK_TYPES = [
   "read_aloud",
@@ -87,6 +93,9 @@ export async function GET(req: Request) {
   });
   const projection = await projectLearnerStageFromGse(student.studentId);
   const pendingImmediateSelfRepair = await findPendingImmediateSelfRepairCycle(student.studentId);
+  const pendingDelayedSelfRepair = pendingImmediateSelfRepair
+    ? null
+    : await findPendingDelayedSelfRepairCycle(student.studentId);
   const latestCausalDiagnosis = await prisma.causalDiagnosis.findFirst({
     where: { studentId: student.studentId },
     orderBy: { createdAt: "desc" },
@@ -143,7 +152,10 @@ export async function GET(req: Request) {
   }
   const baseDiagnosticMode =
     coldStartActive || Boolean(profile?.placementFresh) || projection.placementUncertainty > 0.38;
-  const effectiveRequestedType = pendingImmediateSelfRepair?.sourceTaskType || requestedType;
+  const effectiveRequestedType =
+    pendingImmediateSelfRepair?.sourceTaskType ||
+    pendingDelayedSelfRepair?.verificationTaskType ||
+    requestedType;
   const diagnosticMode = applyFastLaneToDiagnosticMode(
     baseDiagnosticMode || Boolean(qualityDiagnosticOverride),
     fastLaneDecision
@@ -220,7 +232,10 @@ export async function GET(req: Request) {
     .map((item) => item.task?.prompt || "")
     .filter((value) => value.length > 0);
   const disambiguationProbePlan = buildDisambiguationProbePlan({
-    shouldTrigger: pendingImmediateSelfRepair ? false : decision.ambiguityTrigger.shouldTrigger,
+    shouldTrigger:
+      pendingImmediateSelfRepair || pendingDelayedSelfRepair
+        ? false
+        : decision.ambiguityTrigger.shouldTrigger,
     topCauseLabels: decision.ambiguityTrigger.topCauseLabels,
     recentTasks: recentTaskInstances.map((row) => ({
       taskType: row.taskType,
@@ -230,6 +245,8 @@ export async function GET(req: Request) {
   });
   const selectedTaskType = pendingImmediateSelfRepair
     ? pendingImmediateSelfRepair.sourceTaskType
+    : pendingDelayedSelfRepair
+    ? pendingDelayedSelfRepair.verificationTaskType
     : disambiguationProbePlan.enabled && disambiguationProbePlan.selectedTaskType
     ? disambiguationProbePlan.selectedTaskType
     : decision.chosenTaskType;
@@ -264,8 +281,14 @@ export async function GET(req: Request) {
     focusSkills: weakestSkills,
     plannerReason: pendingImmediateSelfRepair
       ? `Immediate self-repair retry for attempt ${pendingImmediateSelfRepair.sourceAttemptId}`
+      : pendingDelayedSelfRepair
+      ? `Delayed non-duplicate verification for attempt ${pendingDelayedSelfRepair.sourceAttemptId}`
       : decision.selectionReason,
-    primaryGoal: pendingImmediateSelfRepair ? "mandatory_immediate_self_repair" : decision.primaryGoal,
+    primaryGoal: pendingImmediateSelfRepair
+      ? "mandatory_immediate_self_repair"
+      : pendingDelayedSelfRepair
+      ? "mandatory_delayed_verification"
+      : decision.primaryGoal,
     recentPrompts,
     domainStages: {
       vocab: domainStages.vocab,
@@ -290,6 +313,12 @@ export async function GET(req: Request) {
       sourcePrompt: pendingImmediateSelfRepair.sourcePrompt,
       causeLabel: pendingImmediateSelfRepair.causeLabel,
       feedback: pendingImmediateSelfRepair.feedback,
+    });
+  } else if (pendingDelayedSelfRepair) {
+    prompt = buildDelayedVerificationPrompt({
+      sourcePrompt: pendingDelayedSelfRepair.sourcePrompt,
+      generatedPrompt: prompt,
+      verificationTaskType: pendingDelayedSelfRepair.verificationTaskType,
     });
   }
   let promptTargetWords = selectedTaskType === "target_vocab" ? extractRequiredWords(prompt) : [];
@@ -351,6 +380,18 @@ export async function GET(req: Request) {
           sourceTaskScore: pendingImmediateSelfRepair.sourceTaskScore,
           sourceTaskInstanceId: pendingImmediateSelfRepair.sourceTaskInstanceId,
           causeLabel: pendingImmediateSelfRepair.causeLabel,
+        }
+      : pendingDelayedSelfRepair
+      ? {
+          mode: "delayed_verification",
+          protocolVersion: SELF_REPAIR_DELAYED_VERIFICATION_VERSION,
+          cycleId: pendingDelayedSelfRepair.cycleId,
+          sourceAttemptId: pendingDelayedSelfRepair.sourceAttemptId,
+          sourceTaskType: pendingDelayedSelfRepair.sourceTaskType,
+          sourcePrompt: pendingDelayedSelfRepair.sourcePrompt,
+          sourceTaskInstanceId: pendingDelayedSelfRepair.sourceTaskInstanceId,
+          verificationTaskType: pendingDelayedSelfRepair.verificationTaskType,
+          causeLabel: pendingDelayedSelfRepair.causeLabel,
         }
       : null,
     fastLane: fastLaneDecision,
@@ -423,6 +464,16 @@ export async function GET(req: Request) {
     estimatedDifficulty: generated.estimatedDifficulty,
   });
 
+  if (pendingDelayedSelfRepair) {
+    await attachDelayedVerificationTaskInstance({
+      cycleId: pendingDelayedSelfRepair.cycleId,
+      studentId: student.studentId,
+      taskInstanceId: taskInstance.id,
+      taskType: selectedTaskType,
+      taskPrompt: prompt,
+    });
+  }
+
   let oodTaskSpec:
     | {
         id: string;
@@ -482,7 +533,11 @@ export async function GET(req: Request) {
     stage: projection.promotionStage,
     placementStage: projection.placementStage,
     ageBand: profile?.ageBand || "9-11",
-    reason: decision.selectionReason,
+    reason: pendingImmediateSelfRepair
+      ? `Immediate self-repair retry for attempt ${pendingImmediateSelfRepair.sourceAttemptId}`
+      : pendingDelayedSelfRepair
+      ? `Delayed non-duplicate verification for attempt ${pendingDelayedSelfRepair.sourceAttemptId}`
+      : decision.selectionReason,
     targetSkills: weakestSkills,
     targetWords: selectedTaskType === "target_vocab" ? promptTargetWords : targetWords,
     recommendedTaskTypes: ALL_TASK_TYPES,
@@ -493,7 +548,11 @@ export async function GET(req: Request) {
     carryoverSummary: profile?.placementCarryoverJson || null,
     diagnosticMode: decision.diagnosticMode,
     decisionId: decision.decisionId,
-    primaryGoal: decision.primaryGoal,
+    primaryGoal: pendingImmediateSelfRepair
+      ? "mandatory_immediate_self_repair"
+      : pendingDelayedSelfRepair
+      ? "mandatory_delayed_verification"
+      : decision.primaryGoal,
     selectionReasonType: decision.selectionReasonType,
     causalRemediation: decision.causalRemediation,
     causalAmbiguityTrigger: decision.ambiguityTrigger,

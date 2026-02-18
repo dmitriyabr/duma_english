@@ -1,6 +1,6 @@
 # Autonomous English Autopilot: Gap Closure Execution Board
 
-Last updated: 2026-02-17
+Last updated: 2026-02-18
 Source baseline: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` + current code/docs (`README.md`, `TASKS.MD`, `docs/BRAIN_RUNTIME.md`)
 
 ## 0) Working Protocol
@@ -113,8 +113,9 @@ Source baseline: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` + current code
 | CH-24 | Fast-lane progression protocol | DONE | Agent_1 | 2026-02-18T04:51:16Z | 2026-02-18T05:04:04Z | `0d07693`, `c2e39cc` | `src/lib/policy/fastLane.ts`, `src/app/api/task/next/route.ts`, `src/lib/ood/budgetController.ts`, `src/lib/contracts/fastLaneCohortReport.ts`, `src/lib/quality/fastLaneCohortReport.ts`, `src/app/api/quality/fast-lane-cohort/route.ts`, `src/scripts/ch24_fast_lane_cohort_report.ts`, `docs/reports/CH24_FAST_LANE_COHORT_REPORT.json`, `docs/CH24_FAST_LANE_PROGRESSION_PROTOCOL.md` | High-confidence learners now enter fast-lane between milestone gates with reduced diagnostic density and lower OOD budget; velocity-vs-safety cohort telemetry/report added |
 | CH-25 | Mandatory immediate self-repair loop | DONE | Agent_3 | 2026-02-18T04:55:15Z | 2026-02-18T05:09:16Z | `be1e6a9`, `c3f2502` | `src/lib/selfRepair/immediateLoop.ts`, `src/worker/index.ts`, `src/app/api/task/next/route.ts`, `src/lib/contracts/selfRepairImmediateLoopReport.ts`, `src/lib/quality/selfRepairImmediateLoopReport.ts`, `src/app/api/quality/self-repair-immediate-loop/route.ts`, `src/scripts/ch25_self_repair_immediate_loop_report.ts`, `docs/reports/CH25_SELF_REPAIR_IMMEDIATE_LOOP_REPORT.json`, `docs/CH25_MANDATORY_IMMEDIATE_SELF_REPAIR_LOOP.md` | Immediate self-repair loop now records required cycle transitions (scheduled->in_progress->completed) and enforces mandatory immediate retry telemetry/dashboard |
 | CH-26 | Delayed non-duplicate verification | DONE | Agent_2 | 2026-02-18T05:05:27Z | 2026-02-18T05:19:22Z | `667721d`, `356bd98` | `src/lib/selfRepair/delayedVerification.ts`, `src/app/api/task/next/route.ts`, `src/lib/contracts/selfRepairDelayedVerificationReport.ts`, `src/lib/quality/selfRepairDelayedVerificationReport.ts`, `src/app/api/quality/self-repair-delayed-verification/route.ts`, `src/scripts/ch26_self_repair_delayed_verification_report.ts`, `docs/reports/CH26_SELF_REPAIR_DELAYED_VERIFICATION_REPORT.json`, `docs/CH26_DELAYED_NON_DUPLICATE_VERIFICATION.md` | Delayed verification is now routed as mandatory self-repair phase with non-duplicate family/formulation validator and invalid-verification telemetry counters |
-| CH-27 | Repair budget guardrails + escalation | IN_PROGRESS | Agent_1 | 2026-02-18T05:07:43Z |  |  |  | Claimed after CH-25/CH-26 split; focus on loop budgets, deadlock detection, and escalation telemetry |
-| CH-28 | Memory scheduler v1 | IN_PROGRESS | Agent_3 | 2026-02-18T05:13:41Z |  |  |  | Added as next free critical-path row after CH-26/CH-27 in progress; implementing node-level retention queue portfolio (`fresh/review/transfer`) with fragile-node priority |
+| CH-27 | Repair budget guardrails + escalation | DONE | Agent_1 | 2026-02-18T05:07:43Z | 2026-02-18T05:20:06Z | `f3ab853`, `0953b47` | `src/lib/selfRepair/budgetGuardrails.ts`, `src/lib/selfRepair/immediateLoop.ts`, `src/app/api/quality/self-repair-budget/route.ts`, `src/scripts/ch27_self_repair_budget_telemetry_report.ts`, `docs/reports/CH27_SELF_REPAIR_BUDGET_TELEMETRY_REPORT.json`, `docs/CH27_REPAIR_BUDGET_GUARDRAILS_ESCALATION.md` | Immediate self-repair loops now enforce per-skill/session caps and auto-escalate with budget telemetry when exhausted |
+| CH-28 | Memory scheduler v1 | DONE | Agent_3 | 2026-02-18T05:13:41Z | 2026-02-18T05:24:41Z | `f4e0e41`, `6c387bf` | `src/lib/memory/scheduler.ts`, `src/lib/contracts/memorySchedulerDashboard.ts`, `src/lib/quality/memorySchedulerDashboard.ts`, `src/app/api/quality/memory-scheduler/route.ts`, `src/scripts/ch28_memory_scheduler_report.ts`, `docs/reports/CH28_MEMORY_SCHEDULER_REPORT.json`, `docs/CH28_MEMORY_SCHEDULER_V1.md` | Memory scheduler v1 now syncs node-level queue portfolio (`memory_fresh`, `memory_review`, transfer queue telemetry) with fragile-node priority and due-miss/latency dashboard |
+| CH-29 | 7/30/90 retention checks | IN_PROGRESS | Agent_2 | 2026-02-18T05:20:54Z |  |  |  | Added as next critical-path row while CH-27/CH-28 are in progress; implementing retention checks dashboard and counters |
 
 ## 3.3) Decision Log
 
@@ -147,6 +148,8 @@ Source baseline: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` + current code
 | 2026-02-18 | CH-24 | Введён fast-lane protocol `fast-lane-progression-v1`: для learners с высокой stage/placement confidence вне milestone gate окно runtime снижает diagnostic density (`diagnosticMode` throttle) и уменьшает OOD budget rate (delta `-0.02` в пределах guardrails), trace пишется в `task.meta.fastLane`; добавлены cohort telemetry endpoint `/api/quality/fast-lane-cohort` и report script `ch24_fast_lane_cohort_report.ts` (velocity vs safety) |
 | 2026-02-18 | CH-25 | Введён mandatory immediate self-repair loop `self-repair-immediate-v1`: после low-score non-read-aloud attempt worker создаёт `SelfRepairCycle` в статусе `scheduled`, immediate retry task с `selfRepair.mode=immediate_retry` замыкает цикл в `completed` с recovery/latency trace; добавлены quality contract/API/report (`/api/quality/self-repair-immediate-loop`, `ch25_self_repair_immediate_loop_report.ts`) |
 | 2026-02-18 | CH-26 | Добавлен delayed verification protocol `self-repair-delayed-verification-v1`: `task-next` обязательным образом маршрутизирует `pending_delayed_verification` циклы с отличным task family, prompt формулировка проверяется validator-ом на near-duplicates; добавлены duplicate-check contract/counters через `/api/quality/self-repair-delayed-verification` и report script |
+| 2026-02-18 | CH-27 | Добавлен протокол `self-repair-budget-guardrails-v1`: immediate loop ограничен капами `<=2` per skill/session и `<=25%` projected session-time share, при исчерпании budget цикл сразу переводится в `escalated` и создаёт `ReviewQueueItem` (`queueType=self_repair_escalation`); добавлены telemetry contract/API/report (`/api/quality/self-repair-budget`, `ch27_self_repair_budget_telemetry_report.ts`) |
+| 2026-02-18 | CH-28 | Добавлен memory scheduler protocol `memory-scheduler-v1`: для `StudentGseMastery` узлов scheduler синхронизирует `ReviewQueueItem` портфель `memory_fresh + memory_review` с fragile-node priority (decayed mastery + uncertainty + sparse evidence + negative skew), а transfer ветка учитывается через `transfer_remediation`; добавлены dashboard contract/API/report (`/api/quality/memory-scheduler`, `ch28_memory_scheduler_report.ts`) c queue latency/due-miss метриками |
 | 2026-02-18 | CH-20 | Добавлен offline replay dataset builder `offline-replay-dataset-v1`: решение агрегирует append-only события (`planner_decision_created -> task_instance_created -> attempt_created -> delayed_outcome_recorded`) в обучающие строки `context -> action -> delayed outcome`, считает completeness/missing-linkage counters, публикует `/api/quality/replay-dataset-completeness` и report-джоб `ch20_offline_replay_dataset_report.ts` |
 
 ## 4) Execution Board (обособленные изменения)
@@ -265,11 +268,11 @@ Source baseline: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` + current code
   Done: delayed verification обязателен и проходит на другом task family/формулировке.  
   Артефакт: duplicate-check validator + invalid-verification counter.
 
-- [ ] **CH-27 — Repair budget guardrails + escalation**  
+- [x] **CH-27 — Repair budget guardrails + escalation**  
   Done: лимиты immediate loops (<=2 per skill/session, <=25% session time) + auto escalation path при deadlock.  
   Артефакт: budget exhaustion telemetry.
 
-- [ ] **CH-28 — Memory scheduler v1**  
+- [x] **CH-28 — Memory scheduler v1**  
   Done: node-level review queue с портфелем `fresh + review + transfer`, приоритет для fragile nodes.  
   Артефакт: queue latency and due-miss dashboard.
 

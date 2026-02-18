@@ -32,6 +32,11 @@ import {
   findPendingDelayedSelfRepairCycle,
   SELF_REPAIR_DELAYED_VERIFICATION_VERSION,
 } from "@/lib/selfRepair/delayedVerification";
+import {
+  buildLocalePolicyContext,
+  extractLocaleSignalSample,
+  LOCALE_POLICY_CONTEXT_VERSION,
+} from "@/lib/localization/localePolicyContext";
 
 const ALL_TASK_TYPES = [
   "read_aloud",
@@ -70,6 +75,15 @@ function similarityToRecent(prompt: string, recentPrompts: string[]) {
     if (overlap > best) best = overlap;
   }
   return Number(best.toFixed(3));
+}
+
+function asObject(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return value as Record<string, unknown>;
+}
+
+function toJsonValue(value: unknown): Prisma.InputJsonValue {
+  return JSON.parse(JSON.stringify(value ?? null)) as Prisma.InputJsonValue;
 }
 
 export async function GET(req: Request) {
@@ -196,7 +210,7 @@ export async function GET(req: Request) {
       : null,
   });
 
-  const [recentTaskInstances, historicalTaskCount, recentOodSignals] = await Promise.all([
+  const [recentTaskInstances, historicalTaskCount, recentOodSignals, recentLocaleSignalRows] = await Promise.all([
     prisma.taskInstance.findMany({
       where: { studentId: student.studentId },
       include: { task: { select: { prompt: true, metaJson: true } } },
@@ -214,6 +228,17 @@ export async function GET(req: Request) {
         verdict: true,
         status: true,
         createdAt: true,
+      },
+    }),
+    prisma.attempt.findMany({
+      where: {
+        studentId: student.studentId,
+        status: "completed",
+      },
+      orderBy: { createdAt: "desc" },
+      take: 30,
+      select: {
+        taskEvaluationJson: true,
       },
     }),
   ]);
@@ -243,13 +268,38 @@ export async function GET(req: Request) {
       metaJson: row.task?.metaJson || null,
     })),
   });
-  const selectedTaskType = pendingImmediateSelfRepair
+  const localeSignalSamples = recentLocaleSignalRows
+    .map((row) => extractLocaleSignalSample(row.taskEvaluationJson))
+    .filter((row): row is NonNullable<typeof row> => Boolean(row));
+  const localePolicyContext = buildLocalePolicyContext({
+    samples: localeSignalSamples,
+    plannerChosenTaskType: decision.chosenTaskType,
+    requestedType: requestedType || null,
+    blockOverride: Boolean(pendingImmediateSelfRepair || pendingDelayedSelfRepair || disambiguationProbePlan.enabled),
+  });
+
+  let selectedTaskType = pendingImmediateSelfRepair
     ? pendingImmediateSelfRepair.sourceTaskType
     : pendingDelayedSelfRepair
     ? pendingDelayedSelfRepair.verificationTaskType
     : disambiguationProbePlan.enabled && disambiguationProbePlan.selectedTaskType
     ? disambiguationProbePlan.selectedTaskType
     : decision.chosenTaskType;
+  const localeOverrideTaskType = localePolicyContext.adaptation.overrideTaskType;
+  const localeOverrideApplied = Boolean(
+    localeOverrideTaskType &&
+      !pendingImmediateSelfRepair &&
+      !pendingDelayedSelfRepair &&
+      !disambiguationProbePlan.enabled &&
+      localeOverrideTaskType !== selectedTaskType
+  );
+  if (localeOverrideApplied && localeOverrideTaskType) {
+    selectedTaskType = localeOverrideTaskType;
+  }
+  const localeSelectionReasonSuffix = localeOverrideApplied
+    ? ` Locale adaptation override selected ${selectedTaskType} (${localePolicyContext.adaptation.reasonCodes.join(", ") || "localized_signals_detected"}).`
+    : "";
+  const effectiveSelectionReason = `${decision.selectionReason}${localeSelectionReasonSuffix}`.trim();
 
   // For target_vocab, words in the prompt MUST match planner target nodes — otherwise we penalize for words we never asked for.
   // Only use GSE_VOCAB descriptors as words; LO/grammar descriptors are sentences, not words.
@@ -283,7 +333,7 @@ export async function GET(req: Request) {
       ? `Immediate self-repair retry for attempt ${pendingImmediateSelfRepair.sourceAttemptId}`
       : pendingDelayedSelfRepair
       ? `Delayed non-duplicate verification for attempt ${pendingDelayedSelfRepair.sourceAttemptId}`
-      : decision.selectionReason,
+      : effectiveSelectionReason,
     primaryGoal: pendingImmediateSelfRepair
       ? "mandatory_immediate_self_repair"
       : pendingDelayedSelfRepair
@@ -335,7 +385,7 @@ export async function GET(req: Request) {
   if (selectedTaskType === "read_aloud" && !referenceText) {
     const fallbackReadAloud = buildTaskTemplate("read_aloud", {
       stage: projection.promotionStage,
-      reason: decision.selectionReason,
+      reason: effectiveSelectionReason,
       focusSkills: weakestSkills,
     });
     prompt = fallbackReadAloud.prompt;
@@ -345,7 +395,7 @@ export async function GET(req: Request) {
 
   const taskMeta: Record<string, unknown> = {
     stage: projection.promotionStage,
-    plannerReason: decision.selectionReason,
+    plannerReason: effectiveSelectionReason,
     focusSkills: weakestSkills,
     requiredWords:
       selectedTaskType === "target_vocab"
@@ -396,7 +446,79 @@ export async function GET(req: Request) {
       : null,
     fastLane: fastLaneDecision,
     oodBudgetController: oodBudgetDecision,
+    localePolicyContext: {
+      version: LOCALE_POLICY_CONTEXT_VERSION,
+      profile: localePolicyContext.profile,
+      adaptation: {
+        ...localePolicyContext.adaptation,
+        overrideApplied: localeOverrideApplied,
+        chosenTaskTypeBeforeOverride: decision.chosenTaskType,
+        chosenTaskTypeAfterOverride: selectedTaskType,
+      },
+    },
   };
+
+  const localeTwinSnapshot = await prisma.learnerTwinSnapshot.create({
+    data: {
+      studentId: student.studentId,
+      source: "locale_policy_context",
+      placementStage: projection.placementStage,
+      promotionStage: projection.promotionStage,
+      masteryProjectionJson: toJsonValue(projection),
+      uncertaintyHotspotsJson: toJsonValue({
+        placementUncertainty: projection.placementUncertainty,
+        placementConfidence: projection.placementConfidence,
+        uncertainNodeIds: placementUncertainNodes,
+      }),
+      motivationSignalsJson: toJsonValue({
+        coldStartActive,
+        fastLaneEligible: fastLaneDecision.eligible,
+      }),
+      frictionSignalsJson: toJsonValue({
+        pendingSelfRepair: Boolean(pendingImmediateSelfRepair || pendingDelayedSelfRepair),
+        codeSwitchRate: localePolicyContext.profile.codeSwitchRate,
+      }),
+      localeProfileJson: toJsonValue({
+        ...localePolicyContext.profile,
+        adaptation: {
+          ...localePolicyContext.adaptation,
+          overrideApplied: localeOverrideApplied,
+          chosenTaskTypeBeforeOverride: decision.chosenTaskType,
+          chosenTaskTypeAfterOverride: selectedTaskType,
+        },
+      }),
+    },
+    select: { id: true },
+  });
+
+  const plannerDecisionForLocale = await prisma.plannerDecisionLog.findUnique({
+    where: { id: decision.decisionId },
+    select: {
+      utilityJson: true,
+      selectionReason: true,
+    },
+  });
+  const localeUtility = asObject(plannerDecisionForLocale?.utilityJson);
+  await prisma.plannerDecisionLog.update({
+    where: { id: decision.decisionId },
+    data: {
+      contextSnapshotId: localeTwinSnapshot.id,
+      chosenTaskType: selectedTaskType,
+      selectionReason: effectiveSelectionReason,
+      utilityJson: {
+        ...localeUtility,
+        localeContextVersion: LOCALE_POLICY_CONTEXT_VERSION,
+        localeProfile: localePolicyContext.profile,
+        localeAdaptation: {
+          ...localePolicyContext.adaptation,
+          overrideApplied: localeOverrideApplied,
+          chosenTaskTypeBeforeOverride: decision.chosenTaskType,
+          chosenTaskTypeAfterOverride: selectedTaskType,
+          contextSnapshotId: localeTwinSnapshot.id,
+        },
+      } as Prisma.InputJsonValue,
+    },
+  });
 
   const oodCandidate = buildOodTaskSpecCandidate({
     studentId: student.studentId,
@@ -537,7 +659,7 @@ export async function GET(req: Request) {
       ? `Immediate self-repair retry for attempt ${pendingImmediateSelfRepair.sourceAttemptId}`
       : pendingDelayedSelfRepair
       ? `Delayed non-duplicate verification for attempt ${pendingDelayedSelfRepair.sourceAttemptId}`
-      : decision.selectionReason,
+      : effectiveSelectionReason,
     targetSkills: weakestSkills,
     targetWords: selectedTaskType === "target_vocab" ? promptTargetWords : targetWords,
     recommendedTaskTypes: ALL_TASK_TYPES,
@@ -554,6 +676,7 @@ export async function GET(req: Request) {
       ? "mandatory_delayed_verification"
       : decision.primaryGoal,
     selectionReasonType: decision.selectionReasonType,
+    localePolicyContext: taskMeta.localePolicyContext ?? null,
     causalRemediation: decision.causalRemediation,
     causalAmbiguityTrigger: decision.ambiguityTrigger,
     hybridPolicy: decision.hybridPolicy,
@@ -574,7 +697,7 @@ export async function GET(req: Request) {
     oodBudget: oodBudgetDecision,
     targetNodeIds: gseSelection.targetNodeIds,
     targetNodeLabels,
-    selectionReason: decision.selectionReason || gseSelection.selectionReason,
+    selectionReason: effectiveSelectionReason || gseSelection.selectionReason,
     oodTaskSpec: oodTaskSpec
       ? {
           id: oodTaskSpec.id,

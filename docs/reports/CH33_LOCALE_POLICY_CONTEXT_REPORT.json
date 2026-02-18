@@ -1,0 +1,14 @@
+{
+  "generatedAt": "2026-02-18T06:58:32.158Z",
+  "version": "locale-policy-context-v1",
+  "windowDays": 30,
+  "totalDecisions": 205,
+  "localizedDecisionCount": 0,
+  "localizedDecisionShare": 0,
+  "localizedAvgTaskScore": null,
+  "baselineAvgTaskScore": 71.345133,
+  "localizedVsBaselineTaskScoreUplift": null,
+  "dominantPrimaryTagCounts": [],
+  "reasonCodeCounts": [],
+  "localizedDecisionSamples": []
+}

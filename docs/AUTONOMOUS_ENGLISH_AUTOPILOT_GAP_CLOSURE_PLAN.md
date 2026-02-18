@@ -107,6 +107,7 @@ Source baseline: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` + current code
 | CH-18 | Transfer remediation queue | DONE | Agent_2 | 2026-02-18T04:18:35Z | 2026-02-18T04:26:52Z | `2f89d3f`, `c3098eb` | `src/lib/ood/transferRemediationQueue.ts`, `src/worker/index.ts`, `src/lib/contracts/transferRemediationQueueDashboard.ts`, `src/lib/quality/transferRemediationQueueDashboard.ts`, `src/app/api/quality/transfer-remediation-queue/route.ts`, `src/scripts/ch18_transfer_remediation_queue_report.ts`, `docs/reports/CH18_TRANSFER_REMEDIATION_QUEUE_DASHBOARD.json`, `docs/CH18_TRANSFER_REMEDIATION_QUEUE.md` | OOD fail signals now enqueue transfer remediation queue items with SLA tracking; repeat transfer pass resolves queue and feeds recovery metrics/dashboard |
 | CH-19 | Reward function v1 (versioned) | IN_PROGRESS | Agent_3 | 2026-02-18T04:28:12Z |  |  |  | Claimed as next critical-path item after transfer block (CH-16..CH-18) completion |
 | CH-20 | Offline replay dataset builder | IN_PROGRESS | Agent_1 | 2026-02-18T04:29:42Z |  |  |  | Claimed after CH-19 split: Agent_3 on CH-19, Agent_1 on CH-20 |
+| CH-21 | Off-policy evaluation pipeline | IN_PROGRESS | Agent_2 | 2026-02-18T04:32:28Z |  |  |  | Claimed after chat coordination: Agent_3 on CH-19 reward path, Agent_1 on CH-20 dataset builder |
 
 ## 3.3) Decision Log
 

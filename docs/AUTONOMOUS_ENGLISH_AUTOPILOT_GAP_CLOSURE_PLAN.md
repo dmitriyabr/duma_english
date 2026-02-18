@@ -98,10 +98,10 @@ Source baseline: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` + current code
 | CH-09 | Cause-attributed evidence write path | DONE | Agent_2 | 2026-02-17T23:29:33Z | 2026-02-18T00:15:30Z | `65f0e5a`, `d5bc41d` | `prisma/migrations/20260217233800_ch09_cause_attributed_evidence/migration.sql`, `src/lib/gse/evidence.ts`, `src/lib/gse/mastery.ts`, `src/scripts/ch09_cause_attribution_audit.ts`, `docs/reports/CH09_CAUSE_ATTRIBUTION_AUDIT_REPORT.json`, `docs/CH09_CAUSE_ATTRIBUTED_EVIDENCE.md` | Evidence/mastery causal attribution persisted end-to-end + audit artifact/script added |
 | CH-10 | Ambiguity trigger logic | DONE | Agent_2 | 2026-02-18T00:21:26Z | 2026-02-18T01:35:46Z | `d2e43f5`, `5971d52` | `src/lib/causal/ambiguityTrigger.ts`, `src/lib/causal/ambiguityTrigger.test.ts`, `src/lib/gse/planner.ts`, `src/app/api/task/next/route.ts`, `src/app/api/planner/simulate/route.ts`, `docs/CH10_AMBIGUITY_TRIGGER_LOGIC.md` | Entropy/margin/action-instability trigger integrated into planner with causal snapshot gating and test matrix |
 | CH-11 | Disambiguation probe task family | IN_PROGRESS | Agent_2 | 2026-02-18T04:00:33Z |  |  |  | Claimed after cross-agent chat coordination: Agent_3 on CH-12, Agent_1 on CH-15 |
-| CH-12 | Cause-driven remediation policy rules | IN_PROGRESS | Agent_3 | 2026-02-18T04:00:20Z |  |  |  | Claimed after cross-agent chat coordination: Agent_2 on CH-11, Agent_1 on CH-15 |
+| CH-12 | Cause-driven remediation policy rules | DONE | Agent_3 | 2026-02-18T04:00:20Z | 2026-02-18T04:12:43Z | `54e5e2f` | `src/lib/causal/remediationPolicy.ts`, `src/lib/causal/remediationPolicy.test.ts`, `src/lib/gse/planner.ts`, `src/app/api/planner/simulate/route.ts`, `docs/CH12_CAUSE_DRIVEN_REMEDIATION_POLICY.md` | Cause-driven utility offsets + remediation trace in planner decision contract/API; verified by tests/lint/build |
 | CH-13 | OOD generator v1 (axis-tagged) | DONE | Agent_1 | 2026-02-17T23:13:27Z | 2026-02-17T23:39:01Z | `b4d2773`, `b218b85` | `src/lib/ood/generator.ts`, `src/app/api/task/next/route.ts`, `docs/CH13_OOD_GENERATOR_V1.md` | Deterministic OOD axis-tagged generation + OODTaskSpec persistence + API exposure |
 | CH-14 | Difficulty anchor calibration layer | DONE | Agent_1 | 2026-02-18T00:56:49Z | 2026-02-18T02:16:40Z | `0cd3792`, `d2881cc` | `src/lib/ood/difficultyCalibration.ts`, `src/lib/ood/generator.ts`, `src/scripts/ch14_difficulty_anchor_stability_report.ts`, `docs/CH14_DIFFICULTY_CALIBRATION_LAYER.md`, `docs/reports/CH14_DIFFICULTY_ANCHOR_STABILITY_REPORT.json` | Shared difficulty calibration layer landed with report artifact; build check currently blocked by in-flight CH-04 prisma schema relation delta |
-| CH-15 | Difficulty matching protocol | IN_PROGRESS | Agent_1 | 2026-02-18T04:02:02Z |  |  |  | Claimed after cross-agent chat coordination: Agent_2 on CH-11, Agent_3 on CH-12 |
+| CH-15 | Difficulty matching protocol | DONE | Agent_1 | 2026-02-18T04:02:02Z | 2026-02-18T04:13:08Z | `7268d32`, `7a521a3` | `src/lib/ood/transferVerdict.ts`, `src/worker/index.ts`, `src/app/api/quality/transfer-verdict/route.ts`, `src/scripts/ch15_transfer_verdict_audit.ts`, `docs/reports/CH15_TRANSFER_VERDICT_AUDIT_REPORT.json`, `docs/CH15_DIFFICULTY_MATCHING_PROTOCOL.md` | Transfer fail labeling now requires matched in-domain control pass in same window; audit endpoint/script/report added |
 
 ## 3.3) Decision Log
 
@@ -119,8 +119,10 @@ Source baseline: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` + current code
 | 2026-02-17 | CH-08 | Causal inference в runtime сделан deterministic и без внешнего вызова модели: `CausalDiagnosis` upsert в worker для каждого completed attempt, выдача `results.causal` в `/api/attempts/[id]`, плюс calibration report script с агрегатами confidence/entropy/margin |
 | 2026-02-18 | CH-09 | Cause-attributed write-path привязан к `CausalDiagnosis`: `AttemptGseEvidence` и `StudentGseMastery` сохраняют top cause/probability/distribution/modelVersion; добавлен audit script `src/scripts/ch09_cause_attribution_audit.ts` с отчётом покрытия/контрактных нарушений |
 | 2026-02-18 | CH-10 | В planner добавлен ambiguity trigger по blueprint (`entropy > H_max` или `topMargin < M_min` + material action instability по utility gap): disambiguation probe включается только если реально меняет выбор действия; trigger trace пишется в `utilityJson` и отдаётся в planning API |
+| 2026-02-18 | CH-12 | Введён cause-driven remediation policy layer: causal posterior теперь добавляет action-family utility offsets (diagnostic/targeted/transfer) с confidence scaling по entropy/topMargin; trace (`top cause`, `policyChangedTopChoice`, per-choice adjustment/alignment) пишется в `PlannerDecisionLog.utilityJson` и отдаётся через planner simulate API |
 | 2026-02-17 | CH-13 | OOD generator v1 добавлен в `task/next`: deterministic cadence, axis tags по task family, запись `OODTaskSpec` на каждую OOD-инъекцию и additive `oodTaskSpec` поле в API ответе |
 | 2026-02-18 | CH-14 | Введён shared difficulty calibration layer: task-family профили переводят raw difficulty в общую шкалу (mean=50/std=15), OOD generator пишет calibrated anchor + calibration metadata в `OODTaskSpec`, добавлен periodic stability report script и артефакт мониторинга `docs/reports/CH14_DIFFICULTY_ANCHOR_STABILITY_REPORT.json` |
+| 2026-02-18 | CH-15 | Добавлен transfer verdict protocol `transfer-difficulty-match-v1`: OOD fail маркируется как `transfer_fail_validated` только при matched in-domain control pass (`|difficulty delta|<=8`, окно 72h, taskScore>=70), иначе verdict переводится в `inconclusive_control_missing`; worker пишет verdict metadata в `OODTaskSpec`, добавлены `/api/quality/transfer-verdict` и audit script/report |
 
 ## 4) Execution Board (обособленные изменения)
 
@@ -172,7 +174,7 @@ Source baseline: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` + current code
   Done: добавлены micro-task templates для разведения конкурирующих причин, с budget caps per session/skill.  
   Артефакт: generator tests + budget guard metrics.
 
-- [ ] **CH-12 — Cause-driven remediation policy rules**  
+- [x] **CH-12 — Cause-driven remediation policy rules**  
   Done: policy выбирает разные стратегии по cause class, а не общий retry/weakness path.  
   Артефакт: decision trace показывает влияние cause на action choice.
 
@@ -186,7 +188,7 @@ Source baseline: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` + current code
   Done: введены anchor sets и общая шкала сложности между task families.  
   Артефакт: periodic calibration job + anchor stability report.
 
-- [ ] **CH-15 — Difficulty matching protocol**  
+- [x] **CH-15 — Difficulty matching protocol**  
   Done: transfer fail валиден только при pass на matched in-domain control в том же окне.  
   Артефакт: transfer verdict audit endpoint.
 

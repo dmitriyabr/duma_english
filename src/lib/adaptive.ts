@@ -18,27 +18,61 @@ const CARRYOVER_CONFIDENCE = 0.8;
 
 const STAGE_GATE: Record<CEFRStage, string[]> = {
   A0: ["read_aloud", "target_vocab", "qa_prompt", "filler_control"],
-  A1: ["read_aloud", "target_vocab", "qa_prompt", "filler_control", "role_play", "topic_talk"],
-  A2: ["read_aloud", "target_vocab", "qa_prompt", "filler_control", "role_play", "topic_talk", "speech_builder"],
-  B1: ["read_aloud", "target_vocab", "qa_prompt", "filler_control", "role_play", "topic_talk", "speech_builder"],
-  B2: ["read_aloud", "target_vocab", "qa_prompt", "filler_control", "role_play", "topic_talk", "speech_builder"],
-  C1: ["read_aloud", "target_vocab", "qa_prompt", "filler_control", "role_play", "topic_talk", "speech_builder"],
-  C2: ["read_aloud", "target_vocab", "qa_prompt", "filler_control", "role_play", "topic_talk", "speech_builder"],
+  A1: ["read_aloud", "reading_comprehension", "target_vocab", "qa_prompt", "filler_control", "role_play", "topic_talk", "writing_prompt"],
+  A2: ["read_aloud", "reading_comprehension", "target_vocab", "qa_prompt", "filler_control", "role_play", "topic_talk", "speech_builder", "writing_prompt"],
+  B1: ["read_aloud", "reading_comprehension", "target_vocab", "qa_prompt", "filler_control", "role_play", "topic_talk", "speech_builder", "writing_prompt"],
+  B2: ["read_aloud", "reading_comprehension", "target_vocab", "qa_prompt", "filler_control", "role_play", "topic_talk", "speech_builder", "writing_prompt"],
+  C1: [
+    "read_aloud",
+    "reading_comprehension",
+    "target_vocab",
+    "qa_prompt",
+    "filler_control",
+    "role_play",
+    "topic_talk",
+    "speech_builder",
+    "writing_prompt",
+    "argumentation",
+    "register_switch",
+    "misunderstanding_repair",
+  ],
+  C2: [
+    "read_aloud",
+    "reading_comprehension",
+    "target_vocab",
+    "qa_prompt",
+    "filler_control",
+    "role_play",
+    "topic_talk",
+    "speech_builder",
+    "writing_prompt",
+    "argumentation",
+    "register_switch",
+    "misunderstanding_repair",
+  ],
 };
 
 const SKILL_TO_TASKS: Record<SkillKey, string[]> = {
   pronunciation: ["read_aloud", "filler_control"],
-  fluency: ["topic_talk", "filler_control", "qa_prompt"],
+  fluency: ["topic_talk", "filler_control", "qa_prompt", "argumentation", "reading_comprehension", "writing_prompt"],
   tempo_control: ["filler_control", "speech_builder", "topic_talk"],
-  vocabulary: ["target_vocab", "topic_talk", "qa_prompt"],
-  task_completion: ["qa_prompt", "role_play", "speech_builder"],
+  vocabulary: ["target_vocab", "topic_talk", "qa_prompt", "register_switch", "reading_comprehension", "writing_prompt"],
+  task_completion: [
+    "qa_prompt",
+    "role_play",
+    "speech_builder",
+    "writing_prompt",
+    "register_switch",
+    "misunderstanding_repair",
+    "reading_comprehension",
+  ],
 };
 
 const BLUEPRINT_TO_TASKS: Record<BlueprintType, string[]> = {
-  guided_practice: ["read_aloud", "qa_prompt"],
-  vocab_activation: ["target_vocab", "topic_talk"],
+  guided_practice: ["read_aloud", "qa_prompt", "reading_comprehension", "writing_prompt"],
+  vocab_activation: ["target_vocab", "topic_talk", "writing_prompt"],
   dialogue_turn: ["role_play", "qa_prompt"],
-  speech_structure: ["speech_builder", "topic_talk"],
+  speech_structure: ["speech_builder", "topic_talk", "argumentation", "register_switch", "reading_comprehension", "writing_prompt"],
   review: ["filler_control", "topic_talk"],
 };
 
@@ -96,7 +130,16 @@ function taskTypeToPrimarySkill(taskType: string): SkillKey {
   if (taskType === "read_aloud") return "pronunciation";
   if (taskType === "filler_control") return "tempo_control";
   if (taskType === "target_vocab") return "vocabulary";
-  if (taskType === "qa_prompt" || taskType === "role_play" || taskType === "speech_builder") {
+  if (
+    taskType === "qa_prompt" ||
+    taskType === "role_play" ||
+    taskType === "speech_builder" ||
+    taskType === "writing_prompt" ||
+    taskType === "reading_comprehension" ||
+    taskType === "argumentation" ||
+    taskType === "register_switch" ||
+    taskType === "misunderstanding_repair"
+  ) {
     return "task_completion";
   }
   return "fluency";

@@ -1,4 +1,12 @@
-const DISCOURSE_TASK_TYPES = ["topic_talk", "qa_prompt", "role_play", "speech_builder"] as const;
+const DISCOURSE_TASK_TYPES = [
+  "topic_talk",
+  "qa_prompt",
+  "role_play",
+  "speech_builder",
+  "argumentation",
+  "register_switch",
+  "misunderstanding_repair",
+] as const;
 
 export const DISCOURSE_PRAGMATICS_VERSION = "discourse-pragmatics-v1" as const;
 export const DISCOURSE_PRAGMATICS_PASS_THRESHOLD = 65;
@@ -74,6 +82,14 @@ function sentenceCount(input: string) {
 
 function detectExpectedRegister(prompt: string): ExpectedRegister {
   const text = normalizeText(prompt);
+  if (
+    text.includes("register switch") ||
+    text.includes("switch register") ||
+    ((text.includes("formal") || text.includes("principal") || text.includes("teacher")) &&
+      (text.includes("conversational") || text.includes("informal") || text.includes("friend")))
+  ) {
+    return "neutral";
+  }
   if (
     text.includes("formal") ||
     text.includes("presentation") ||
@@ -153,6 +169,11 @@ function buildDimensionScores(params: {
   );
 
   const expectedRegister = detectExpectedRegister(params.taskPrompt || "");
+  const argumentTaskBonus = params.taskType === "argumentation" ? 8 : 0;
+  const registerSwitchBonus =
+    params.taskType === "register_switch" && formalCueCount > 0 && conversationalCueCount > 0
+      ? 14
+      : 0;
 
   const argumentStructure = clamp(
     18 +
@@ -160,7 +181,8 @@ function buildDimensionScores(params: {
       Math.min(20, reasonCueCount * 10) +
       Math.min(20, exampleCueCount * 10) +
       Math.min(15, conclusionCueCount * 15) +
-      Math.min(22, sentences * 4),
+      Math.min(22, sentences * 4) +
+      argumentTaskBonus,
   );
 
   const registerBias =
@@ -169,9 +191,14 @@ function buildDimensionScores(params: {
       : expectedRegister === "conversational"
       ? conversationalCueCount * 7 - formalCueCount * 5
       : formalCueCount * 3 + conversationalCueCount * 2 - Math.abs(formalCueCount - conversationalCueCount) * 2;
-  const registerControl = clamp(68 + registerBias);
+  const registerControl = clamp(68 + registerBias + registerSwitchBonus);
 
-  const taskTypeBoost = params.taskType === "role_play" ? 10 : params.taskType === "qa_prompt" ? 5 : 0;
+  const taskTypeBoost =
+    params.taskType === "role_play" || params.taskType === "misunderstanding_repair"
+      ? 10
+      : params.taskType === "qa_prompt" || params.taskType === "register_switch"
+      ? 5
+      : 0;
   const turnTakingRepair = clamp(
     24 + taskTypeBoost + Math.min(30, repairCueCount * 14) + Math.min(28, responseCueCount * 12),
   );

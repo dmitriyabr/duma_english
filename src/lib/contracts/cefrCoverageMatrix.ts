@@ -20,6 +20,9 @@ export const CEFR_COVERAGE_TASK_FAMILIES = [
   "topic_talk",
   "filler_control",
   "speech_builder",
+  "argumentation",
+  "register_switch",
+  "misunderstanding_repair",
 ] as const;
 export type CefrCoverageTaskFamily = (typeof CEFR_COVERAGE_TASK_FAMILIES)[number];
 
@@ -218,6 +221,15 @@ const SKILL_BINDINGS: Record<CefrCoverageSkill, SkillBinding> = {
   },
 };
 
+const ADVANCED_DISCOURSE_STAGE_SET = new Set<CefrCoverageStage>(["C1", "C2"]);
+const ADVANCED_DISCOURSE_TASKS_BY_SKILL: Partial<
+  Record<CefrCoverageSkill, CefrCoverageTaskFamily[]>
+> = {
+  fluency: ["argumentation", "register_switch"],
+  vocabulary: ["register_switch"],
+  task_completion: ["argumentation", "register_switch", "misunderstanding_repair"],
+};
+
 function dedupe<T>(items: T[]) {
   return Array.from(new Set(items));
 }
@@ -247,13 +259,16 @@ function buildDescriptorRows(): CefrCoverageDescriptorRow[] {
   for (const stage of CEFR_COVERAGE_STAGE_ORDER) {
     for (const skill of CEFR_COVERAGE_SKILLS) {
       const binding = SKILL_BINDINGS[skill];
+      const advancedFamilies = ADVANCED_DISCOURSE_STAGE_SET.has(stage)
+        ? ADVANCED_DISCOURSE_TASKS_BY_SKILL[skill] || []
+        : [];
       rows.push({
         descriptorId: `cefr:${stage.toLowerCase()}:${skill}`,
         stage,
         skill,
         descriptor: STAGE_SKILL_DESCRIPTORS[stage][skill],
         nodeSelectors: buildNodeSelectors(stage, binding.nodeSelectorTemplates),
-        taskFamilies: dedupe(binding.taskFamilies),
+        taskFamilies: dedupe([...binding.taskFamilies, ...advancedFamilies]),
         rubricRows: dedupe(binding.rubricRows),
       });
     }
@@ -261,11 +276,11 @@ function buildDescriptorRows(): CefrCoverageDescriptorRow[] {
   return rows;
 }
 
-export const CEFR_COVERAGE_MATRIX_VERSION = "cefr-coverage.v1.2026-02-17";
+export const CEFR_COVERAGE_MATRIX_VERSION = "cefr-coverage.v1.2026-02-19";
 
 export const CEFR_COVERAGE_MATRIX: CefrCoverageMatrix = cefrCoverageMatrixSchema.parse({
   version: CEFR_COVERAGE_MATRIX_VERSION,
-  generatedAt: "2026-02-17T00:00:00Z",
+  generatedAt: "2026-02-19T00:00:00Z",
   descriptorRows: buildDescriptorRows(),
 });
 

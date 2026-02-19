@@ -35,6 +35,38 @@ export const TASK_TEMPLATES: TaskTemplate[] = [
     },
   },
   {
+    type: "reading_comprehension",
+    level: 1,
+    prompt:
+      "Read the passage and answer in 3-4 sentences.\nPassage: Amina reads library books every evening because stories help her learn new words.\nQuestion: Why does Amina read library books every evening?",
+    assessmentMode: "stt",
+    constraints: { minSeconds: 25, maxSeconds: 90 },
+    maxDurationSec: 75,
+    meta: {
+      supportsPronAssessment: false,
+      rubricType: "reading_comprehension",
+      modality: "reading",
+      readingPromptVersion: "reading-runtime-v1",
+    },
+  },
+  {
+    type: "writing_prompt",
+    level: 1,
+    prompt:
+      "Write 5-7 sentences about a school challenge you solved. Include what happened, what you did, and what changed.",
+    assessmentMode: "stt",
+    constraints: { minSeconds: 60, maxSeconds: 300 },
+    maxDurationSec: 240,
+    meta: {
+      supportsPronAssessment: false,
+      rubricType: "writing_prompt",
+      modality: "writing",
+      assessmentModeOverride: "text",
+      minWordCount: 45,
+      requiresRevisionHint: true,
+    },
+  },
+  {
     type: "topic_talk",
     level: 1,
     prompt: "Talk about your favorite place to play. Say where it is and why you like it.",
@@ -101,6 +133,54 @@ export const TASK_TEMPLATES: TaskTemplate[] = [
       requiredParts: ["hook", "point", "example", "close"],
     },
   },
+  {
+    type: "argumentation",
+    level: 1,
+    prompt:
+      "Argumentation task: take a position on 'School uniforms should be required' and include a claim, two reasons, one counterargument, and a conclusion.",
+    assessmentMode: "stt",
+    constraints: { minSeconds: 35, maxSeconds: 120 },
+    maxDurationSec: 60,
+    meta: {
+      supportsPronAssessment: false,
+      rubricType: "argumentation",
+      discourseFamily: "argumentation",
+      requiredParts: ["claim", "reasons", "counterargument", "conclusion"],
+      recommendedStages: ["C1", "C2"],
+    },
+  },
+  {
+    type: "register_switch",
+    level: 1,
+    prompt:
+      "Register switch task: explain the same school problem twice - first to your principal (formal), then to your best friend (conversational).",
+    assessmentMode: "stt",
+    constraints: { minSeconds: 35, maxSeconds: 120 },
+    maxDurationSec: 60,
+    meta: {
+      supportsPronAssessment: false,
+      rubricType: "register_switch",
+      discourseFamily: "register_switch",
+      expectedRegisters: ["formal", "conversational"],
+      recommendedStages: ["C1", "C2"],
+    },
+  },
+  {
+    type: "misunderstanding_repair",
+    level: 1,
+    prompt:
+      "Misunderstanding repair: your partner misunderstands your plan. Clarify, rephrase, check understanding, and agree on the next step.",
+    assessmentMode: "stt",
+    constraints: { minSeconds: 35, maxSeconds: 120 },
+    maxDurationSec: 60,
+    meta: {
+      supportsPronAssessment: false,
+      rubricType: "misunderstanding_repair",
+      discourseFamily: "misunderstanding_repair",
+      requiredActs: ["clarify", "rephrase", "check_understanding", "confirm_next_step"],
+      recommendedStages: ["C1", "C2"],
+    },
+  },
 ];
 
 export function pickTaskTemplate() {
@@ -136,6 +216,26 @@ export function buildTaskTemplate(type: string, options: TaskTemplateBuildOption
   if (base.type === "speech_builder") {
     next.prompt =
       "Speak in 4 short steps: 1) topic, 2) your idea, 3) one example, 4) clear ending.";
+  }
+
+  if (base.type === "argumentation") {
+    next.prompt =
+      "Take a clear position, give two reasons, include one counterargument, and finish with a conclusion.";
+  }
+
+  if (base.type === "register_switch") {
+    next.prompt =
+      "Say your message twice: first in formal style for a teacher, then in conversational style for a friend.";
+  }
+
+  if (base.type === "misunderstanding_repair") {
+    next.prompt =
+      "Repair a misunderstanding: clarify your idea, rephrase it, check understanding, and confirm the next step.";
+  }
+
+  if (base.type === "writing_prompt") {
+    next.prompt =
+      "Write 5-7 sentences about a real school experience. Explain the situation, your action, and the result.";
   }
 
   return next;

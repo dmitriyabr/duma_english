@@ -32,6 +32,19 @@ import { computeDecayedMastery } from "./mastery";
 import { mapStageToGseRange } from "./utils";
 
 const STAGE_ORDER: CEFRStage[] = ["A0", "A1", "A2", "B1", "B2", "C1", "C2"];
+const ADVANCED_DISCOURSE_TASK_TYPES = [
+  "argumentation",
+  "register_switch",
+  "misunderstanding_repair",
+] as const;
+
+function stageAllowsTaskType(stage: string, taskType: string) {
+  if (ADVANCED_DISCOURSE_TASK_TYPES.includes(taskType as (typeof ADVANCED_DISCOURSE_TASK_TYPES)[number])) {
+    return stage === "C1" || stage === "C2";
+  }
+  return true;
+}
+
 function nextStage(stage: string): CEFRStage {
   const i = STAGE_ORDER.indexOf(stage as CEFRStage);
   if (i < 0 || i >= STAGE_ORDER.length - 1) return (stage as CEFRStage) || "A1";
@@ -54,9 +67,14 @@ function nodeDomain(nodeType: string) {
 function taskDomainWeights(taskType: string): Record<DomainKey, number> {
   if (taskType === "target_vocab") return { vocab: 1, grammar: 0.45, lo: 0.4 };
   if (taskType === "read_aloud") return { vocab: 0.15, grammar: 0.35, lo: 1 };
+  if (taskType === "reading_comprehension") return { vocab: 0.45, grammar: 0.78, lo: 0.9 };
+  if (taskType === "writing_prompt") return { vocab: 0.62, grammar: 0.92, lo: 0.9 };
   if (taskType === "qa_prompt") return { vocab: 0.5, grammar: 0.8, lo: 0.85 };
   if (taskType === "role_play") return { vocab: 0.5, grammar: 0.75, lo: 0.9 };
   if (taskType === "speech_builder") return { vocab: 0.5, grammar: 0.85, lo: 1 };
+  if (taskType === "argumentation") return { vocab: 0.65, grammar: 0.9, lo: 1 };
+  if (taskType === "register_switch") return { vocab: 0.65, grammar: 0.85, lo: 1 };
+  if (taskType === "misunderstanding_repair") return { vocab: 0.55, grammar: 0.8, lo: 1 };
   if (taskType === "filler_control") return { vocab: 0.25, grammar: 0.5, lo: 0.8 };
   return { vocab: 0.45, grammar: 0.7, lo: 0.9 };
 }
@@ -227,9 +245,18 @@ function nextDomainToProbe(recentTaskTypes: string[]) {
 
 function taskCluster(taskType: string) {
   if (taskType === "read_aloud") return "reading";
+  if (taskType === "reading_comprehension") return "reading";
+  if (taskType === "writing_prompt") return "writing";
   if (taskType === "target_vocab") return "vocab";
   if (taskType === "filler_control") return "delivery";
-  if (taskType === "qa_prompt" || taskType === "role_play") return "interaction";
+  if (
+    taskType === "qa_prompt" ||
+    taskType === "role_play" ||
+    taskType === "register_switch" ||
+    taskType === "misunderstanding_repair"
+  ) {
+    return "interaction";
+  }
   return "monologue";
 }
 
@@ -1014,8 +1041,21 @@ function scoreCandidate(params: {
       ? 1.1
       : 0;
   const tokenCost =
-    params.taskType === "speech_builder" || params.taskType === "role_play" ? 1.3 : 0.9;
-  const latencyRisk = params.taskType === "speech_builder" ? 0.22 : 0.1;
+    params.taskType === "speech_builder" ||
+    params.taskType === "role_play" ||
+    params.taskType === "argumentation" ||
+    params.taskType === "register_switch" ||
+    params.taskType === "misunderstanding_repair"
+      ? 1.3
+      : params.taskType === "writing_prompt"
+      ? 1.05
+      : 0.9;
+  const latencyRisk =
+    params.taskType === "speech_builder" ||
+    params.taskType === "argumentation" ||
+    params.taskType === "writing_prompt"
+      ? 0.22
+      : 0.1;
   const explorationBonus = clamp(avgSigma / 100, 0.05, 0.3);
   const preferredBoost = targetNodes.some((node) => preferredSet.has(node.nodeId)) ? 0.18 : 0;
   const domainRotationBonus = targetNodes.some((node) => node.domain === targetDomain) ? 0.35 : 0;
@@ -1119,7 +1159,36 @@ export async function planNextTaskDecision(params: {
   let taskTypes =
     candidateTaskTypes.length > 0
       ? candidateTaskTypes
-      : ["read_aloud", "target_vocab", "qa_prompt", "role_play", "topic_talk", "filler_control", "speech_builder"];
+      : [
+          "read_aloud",
+          "reading_comprehension",
+          "target_vocab",
+          "writing_prompt",
+          "qa_prompt",
+          "role_play",
+          "topic_talk",
+          "filler_control",
+          "speech_builder",
+          "argumentation",
+          "register_switch",
+          "misunderstanding_repair",
+        ];
+  const stageFilteredTaskTypes = taskTypes.filter((taskType) => stageAllowsTaskType(params.stage, taskType));
+  if (stageFilteredTaskTypes.length > 0) {
+    taskTypes = stageFilteredTaskTypes;
+  } else {
+    taskTypes = [
+      "read_aloud",
+      "reading_comprehension",
+      "target_vocab",
+      "writing_prompt",
+      "qa_prompt",
+      "role_play",
+      "topic_talk",
+      "filler_control",
+      "speech_builder",
+    ];
+  }
 
   // Per-domain target stages: each domain advances independently
   const ds = params.domainStages;
@@ -1219,7 +1288,7 @@ export async function planNextTaskDecision(params: {
     return typeof scores.taskScore === "number" && scores.taskScore < 55;
   });
   if (recoveryTriggered) {
-    const recoveryTypes = ["read_aloud", "target_vocab", "qa_prompt", "filler_control"];
+    const recoveryTypes = ["read_aloud", "reading_comprehension", "target_vocab", "writing_prompt", "qa_prompt", "filler_control"];
     const reduced = taskTypes.filter((type) => recoveryTypes.includes(type));
     taskTypes = reduced.length > 0 ? reduced : recoveryTypes;
   }

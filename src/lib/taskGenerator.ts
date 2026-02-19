@@ -1,6 +1,11 @@
 import { z } from "zod";
 import { buildTaskTemplate } from "./taskTemplates";
-import { extractReferenceText, extractRequiredWords } from "./taskText";
+import {
+  extractReadingPassage,
+  extractReadingQuestion,
+  extractReferenceText,
+  extractRequiredWords,
+} from "./taskText";
 import { chatJson } from "./llm";
 import { config } from "./config";
 import { buildDisambiguationPromptGuidance, type DisambiguationProbePlan } from "./causal/disambiguationProbe";
@@ -9,10 +14,10 @@ const generatedTaskSchema = z.object({
   task_type: z.string().min(2),
   instruction: z.string().min(20).max(420),
   constraints: z.object({
-    minSeconds: z.number().int().min(5).max(120),
-    maxSeconds: z.number().int().min(10).max(180),
+    minSeconds: z.number().int().min(5).max(300),
+    maxSeconds: z.number().int().min(10).max(300),
   }),
-  maxDurationSec: z.number().int().min(10).max(120),
+  maxDurationSec: z.number().int().min(10).max(300),
   assessmentMode: z.enum(["pa", "stt"]),
   expected_artifacts: z.array(z.string()).max(12),
   scoring_hooks: z.array(z.string()).max(12),
@@ -76,6 +81,16 @@ function fallbackTaskSpec(input: GenerateTaskSpecInput): GeneratedTaskSpec {
       "Read this aloud clearly: 'Every day I learn new words and use them in class.'",
       "Read this aloud clearly: 'Our class works together, asks questions, and solves problems.'",
     ],
+    reading_comprehension: [
+      "Read the passage and answer in 3-4 sentences.\nPassage: Musa waters the school garden every morning so vegetables can grow well in dry weather.\nQuestion: Why does Musa water the school garden every morning?",
+      "Read the passage and answer in 3-4 sentences.\nPassage: Amina reads a short chapter each evening and writes two new words in her notebook.\nQuestion: How does Amina use reading to improve her English?",
+      "Read the passage and answer in 3-4 sentences.\nPassage: The class planted trees around the playground because shade helps students rest after games.\nQuestion: Why did the class plant trees around the playground?",
+    ],
+    writing_prompt: [
+      "Write 5-7 sentences about a school challenge you solved. Include the problem, your action, and the result.",
+      "Write 6 sentences about helping a classmate. Explain what happened, what you said, and what changed.",
+      "Write a short paragraph about your study plan this week. Include one obstacle and how you handled it.",
+    ],
     target_vocab: [
       `Use these words in a short talk: ${input.targetWords.slice(0, 4).join(", ") || "school, learn, friend, goal"}.`,
       `Make 3-4 sentences using these words: ${input.targetWords.slice(0, 4).join(", ") || "plan, study, team, improve"}.`,
@@ -106,6 +121,21 @@ function fallbackTaskSpec(input: GenerateTaskSpecInput): GeneratedTaskSpec {
       "Give a 4-part mini speech: start, key point, example, finish.",
       "Speak in 4 steps: topic, idea, example, ending.",
     ],
+    argumentation: [
+      "Take a position on school uniforms and give two reasons, one counterargument, and a conclusion.",
+      "Argue whether homework should be reduced. Include claim, reasons, counterargument, and conclusion.",
+      "Choose one side on screen time limits and defend it with reasons and one rebuttal.",
+    ],
+    register_switch: [
+      "Explain a late-homework issue twice: first to your teacher formally, then to your friend informally.",
+      "Give the same school request in two styles: formal for a principal, conversational for a classmate.",
+      "Switch register: formal explanation for staff, then casual version for a friend.",
+    ],
+    misunderstanding_repair: [
+      "Your partner misunderstood your plan. Clarify, rephrase, check understanding, and agree next steps.",
+      "Repair a misunderstanding in conversation: explain again, verify understanding, and close with agreement.",
+      "Role-play confusion recovery: clarify intent, restate key point, ask if it is clear, and confirm action.",
+    ],
   };
   const variants = fallbackVariants[taskType] || [];
   const selectedPrompt = variants.find((candidate) => !isTooSimilarPrompt(candidate, input.recentPrompts || []));
@@ -116,11 +146,10 @@ function fallbackTaskSpec(input: GenerateTaskSpecInput): GeneratedTaskSpec {
     constraints: template.constraints,
     maxDurationSec: template.maxDurationSec,
     assessmentMode: template.assessmentMode,
-    expectedArtifacts: [
-      "transcript",
-      "task_completion",
-      "speech_metrics",
-    ],
+    expectedArtifacts:
+      taskType === "writing_prompt"
+        ? ["transcript", "task_completion", "writing_metrics"]
+        : ["transcript", "task_completion", "speech_metrics"],
     scoringHooks: input.focusSkills.slice(0, 3),
     estimatedDifficulty: input.stage === "A0" ? 30 : input.stage === "A1" ? 45 : input.stage === "A2" ? 58 : 70,
     targetNodes: input.targetNodeIds.slice(0, 6),
@@ -228,11 +257,52 @@ function taskTypeQualityGuidance(input: GenerateTaskSpecInput) {
       "3) Keep task concrete and child-friendly.",
     ];
   }
+  if (taskType === "reading_comprehension") {
+    return [
+      "Task quality rules for reading_comprehension:",
+      "1) Instruction must include both 'Passage:' and 'Question:' sections.",
+      "2) Passage should be 1-2 short sentences with concrete school/life context.",
+      "3) Question must require comprehension (why/how/what) and answerable from passage content.",
+      "4) Require 3-4 sentence response grounded in passage details.",
+    ];
+  }
+  if (taskType === "writing_prompt") {
+    return [
+      "Task quality rules for writing_prompt:",
+      "1) Require 5-7 sentence written response about a concrete school/life context.",
+      "2) Ask for situation -> action -> result structure.",
+      "3) Encourage clear connectors (because, then, finally) and full sentences.",
+    ];
+  }
   if (taskType === "speech_builder") {
     return [
       "Task quality rules for speech_builder:",
       "1) Use child wording: topic, main idea, one example, clear ending.",
       "2) Avoid method terms (hook, point, close).",
+    ];
+  }
+  if (taskType === "argumentation") {
+    return [
+      "Task quality rules for argumentation:",
+      "1) Require clear position, at least two reasons, one counterargument, and a conclusion.",
+      "2) Keep topic age-appropriate and concrete.",
+      "3) Instruction should encourage evidence-based explanation, not single-sentence opinions.",
+    ];
+  }
+  if (taskType === "register_switch") {
+    return [
+      "Task quality rules for register_switch:",
+      "1) Require two audience contexts in one task (formal + conversational).",
+      "2) Explicitly mention register shift/switch.",
+      "3) Keep scenario realistic for school-age learners.",
+    ];
+  }
+  if (taskType === "misunderstanding_repair") {
+    return [
+      "Task quality rules for misunderstanding_repair:",
+      "1) Include misunderstanding context and explicit repair steps.",
+      "2) Require clarify/rephrase/check-understanding behavior.",
+      "3) End with aligned next action or confirmation.",
     ];
   }
   return [
@@ -259,11 +329,67 @@ function validatePromptQuality(spec: GeneratedTaskSpec, input: GenerateTaskSpecI
     }
   }
 
+  if (taskType === "reading_comprehension") {
+    const passage = extractReadingPassage(prompt);
+    const question = extractReadingQuestion(prompt);
+    if (!passage) return { ok: false, reason: "missing_reading_passage" };
+    if (!question) return { ok: false, reason: "missing_reading_question" };
+    const passageWords = countWords(passage);
+    if (passageWords < 12 || passageWords > 45) {
+      return { ok: false, reason: "reading_passage_length_out_of_range" };
+    }
+    if (!/\\?$/.test(question) || countWords(question) < 5) {
+      return { ok: false, reason: "reading_question_quality_low" };
+    }
+  }
+
+  if (taskType === "writing_prompt") {
+    const words = countWords(prompt);
+    if (words < 12) return { ok: false, reason: "writing_prompt_too_short" };
+    const normalized = normalizePromptText(prompt);
+    const hasStructureCue =
+      normalized.includes("situation") ||
+      normalized.includes("problem") ||
+      normalized.includes("action") ||
+      normalized.includes("result");
+    if (!hasStructureCue) return { ok: false, reason: "writing_structure_cues_missing" };
+  }
+
   if (taskType === "target_vocab" && input.targetWords.length >= 2) {
     const parsedWords = extractRequiredWords(prompt);
     const provided = new Set(input.targetWords.map((w) => w.toLowerCase().trim()));
     const overlap = parsedWords.filter((w) => provided.has(w)).length;
     if (overlap < 2) return { ok: false, reason: "target_words_not_respected" };
+  }
+
+  if (taskType === "argumentation") {
+    const normalized = normalizePromptText(prompt);
+    const cueCount =
+      (normalized.includes("position") ? 1 : 0) +
+      (normalized.includes("reason") ? 1 : 0) +
+      (normalized.includes("counterargument") || normalized.includes("counter argument") ? 1 : 0) +
+      (normalized.includes("conclusion") ? 1 : 0);
+    if (cueCount < 3) return { ok: false, reason: "argumentation_structure_missing" };
+  }
+
+  if (taskType === "register_switch") {
+    const normalized = normalizePromptText(prompt);
+    const hasFormal = normalized.includes("formal");
+    const hasConversational =
+      normalized.includes("conversational") || normalized.includes("informal");
+    const hasSwitchCue = normalized.includes("switch") || normalized.includes("register");
+    if (!(hasFormal && hasConversational && hasSwitchCue)) {
+      return { ok: false, reason: "register_switch_cues_missing" };
+    }
+  }
+
+  if (taskType === "misunderstanding_repair") {
+    const normalized = normalizePromptText(prompt);
+    const hasRepairCue =
+      normalized.includes("clarify") ||
+      normalized.includes("rephrase") ||
+      normalized.includes("misunderstand");
+    if (!hasRepairCue) return { ok: false, reason: "repair_cues_missing" };
   }
 
   return { ok: true, reason: null as string | null };
@@ -297,10 +423,10 @@ function normalizeGeneratedPayload(
     taskType,
     prompt: instruction,
     constraints: {
-      minSeconds: Math.max(5, Math.min(120, Math.round(minSeconds))),
-      maxSeconds: Math.max(10, Math.min(180, Math.round(maxSeconds))),
+      minSeconds: Math.max(5, Math.min(300, Math.round(minSeconds))),
+      maxSeconds: Math.max(10, Math.min(300, Math.round(maxSeconds))),
     },
-    maxDurationSec: Math.max(10, Math.min(120, Math.round(maxDurationSec))),
+    maxDurationSec: Math.max(10, Math.min(300, Math.round(maxDurationSec))),
     assessmentMode: coerceMode(row.assessmentMode, taskType),
     expectedArtifacts: expectedArtifacts.length ? expectedArtifacts.slice(0, 12) : fallback.expectedArtifacts,
     scoringHooks: scoringHooks.length ? scoringHooks.slice(0, 12) : fallback.scoringHooks,
@@ -353,7 +479,7 @@ export async function generateTaskSpec(input: GenerateTaskSpecInput): Promise<Ge
   }
 
   const prompt = [
-    "Generate one speaking task for a child learner.",
+    "Generate one English task for a child learner (speaking or writing depending on required task type).",
     "Output JSON only with keys: task_type,instruction,constraints,maxDurationSec,assessmentMode,expected_artifacts,scoring_hooks,estimated_difficulty.",
     "Use simple child-friendly language and no method jargon.",
     "Keep instruction under 45 words.",
@@ -369,6 +495,8 @@ export async function generateTaskSpec(input: GenerateTaskSpecInput): Promise<Ge
     `Avoid repeating recent prompts: ${(input.recentPrompts || []).slice(0, 5).join(" || ") || "none"}`,
     taskType === "read_aloud"
       ? "For read_aloud: instruction MUST include exact text to read in quotes, e.g. Read this aloud clearly: '...'."
+      : taskType === "reading_comprehension"
+      ? "For reading_comprehension: instruction MUST include both sections with exact labels: 'Passage:' and 'Question:'."
       : "For non-read_aloud: do not ask learner to read a reference sentence.",
     ...taskTypeQualityGuidance(input),
     ...buildDisambiguationPromptGuidance(input.disambiguationProbe || {

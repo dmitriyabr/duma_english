@@ -12,6 +12,9 @@ const TASK_TYPE_PRIMARY_AXIS: Record<string, (typeof oodAxisTags)[number]> = {
   topic_talk: "register",
   filler_control: "format",
   speech_builder: "goal",
+  argumentation: "goal",
+  register_switch: "register",
+  misunderstanding_repair: "interlocutor",
 };
 
 function hashToPositiveInt(value: string) {

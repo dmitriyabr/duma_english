@@ -49,8 +49,23 @@ export type AmbiguityTriggerEvaluation = {
 };
 
 export function mapTaskTypeToActionFamily(taskType: string): PlannerActionFamily {
-  if (taskType === "target_vocab" || taskType === "speech_builder") return "targeted_practice";
-  if (taskType === "role_play" || taskType === "topic_talk") return "transfer_probe";
+  if (
+    taskType === "target_vocab" ||
+    taskType === "speech_builder" ||
+    taskType === "reading_comprehension" ||
+    taskType === "writing_prompt"
+  ) {
+    return "targeted_practice";
+  }
+  if (
+    taskType === "role_play" ||
+    taskType === "topic_talk" ||
+    taskType === "argumentation" ||
+    taskType === "register_switch" ||
+    taskType === "misunderstanding_repair"
+  ) {
+    return "transfer_probe";
+  }
   return "diagnostic_probe";
 }
 

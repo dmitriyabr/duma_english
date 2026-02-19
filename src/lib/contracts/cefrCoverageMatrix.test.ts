@@ -44,3 +44,21 @@ test("cefr coverage validator flags duplicate and missing stage/skill mappings",
   assert.equal(codes.has("duplicate_stage_skill_mapping"), true);
   assert.equal(codes.has("missing_stage_skill_mapping"), true);
 });
+
+test("C1/C2 task completion rows include advanced discourse task families", () => {
+  const c1TaskCompletion = CEFR_COVERAGE_MATRIX.descriptorRows.find(
+    (row) => row.stage === "C1" && row.skill === "task_completion",
+  );
+  const c2TaskCompletion = CEFR_COVERAGE_MATRIX.descriptorRows.find(
+    (row) => row.stage === "C2" && row.skill === "task_completion",
+  );
+
+  assert.ok(c1TaskCompletion);
+  assert.ok(c2TaskCompletion);
+  assert.equal(c1TaskCompletion!.taskFamilies.includes("argumentation"), true);
+  assert.equal(c1TaskCompletion!.taskFamilies.includes("register_switch"), true);
+  assert.equal(c1TaskCompletion!.taskFamilies.includes("misunderstanding_repair"), true);
+  assert.equal(c2TaskCompletion!.taskFamilies.includes("argumentation"), true);
+  assert.equal(c2TaskCompletion!.taskFamilies.includes("register_switch"), true);
+  assert.equal(c2TaskCompletion!.taskFamilies.includes("misunderstanding_repair"), true);
+});

@@ -87,3 +87,48 @@ test("task generator respects enabled disambiguation probe task override in fall
 
   if (original) process.env.OPENAI_API_KEY = original;
 });
+
+test("task generator fallback emits structured reading_comprehension prompt", async () => {
+  const original = process.env.OPENAI_API_KEY;
+  delete process.env.OPENAI_API_KEY;
+
+  const spec = await generateTaskSpec({
+    taskType: "reading_comprehension",
+    stage: "A2",
+    ageBand: "9-11",
+    targetWords: [],
+    targetNodeIds: ["gse:lo:reading:inference"],
+    focusSkills: ["task_completion", "vocabulary"],
+    plannerReason: "Collect reading-comprehension evidence.",
+    primaryGoal: "reduce_uncertainty",
+  });
+
+  assert.equal(spec.taskType, "reading_comprehension");
+  assert.equal(spec.fallbackUsed, true);
+  assert.equal(/passage:/i.test(spec.prompt), true);
+  assert.equal(/question:/i.test(spec.prompt), true);
+
+  if (original) process.env.OPENAI_API_KEY = original;
+});
+
+test("task generator fallback supports advanced discourse family prompts", async () => {
+  const original = process.env.OPENAI_API_KEY;
+  delete process.env.OPENAI_API_KEY;
+
+  const spec = await generateTaskSpec({
+    taskType: "argumentation",
+    stage: "C1",
+    ageBand: "12-14",
+    targetWords: [],
+    targetNodeIds: ["gse:lo:c1:argument"],
+    focusSkills: ["task_completion", "fluency"],
+    plannerReason: "Advance discourse practice for C-level learner.",
+    primaryGoal: "maintain_progress",
+  });
+
+  assert.equal(spec.taskType, "argumentation");
+  assert.equal(spec.fallbackUsed, true);
+  assert.ok(/position|counterargument|conclusion/i.test(spec.prompt));
+
+  if (original) process.env.OPENAI_API_KEY = original;
+});

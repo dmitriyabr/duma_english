@@ -1,0 +1,281 @@
+{
+  "generatedAt": "2026-02-19T14:28:18.143Z",
+  "contractVersion": "advanced-discourse-task-families-report-v1",
+  "windowDays": 30,
+  "baselineTaskFamilies": [
+    "read_aloud",
+    "target_vocab",
+    "qa_prompt",
+    "role_play",
+    "topic_talk",
+    "filler_control",
+    "speech_builder"
+  ],
+  "currentTaskFamilies": [
+    "argumentation",
+    "filler_control",
+    "misunderstanding_repair",
+    "qa_prompt",
+    "read_aloud",
+    "reading_comprehension",
+    "register_switch",
+    "role_play",
+    "speech_builder",
+    "target_vocab",
+    "topic_talk",
+    "writing_prompt"
+  ],
+  "addedTaskFamilies": [
+    "argumentation",
+    "misunderstanding_repair",
+    "reading_comprehension",
+    "register_switch",
+    "writing_prompt"
+  ],
+  "removedTaskFamilies": [],
+  "catalogRows": [
+    {
+      "taskType": "argumentation",
+      "classification": "advanced_discourse",
+      "fromTemplateCatalog": true,
+      "supportsDiscoursePragmatics": true,
+      "stageCoverage": [
+        "C1",
+        "C2"
+      ]
+    },
+    {
+      "taskType": "filler_control",
+      "classification": "baseline",
+      "fromTemplateCatalog": true,
+      "supportsDiscoursePragmatics": false,
+      "stageCoverage": [
+        "A0",
+        "A1",
+        "A2",
+        "B1",
+        "B2",
+        "C1",
+        "C2"
+      ]
+    },
+    {
+      "taskType": "misunderstanding_repair",
+      "classification": "advanced_discourse",
+      "fromTemplateCatalog": true,
+      "supportsDiscoursePragmatics": true,
+      "stageCoverage": [
+        "C1",
+        "C2"
+      ]
+    },
+    {
+      "taskType": "qa_prompt",
+      "classification": "baseline",
+      "fromTemplateCatalog": true,
+      "supportsDiscoursePragmatics": true,
+      "stageCoverage": [
+        "A0",
+        "A1",
+        "A2",
+        "B1",
+        "B2",
+        "C1",
+        "C2"
+      ]
+    },
+    {
+      "taskType": "read_aloud",
+      "classification": "baseline",
+      "fromTemplateCatalog": true,
+      "supportsDiscoursePragmatics": false,
+      "stageCoverage": [
+        "A0",
+        "A1",
+        "A2",
+        "B1",
+        "B2",
+        "C1",
+        "C2"
+      ]
+    },
+    {
+      "taskType": "reading_comprehension",
+      "classification": "other",
+      "fromTemplateCatalog": true,
+      "supportsDiscoursePragmatics": false,
+      "stageCoverage": [
+        "A0",
+        "A1",
+        "A2",
+        "B1",
+        "B2",
+        "C1",
+        "C2"
+      ]
+    },
+    {
+      "taskType": "register_switch",
+      "classification": "advanced_discourse",
+      "fromTemplateCatalog": true,
+      "supportsDiscoursePragmatics": true,
+      "stageCoverage": [
+        "C1",
+        "C2"
+      ]
+    },
+    {
+      "taskType": "role_play",
+      "classification": "baseline",
+      "fromTemplateCatalog": true,
+      "supportsDiscoursePragmatics": true,
+      "stageCoverage": [
+        "A0",
+        "A1",
+        "A2",
+        "B1",
+        "B2",
+        "C1",
+        "C2"
+      ]
+    },
+    {
+      "taskType": "speech_builder",
+      "classification": "baseline",
+      "fromTemplateCatalog": true,
+      "supportsDiscoursePragmatics": true,
+      "stageCoverage": [
+        "A0",
+        "A1",
+        "A2",
+        "B1",
+        "B2",
+        "C1",
+        "C2"
+      ]
+    },
+    {
+      "taskType": "target_vocab",
+      "classification": "baseline",
+      "fromTemplateCatalog": true,
+      "supportsDiscoursePragmatics": false,
+      "stageCoverage": [
+        "A0",
+        "A1",
+        "A2",
+        "B1",
+        "B2",
+        "C1",
+        "C2"
+      ]
+    },
+    {
+      "taskType": "topic_talk",
+      "classification": "baseline",
+      "fromTemplateCatalog": true,
+      "supportsDiscoursePragmatics": true,
+      "stageCoverage": [
+        "A0",
+        "A1",
+        "A2",
+        "B1",
+        "B2",
+        "C1",
+        "C2"
+      ]
+    },
+    {
+      "taskType": "writing_prompt",
+      "classification": "other",
+      "fromTemplateCatalog": true,
+      "supportsDiscoursePragmatics": false,
+      "stageCoverage": [
+        "A0",
+        "A1",
+        "A2",
+        "B1",
+        "B2",
+        "C1",
+        "C2"
+      ]
+    }
+  ],
+  "passRateByTaskFamily": [
+    {
+      "taskType": "topic_talk",
+      "attempts": 51,
+      "passedAttempts": 40,
+      "passRate": 0.784314
+    },
+    {
+      "taskType": "target_vocab",
+      "attempts": 41,
+      "passedAttempts": 35,
+      "passRate": 0.853659
+    },
+    {
+      "taskType": "qa_prompt",
+      "attempts": 31,
+      "passedAttempts": 29,
+      "passRate": 0.935484
+    },
+    {
+      "taskType": "read_aloud",
+      "attempts": 20,
+      "passedAttempts": 14,
+      "passRate": 0.7
+    },
+    {
+      "taskType": "filler_control",
+      "attempts": 12,
+      "passedAttempts": 10,
+      "passRate": 0.833333
+    },
+    {
+      "taskType": "role_play",
+      "attempts": 10,
+      "passedAttempts": 9,
+      "passRate": 0.9
+    },
+    {
+      "taskType": "speech_builder",
+      "attempts": 4,
+      "passedAttempts": 2,
+      "passRate": 0.5
+    },
+    {
+      "taskType": "argumentation",
+      "attempts": 0,
+      "passedAttempts": 0,
+      "passRate": null
+    },
+    {
+      "taskType": "misunderstanding_repair",
+      "attempts": 0,
+      "passedAttempts": 0,
+      "passRate": null
+    },
+    {
+      "taskType": "reading_comprehension",
+      "attempts": 0,
+      "passedAttempts": 0,
+      "passRate": null
+    },
+    {
+      "taskType": "register_switch",
+      "attempts": 0,
+      "passedAttempts": 0,
+      "passRate": null
+    },
+    {
+      "taskType": "writing_prompt",
+      "attempts": 0,
+      "passedAttempts": 0,
+      "passRate": null
+    }
+  ],
+  "totals": {
+    "attemptsConsidered": 181,
+    "scoredAttempts": 169
+  }
+}

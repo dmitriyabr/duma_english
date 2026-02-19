@@ -81,6 +81,9 @@ export function selectDelayedVerificationTaskType(sourceTaskType: string) {
     topic_talk: "qa_prompt",
     filler_control: "speech_builder",
     speech_builder: "qa_prompt",
+    argumentation: "register_switch",
+    register_switch: "misunderstanding_repair",
+    misunderstanding_repair: "argumentation",
     read_aloud: "qa_prompt",
   };
   return map[sourceTaskType] || "qa_prompt";

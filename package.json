@@ -31,6 +31,8 @@
     "language-signals:report": "tsx src/scripts/ch31_language_signal_report.ts",
     "l1-interference:report": "tsx src/scripts/ch32_l1_interference_template_report.ts",
     "locale-policy:report": "tsx src/scripts/ch33_locale_policy_context_report.ts",
+    "advanced-discourse:report": "tsx src/scripts/ch35_advanced_discourse_task_families_report.ts",
+    "reading-runtime:report": "tsx src/scripts/ch36_reading_runtime_report.ts",
     "policy-log:validate": "tsx src/scripts/ch04_policy_decision_log_validator.ts",
     "transfer:verdict:audit": "tsx src/scripts/ch15_transfer_verdict_audit.ts"
   },

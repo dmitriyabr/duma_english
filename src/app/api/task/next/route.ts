@@ -40,13 +40,29 @@ import {
 
 const ALL_TASK_TYPES = [
   "read_aloud",
+  "reading_comprehension",
+  "writing_prompt",
   "target_vocab",
   "qa_prompt",
   "role_play",
   "topic_talk",
   "filler_control",
   "speech_builder",
+  "argumentation",
+  "register_switch",
+  "misunderstanding_repair",
 ];
+
+const ADVANCED_DISCOURSE_TASK_TYPES = [
+  "argumentation",
+  "register_switch",
+  "misunderstanding_repair",
+];
+
+function stageEligibleTaskTypes(stage: string) {
+  if (stage === "C1" || stage === "C2") return ALL_TASK_TYPES;
+  return ALL_TASK_TYPES.filter((taskType) => !ADVANCED_DISCOURSE_TASK_TYPES.includes(taskType));
+}
 
 function normalizePromptText(value: string) {
   return value
@@ -170,6 +186,9 @@ export async function GET(req: Request) {
     pendingImmediateSelfRepair?.sourceTaskType ||
     pendingDelayedSelfRepair?.verificationTaskType ||
     requestedType;
+  const forceRequestedType = Boolean(
+    pendingImmediateSelfRepair || pendingDelayedSelfRepair
+  );
   const diagnosticMode = applyFastLaneToDiagnosticMode(
     baseDiagnosticMode || Boolean(qualityDiagnosticOverride),
     fastLaneDecision
@@ -184,10 +203,17 @@ export async function GET(req: Request) {
     studentId: student.studentId,
     stage: projection.promotionStage,
     ageBand: profile?.ageBand || "9-11",
-    candidateTaskTypes:
-      effectiveRequestedType && effectiveRequestedType.length > 0
-        ? [effectiveRequestedType, ...ALL_TASK_TYPES]
-        : ALL_TASK_TYPES,
+    candidateTaskTypes: (() => {
+      const allowedForStage = stageEligibleTaskTypes(projection.promotionStage);
+      if (
+        effectiveRequestedType &&
+        effectiveRequestedType.length > 0 &&
+        (forceRequestedType || allowedForStage.includes(effectiveRequestedType))
+      ) {
+        return [effectiveRequestedType, ...allowedForStage];
+      }
+      return allowedForStage;
+    })(),
     requestedType: effectiveRequestedType,
     diagnosticMode,
     preferredNodeIds:
@@ -346,8 +372,14 @@ export async function GET(req: Request) {
     },
     disambiguationProbe: disambiguationProbePlan,
   });
-  const effectiveAssessmentMode: "pa" | "stt" = selectedTaskType === "read_aloud" ? "pa" : "stt";
-  const durationCap = effectiveAssessmentMode === "pa" ? 30 : 60;
+  const effectiveAssessmentMode: "pa" | "stt" | "text" =
+    selectedTaskType === "read_aloud"
+      ? "pa"
+      : selectedTaskType === "writing_prompt"
+      ? "text"
+      : "stt";
+  const durationCap =
+    effectiveAssessmentMode === "pa" ? 30 : effectiveAssessmentMode === "text" ? 300 : 60;
   const effectiveMaxDurationSec = Math.max(10, Math.min(durationCap, generated.maxDurationSec));
   const effectiveConstraints = {
     minSeconds: Math.max(5, Math.min(effectiveMaxDurationSec, generated.constraints.minSeconds)),
@@ -408,6 +440,7 @@ export async function GET(req: Request) {
     supportsPronAssessment: selectedTaskType === "read_aloud",
     assessmentMode: effectiveAssessmentMode,
     maxDurationSec: effectiveMaxDurationSec,
+    modality: selectedTaskType === "writing_prompt" ? "writing" : selectedTaskType === "reading_comprehension" ? "reading" : "speaking",
     ambiguityTrigger: decision.ambiguityTrigger,
     causalRemediation: decision.causalRemediation,
     causalDisambiguationProbe: disambiguationProbePlan,
@@ -662,7 +695,7 @@ export async function GET(req: Request) {
       : effectiveSelectionReason,
     targetSkills: weakestSkills,
     targetWords: selectedTaskType === "target_vocab" ? promptTargetWords : targetWords,
-    recommendedTaskTypes: ALL_TASK_TYPES,
+    recommendedTaskTypes: stageEligibleTaskTypes(projection.promotionStage),
     placementFresh: Boolean(profile?.placementFresh),
     coldStartActive,
     coldStartAttempts: profile?.coldStartAttempts || 0,

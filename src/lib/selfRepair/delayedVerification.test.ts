@@ -8,6 +8,8 @@ import {
 test("selectDelayedVerificationTaskType chooses a different family", () => {
   assert.equal(selectDelayedVerificationTaskType("qa_prompt"), "role_play");
   assert.equal(selectDelayedVerificationTaskType("target_vocab"), "qa_prompt");
+  assert.equal(selectDelayedVerificationTaskType("argumentation"), "register_switch");
+  assert.equal(selectDelayedVerificationTaskType("register_switch"), "misunderstanding_repair");
   assert.equal(selectDelayedVerificationTaskType("unknown_type"), "qa_prompt");
 });
 

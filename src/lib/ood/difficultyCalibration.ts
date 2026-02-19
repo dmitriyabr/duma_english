@@ -12,6 +12,9 @@ export const OOD_TASK_FAMILIES = [
   "topic_talk",
   "filler_control",
   "speech_builder",
+  "argumentation",
+  "register_switch",
+  "misunderstanding_repair",
 ] as const;
 
 export type OodTaskFamily = (typeof OOD_TASK_FAMILIES)[number];
@@ -96,6 +99,9 @@ export const BASELINE_DIFFICULTY_PROFILES: Record<OodTaskFamily, DifficultyFamil
   topic_talk: { taskType: "topic_talk", mean: 58, std: 14, sampleSize: 0 },
   filler_control: { taskType: "filler_control", mean: 46, std: 10, sampleSize: 0 },
   speech_builder: { taskType: "speech_builder", mean: 54, std: 13, sampleSize: 0 },
+  argumentation: { taskType: "argumentation", mean: 84, std: 10, sampleSize: 0 },
+  register_switch: { taskType: "register_switch", mean: 86, std: 9, sampleSize: 0 },
+  misunderstanding_repair: { taskType: "misunderstanding_repair", mean: 82, std: 10, sampleSize: 0 },
 };
 
 function isOodTaskFamily(taskType: string): taskType is OodTaskFamily {

@@ -13,13 +13,28 @@ const schema = z.object({
 
 const DEFAULT_TYPES = [
   "read_aloud",
+  "reading_comprehension",
   "target_vocab",
   "qa_prompt",
   "role_play",
   "topic_talk",
   "filler_control",
   "speech_builder",
+  "argumentation",
+  "register_switch",
+  "misunderstanding_repair",
 ];
+
+const ADVANCED_DISCOURSE_TASK_TYPES = [
+  "argumentation",
+  "register_switch",
+  "misunderstanding_repair",
+];
+
+function defaultTypesForStage(stage: string) {
+  if (stage === "C1" || stage === "C2") return DEFAULT_TYPES;
+  return DEFAULT_TYPES.filter((taskType) => !ADVANCED_DISCOURSE_TASK_TYPES.includes(taskType));
+}
 
 export async function POST(req: NextRequest) {
   const student = await getStudentFromRequest();
@@ -56,7 +71,7 @@ export async function POST(req: NextRequest) {
     candidateTaskTypes:
       body.data.candidateTaskTypes && body.data.candidateTaskTypes.length > 0
         ? body.data.candidateTaskTypes
-        : DEFAULT_TYPES,
+        : defaultTypesForStage(projection.promotionStage),
     requestedType: body.data.requestedType || null,
     diagnosticMode:
       typeof body.data.diagnosticMode === "boolean"

@@ -10,6 +10,9 @@ import {
 test("isDiscoursePragmaticsTaskType detects discourse families", () => {
   assert.equal(isDiscoursePragmaticsTaskType("topic_talk"), true);
   assert.equal(isDiscoursePragmaticsTaskType("role_play"), true);
+  assert.equal(isDiscoursePragmaticsTaskType("argumentation"), true);
+  assert.equal(isDiscoursePragmaticsTaskType("register_switch"), true);
+  assert.equal(isDiscoursePragmaticsTaskType("misunderstanding_repair"), true);
   assert.equal(isDiscoursePragmaticsTaskType("target_vocab"), false);
 });
 

@@ -6,13 +6,28 @@ import { prisma } from "@/lib/db";
 
 const RECOMMENDED_TASK_TYPES = [
   "read_aloud",
+  "reading_comprehension",
   "target_vocab",
   "qa_prompt",
   "role_play",
   "topic_talk",
   "filler_control",
   "speech_builder",
+  "argumentation",
+  "register_switch",
+  "misunderstanding_repair",
 ];
+
+const ADVANCED_DISCOURSE_TASK_TYPES = [
+  "argumentation",
+  "register_switch",
+  "misunderstanding_repair",
+];
+
+function recommendedTaskTypesForStage(stage: string) {
+  if (stage === "C1" || stage === "C2") return RECOMMENDED_TASK_TYPES;
+  return RECOMMENDED_TASK_TYPES.filter((taskType) => !ADVANCED_DISCOURSE_TASK_TYPES.includes(taskType));
+}
 
 export async function GET() {
   const student = await getStudentFromRequest();
@@ -53,7 +68,7 @@ export async function GET() {
     },
     weakestSkills,
     targetWords: targetWords.map((row) => row.lemma.toLowerCase()),
-    recommendedTaskTypes: RECOMMENDED_TASK_TYPES,
+    recommendedTaskTypes: recommendedTaskTypesForStage(projection.promotionStage),
     nextTaskReason:
       nextTargets[0]?.descriptor || "Collect more evidence on weak and uncertain GSE nodes.",
     nextTargetNodes: nextTargets,

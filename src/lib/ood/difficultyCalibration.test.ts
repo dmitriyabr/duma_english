@@ -62,3 +62,12 @@ test("buildDifficultyAnchorMetadata includes calibration fields for persistence"
   assert.equal(metadata.taskType, "qa_prompt");
   assert.ok(typeof metadata.sharedScaleDifficulty === "number");
 });
+
+test("new advanced discourse families are part of baseline calibration set", () => {
+  assert.equal(BASELINE_DIFFICULTY_PROFILES.argumentation.taskType, "argumentation");
+  assert.equal(BASELINE_DIFFICULTY_PROFILES.register_switch.taskType, "register_switch");
+  assert.equal(
+    BASELINE_DIFFICULTY_PROFILES.misunderstanding_repair.taskType,
+    "misunderstanding_repair",
+  );
+});

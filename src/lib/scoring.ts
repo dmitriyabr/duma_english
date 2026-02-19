@@ -135,8 +135,10 @@ export function composeScores(options: {
   languageScore: number | null | undefined;
   attemptCount: number;
   strictReliabilityGating?: boolean;
+  modality?: "speech" | "writing";
 }): ScoreBreakdown {
   const strict = Boolean(options.strictReliabilityGating);
+  const modality = options.modality || "speech";
   const speech = computeSpeechScore(options.metrics);
   const taskScore =
     typeof options.taskScore === "number" && Number.isFinite(options.taskScore)
@@ -146,6 +148,23 @@ export function composeScores(options: {
     typeof options.languageScore === "number" && Number.isFinite(options.languageScore)
       ? Math.round(clamp(options.languageScore))
       : null;
+
+  if (modality === "writing") {
+    const reliability: MetricReliability =
+      taskScore !== null && languageScore !== null ? (strict ? "high" : "medium") : "low";
+    const overallScore =
+      taskScore !== null && languageScore !== null
+        ? Math.round(clamp(taskScore * 0.58 + languageScore * 0.42))
+        : null;
+
+    return {
+      speechScore: null,
+      taskScore,
+      languageScore,
+      overallScore: strict && reliability === "low" ? null : overallScore,
+      reliability,
+    };
+  }
 
   let overallScore: number | null = null;
   const reliability = scoreReliability([speech.score, taskScore, languageScore], strict);

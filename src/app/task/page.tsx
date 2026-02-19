@@ -8,7 +8,7 @@ type TaskResponse = {
   taskId: string;
   type: string;
   prompt: string;
-  assessmentMode: "pa" | "stt";
+  assessmentMode: "pa" | "stt" | "text";
   maxDurationSec: number;
   constraints: { minSeconds: number; maxSeconds: number };
   stage?: string;
@@ -32,6 +32,18 @@ type TaskResponse = {
 };
 
 function taskGuide(type: string) {
+  if (type === "writing_prompt") {
+    return {
+      title: "How to structure your writing",
+      steps: [
+        "Sentence 1-2: Explain the situation or problem.",
+        "Sentence 3-4: Explain what you did.",
+        "Sentence 5-6: Explain the result and what you learned.",
+      ],
+      example:
+        "Last week our group had no plan for a project. I suggested clear roles and a timeline. Then we finished early and presented confidently.",
+    };
+  }
   if (type !== "speech_builder") return null;
   return {
     title: "How to do this in 4 steps",
@@ -53,6 +65,12 @@ function taskActionCopy(taskType?: string) {
       sub: "Tap once and read with your best voice.",
     };
   }
+  if (taskType === "reading_comprehension") {
+    return {
+      cta: "Let's read and answer!",
+      sub: "Read the passage, then explain your answer clearly.",
+    };
+  }
   if (taskType === "target_vocab") {
     return {
       cta: "I'm ready!",
@@ -63,6 +81,12 @@ function taskActionCopy(taskType?: string) {
     return {
       cta: "Let's build it!",
       sub: "Start your mini-talk in one tap.",
+    };
+  }
+  if (taskType === "writing_prompt") {
+    return {
+      cta: "Let's write it!",
+      sub: "Use your best sentences and submit your draft.",
     };
   }
   return {
@@ -79,6 +103,12 @@ function taskExampleQuote(task: TaskResponse | null) {
   }
   if (task.type === "read_aloud") {
     return "I can read this clearly and with confidence!";
+  }
+  if (task.type === "reading_comprehension") {
+    return "I can use details from the passage in my answer!";
+  }
+  if (task.type === "writing_prompt") {
+    return "I can write the situation, my action, and the result clearly.";
   }
   if (task.type === "speech_builder") {
     return "My topic, my idea, my example, my ending!";
@@ -132,7 +162,14 @@ export default function TaskPage() {
   );
   const actionCopy = taskActionCopy(task?.type);
   const exampleQuote = taskExampleQuote(task);
-  const modeLabel = task?.assessmentMode === "pa" ? "Read Aloud" : "Free Talk";
+  const modeLabel =
+    task?.type === "reading_comprehension"
+      ? "Read + Answer"
+      : task?.assessmentMode === "pa"
+      ? "Read Aloud"
+      : task?.assessmentMode === "text"
+      ? "Writing"
+      : "Free Talk";
   const levelLabel = `${task?.stage || "A0"} Star`;
 
   return (
@@ -216,7 +253,10 @@ export default function TaskPage() {
                     </div>
                   </div>
                   <div className="task-start-wrap">
-                    <button className="btn task-start-btn" onClick={() => router.push("/record")}>
+                    <button
+                      className="btn task-start-btn"
+                      onClick={() => router.push(task?.assessmentMode === "text" ? "/write" : "/record")}
+                    >
                       <span className="task-cta-icon">📣</span>
                       {actionCopy.cta}
                     </button>

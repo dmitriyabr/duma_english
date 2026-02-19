@@ -7,6 +7,7 @@ import { prisma } from "@/lib/db";
 const RECOMMENDED_TASK_TYPES = [
   "read_aloud",
   "reading_comprehension",
+  "listening_comprehension",
   "target_vocab",
   "qa_prompt",
   "role_play",

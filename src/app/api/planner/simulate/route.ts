@@ -14,6 +14,7 @@ const schema = z.object({
 const DEFAULT_TYPES = [
   "read_aloud",
   "reading_comprehension",
+  "listening_comprehension",
   "target_vocab",
   "qa_prompt",
   "role_play",

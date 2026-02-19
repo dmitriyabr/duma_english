@@ -88,6 +88,30 @@ test("task generator respects enabled disambiguation probe task override in fall
   if (original) process.env.OPENAI_API_KEY = original;
 });
 
+test("task generator fallback supports writing_prompt tasks", async () => {
+  const original = process.env.OPENAI_API_KEY;
+  delete process.env.OPENAI_API_KEY;
+
+  const spec = await generateTaskSpec({
+    taskType: "writing_prompt",
+    stage: "B1",
+    ageBand: "12-14",
+    targetWords: [],
+    targetNodeIds: ["gse:lo:writing:1"],
+    focusSkills: ["task_completion", "vocabulary"],
+    plannerReason: "Build writing structure and coherence.",
+    primaryGoal: "lift_weak_nodes",
+  });
+
+  assert.equal(spec.taskType, "writing_prompt");
+  assert.equal(spec.fallbackUsed, true);
+  assert.ok(spec.prompt.toLowerCase().includes("write"));
+  assert.ok(spec.expectedArtifacts.includes("writing_metrics"));
+  assert.ok(spec.maxDurationSec >= 120);
+
+  if (original) process.env.OPENAI_API_KEY = original;
+});
+
 test("task generator fallback emits structured reading_comprehension prompt", async () => {
   const original = process.env.OPENAI_API_KEY;
   delete process.env.OPENAI_API_KEY;
@@ -129,6 +153,29 @@ test("task generator fallback supports advanced discourse family prompts", async
   assert.equal(spec.taskType, "argumentation");
   assert.equal(spec.fallbackUsed, true);
   assert.ok(/position|counterargument|conclusion/i.test(spec.prompt));
+
+  if (original) process.env.OPENAI_API_KEY = original;
+});
+
+test("task generator fallback emits structured listening_comprehension prompt", async () => {
+  const original = process.env.OPENAI_API_KEY;
+  delete process.env.OPENAI_API_KEY;
+
+  const spec = await generateTaskSpec({
+    taskType: "listening_comprehension",
+    stage: "B1",
+    ageBand: "12-14",
+    targetWords: [],
+    targetNodeIds: ["gse:lo:listening:b1"],
+    focusSkills: ["task_completion", "fluency"],
+    plannerReason: "Listening comprehension calibration run.",
+    primaryGoal: "reduce_uncertainty",
+  });
+
+  assert.equal(spec.taskType, "listening_comprehension");
+  assert.equal(spec.fallbackUsed, true);
+  assert.ok(spec.prompt.includes("Audio:"));
+  assert.ok(spec.prompt.includes("Question:"));
 
   if (original) process.env.OPENAI_API_KEY = original;
 });

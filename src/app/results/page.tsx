@@ -29,6 +29,12 @@ type MetricCard = {
 
 type AttemptResult = {
   status: string;
+  task?: {
+    taskId: string;
+    type: string;
+    prompt: string;
+    assessmentMode: "pa" | "stt" | "text";
+  } | null;
   flow?: {
     isPlacement?: boolean;
     placementSessionId?: string | null;
@@ -223,6 +229,7 @@ export default function ResultsPage() {
 
   const feedback = data?.results?.feedback;
   const taskEvaluation = data?.results?.taskEvaluation;
+  const isWriting = data?.task?.assessmentMode === "text" || taskEvaluation?.taskType === "writing_prompt";
   const metricCards = useMemo(() => data?.results?.visibleMetrics || [], [data?.results?.visibleMetrics]);
   const artifactEntries = Object.entries(taskEvaluation?.artifacts || {}).filter(([, value]) => {
     const rendered = renderArtifactValue(value);
@@ -251,6 +258,11 @@ export default function ResultsPage() {
     : "Starting";
 
   useEffect(() => {
+    if (!data?.task) return;
+    localStorage.setItem("currentTask", JSON.stringify(data.task));
+  }, [data?.task]);
+
+  useEffect(() => {
     if (!isBusy) return;
     const interval = window.setInterval(() => {
       setBusyHintIndex((index) => index + 1);
@@ -275,8 +287,10 @@ export default function ResultsPage() {
           </div>
 
           <p className="task-kicker results-kicker">🏁 QUEST RESULTS</p>
-          <h1 className="task-title-main">Great speaking work!</h1>
-          <h2 className="task-title-accent results-title-accent">Let&apos;s see your magic</h2>
+          <h1 className="task-title-main">{isWriting ? "Great writing work!" : "Great speaking work!"}</h1>
+          <h2 className="task-title-accent results-title-accent">
+            {isWriting ? "Let&apos;s improve your draft" : "Let&apos;s see your magic"}
+          </h2>
 
           {error && <p className="results-error">{error}</p>}
 
@@ -309,8 +323,8 @@ export default function ResultsPage() {
                   {data?.error?.message || "Unknown error"} {data?.error?.code ? `(${data.error.code})` : ""}
                 </p>
                 <div className="results-actions">
-                  <Link className="btn task-start-btn results-main-btn" href="/record">
-                    🎙️ Try again
+                  <Link className="btn task-start-btn results-main-btn" href={isWriting ? "/write" : "/record"}>
+                    {isWriting ? "✍️ Try again" : "🎙️ Try again"}
                   </Link>
                   <Link className="btn ghost results-secondary-btn" href="/task">
                     Back to tasks
@@ -328,8 +342,8 @@ export default function ResultsPage() {
                   {retryHeadline(data?.retry?.reasonCode || data?.error?.code)}
                 </p>
                 <div className="results-actions">
-                  <Link className="btn task-start-btn results-main-btn" href="/record">
-                    🎙️ Try again
+                  <Link className="btn task-start-btn results-main-btn" href={isWriting ? "/write" : "/record"}>
+                    {isWriting ? "✍️ Try again" : "🎙️ Try again"}
                   </Link>
                   <Link className="btn ghost results-secondary-btn" href="/task">
                     Back to tasks
@@ -352,7 +366,7 @@ export default function ResultsPage() {
                         <p className="results-summary-text">{feedback.summary}</p>
                       ) : (
                         <p className="results-summary-text">
-                          Your answer is ready, and we prepared ideas for your next speaking quest.
+                          Your answer is ready, and we prepared ideas for your next {isWriting ? "writing" : "speaking"} quest.
                         </p>
                       )}
                     </div>
@@ -375,7 +389,7 @@ export default function ResultsPage() {
 
                 {transcript && (
                   <section className="results-panel">
-                    <p className="results-panel-title">What you said</p>
+                    <p className="results-panel-title">{isWriting ? "What you wrote" : "What you said"}</p>
                     <p className="results-transcript">{transcript}</p>
                   </section>
                 )}
@@ -548,8 +562,8 @@ export default function ResultsPage() {
                   <Link className="btn task-start-btn results-main-btn" href="/task">
                     🚀 Next quest
                   </Link>
-                  <Link className="btn ghost results-secondary-btn" href="/record">
-                    🎙️ Retry this one
+                  <Link className="btn ghost results-secondary-btn" href={isWriting ? "/write?revise=1" : "/record"}>
+                    {isWriting ? "✍️ Revise this one" : "🎙️ Retry this one"}
                   </Link>
                 </div>
               </>

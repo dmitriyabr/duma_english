@@ -64,6 +64,15 @@ test("buildDifficultyAnchorMetadata includes calibration fields for persistence"
 });
 
 test("new advanced discourse families are part of baseline calibration set", () => {
+  assert.equal(
+    BASELINE_DIFFICULTY_PROFILES.reading_comprehension.taskType,
+    "reading_comprehension",
+  );
+  assert.equal(
+    BASELINE_DIFFICULTY_PROFILES.listening_comprehension.taskType,
+    "listening_comprehension",
+  );
+  assert.equal(BASELINE_DIFFICULTY_PROFILES.writing_prompt.taskType, "writing_prompt");
   assert.equal(BASELINE_DIFFICULTY_PROFILES.argumentation.taskType, "argumentation");
   assert.equal(BASELINE_DIFFICULTY_PROFILES.register_switch.taskType, "register_switch");
   assert.equal(

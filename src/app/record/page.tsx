@@ -7,7 +7,7 @@ import Link from "next/link";
 type TaskResponse = {
   taskId: string;
   prompt: string;
-  assessmentMode: "pa" | "stt";
+  assessmentMode: "pa" | "stt" | "text";
   maxDurationSec: number;
   constraints: { minSeconds: number; maxSeconds: number };
 };
@@ -142,6 +142,10 @@ export default function RecordPage() {
   }
 
   async function startRecording() {
+    if (task?.assessmentMode === "text") {
+      setError("This task is writing-only. Please use the writing page.");
+      return;
+    }
     setError(null);
     setSeconds(0);
     chunksRef.current = [];
@@ -212,6 +216,11 @@ export default function RecordPage() {
       setStatus("Idle");
       return;
     }
+    if (task.assessmentMode === "text") {
+      setError("This task expects text submission.");
+      setStatus("Idle");
+      return;
+    }
 
     if (durationSec <= 0) {
       setError("Empty recording. Please try again.");
@@ -261,7 +270,8 @@ export default function RecordPage() {
 
   const isRecording = status === "Recording";
   const isUploading = status === "Uploading";
-  const modeLabel = task?.assessmentMode === "pa" ? "Read Aloud" : "Free Talk";
+  const modeLabel =
+    task?.assessmentMode === "pa" ? "Read Aloud" : task?.assessmentMode === "text" ? "Writing" : "Free Talk";
   const elapsedLabel = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
   const actionLabel = isUploading
     ? "Sending your voice..."
@@ -293,7 +303,14 @@ export default function RecordPage() {
           <h1 className="task-title-main">Ready to talk?</h1>
           <h2 className="task-title-accent record-title-accent">Let&apos;s record your magic!</h2>
 
-          {task ? (
+          {task?.assessmentMode === "text" ? (
+            <div className="record-empty">
+              <p className="record-empty-title">This quest uses writing, not recording.</p>
+              <p className="subtitle">
+                Continue in <Link href="/write">Write</Link>.
+              </p>
+            </div>
+          ) : task ? (
             <div className="record-main-grid">
               <div className="record-main-left">
                 <article className="record-mission-card">

@@ -6,6 +6,9 @@ const OOD_GENERATOR_VERSION = "ood-generator-v1";
 const LEGACY_OOD_INJECTION_INTERVAL = 6; // backward-compatible fallback when no budget decision is available
 const TASK_TYPE_PRIMARY_AXIS: Record<string, (typeof oodAxisTags)[number]> = {
   read_aloud: "format",
+  reading_comprehension: "topic",
+  listening_comprehension: "interlocutor",
+  writing_prompt: "goal",
   target_vocab: "topic",
   qa_prompt: "interlocutor",
   role_play: "goal",

@@ -4,6 +4,7 @@ import { evaluateAmbiguityTrigger, mapTaskTypeToActionFamily } from "./ambiguity
 
 test("task type -> action family mapping remains deterministic", () => {
   assert.equal(mapTaskTypeToActionFamily("target_vocab"), "targeted_practice");
+  assert.equal(mapTaskTypeToActionFamily("listening_comprehension"), "targeted_practice");
   assert.equal(mapTaskTypeToActionFamily("role_play"), "transfer_probe");
   assert.equal(mapTaskTypeToActionFamily("argumentation"), "transfer_probe");
   assert.equal(mapTaskTypeToActionFamily("register_switch"), "transfer_probe");

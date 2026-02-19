@@ -6,6 +6,9 @@ export const SHARED_SCALE_STD = 15;
 
 export const OOD_TASK_FAMILIES = [
   "read_aloud",
+  "reading_comprehension",
+  "listening_comprehension",
+  "writing_prompt",
   "target_vocab",
   "qa_prompt",
   "role_play",
@@ -93,6 +96,9 @@ function computeStats(values: number[]): NumericArrayStats | null {
 
 export const BASELINE_DIFFICULTY_PROFILES: Record<OodTaskFamily, DifficultyFamilyProfile> = {
   read_aloud: { taskType: "read_aloud", mean: 42, std: 11, sampleSize: 0 },
+  reading_comprehension: { taskType: "reading_comprehension", mean: 60, std: 13, sampleSize: 0 },
+  listening_comprehension: { taskType: "listening_comprehension", mean: 61, std: 12, sampleSize: 0 },
+  writing_prompt: { taskType: "writing_prompt", mean: 62, std: 12, sampleSize: 0 },
   target_vocab: { taskType: "target_vocab", mean: 48, std: 12, sampleSize: 0 },
   qa_prompt: { taskType: "qa_prompt", mean: 50, std: 12, sampleSize: 0 },
   role_play: { taskType: "role_play", mean: 56, std: 13, sampleSize: 0 },

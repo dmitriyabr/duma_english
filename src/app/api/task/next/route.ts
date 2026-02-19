@@ -41,6 +41,7 @@ import {
 const ALL_TASK_TYPES = [
   "read_aloud",
   "reading_comprehension",
+  "listening_comprehension",
   "writing_prompt",
   "target_vocab",
   "qa_prompt",
@@ -440,7 +441,14 @@ export async function GET(req: Request) {
     supportsPronAssessment: selectedTaskType === "read_aloud",
     assessmentMode: effectiveAssessmentMode,
     maxDurationSec: effectiveMaxDurationSec,
-    modality: selectedTaskType === "writing_prompt" ? "writing" : selectedTaskType === "reading_comprehension" ? "reading" : "speaking",
+    modality:
+      selectedTaskType === "writing_prompt"
+        ? "writing"
+        : selectedTaskType === "reading_comprehension"
+        ? "reading"
+        : selectedTaskType === "listening_comprehension"
+        ? "listening"
+        : "speaking",
     ambiguityTrigger: decision.ambiguityTrigger,
     causalRemediation: decision.causalRemediation,
     causalDisambiguationProbe: disambiguationProbePlan,

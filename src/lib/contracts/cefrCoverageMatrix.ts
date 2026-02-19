@@ -14,6 +14,7 @@ export type CefrCoverageSkill = (typeof CEFR_COVERAGE_SKILLS)[number];
 
 export const CEFR_COVERAGE_TASK_FAMILIES = [
   "read_aloud",
+  "listening_comprehension",
   "target_vocab",
   "qa_prompt",
   "role_play",
@@ -174,7 +175,7 @@ const SKILL_BINDINGS: Record<CefrCoverageSkill, SkillBinding> = {
       { kind: "bundle_domain", domain: "lo" },
       { kind: "gse_node_type", nodeType: "GSE_LO" },
     ],
-    taskFamilies: ["topic_talk", "qa_prompt", "speech_builder"],
+    taskFamilies: ["topic_talk", "qa_prompt", "speech_builder", "listening_comprehension"],
     rubricRows: [
       "main_point_detected",
       "supporting_detail_count",
@@ -207,7 +208,7 @@ const SKILL_BINDINGS: Record<CefrCoverageSkill, SkillBinding> = {
       { kind: "gse_node_type", nodeType: "GSE_GRAMMAR" },
       { kind: "gse_node_type", nodeType: "GSE_LO" },
     ],
-    taskFamilies: ["qa_prompt", "role_play", "speech_builder"],
+    taskFamilies: ["qa_prompt", "role_play", "speech_builder", "listening_comprehension"],
     rubricRows: [
       "question_answered",
       "direct_answer_first",

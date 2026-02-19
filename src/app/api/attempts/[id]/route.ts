@@ -61,6 +61,16 @@ export async function GET(_: Request, context: AttemptRouteContext) {
   }
 
   const metrics = (attempt.speechMetricsJson || {}) as SpeechMetrics;
+  const taskMeta =
+    attempt.task.metaJson && typeof attempt.task.metaJson === "object" && !Array.isArray(attempt.task.metaJson)
+      ? (attempt.task.metaJson as Record<string, unknown>)
+      : {};
+  const taskAssessmentMode =
+    taskMeta.assessmentMode === "text"
+      ? "text"
+      : taskMeta.assessmentMode === "pa"
+      ? "pa"
+      : "stt";
   const scores = (attempt.scoresJson || {}) as {
     speechScore?: number | null;
     taskScore?: number | null;
@@ -120,6 +130,30 @@ export async function GET(_: Request, context: AttemptRouteContext) {
   const audienceFitScore =
     typeof taskEvaluation?.artifacts?.audienceFitScore === "number"
       ? taskEvaluation.artifacts.audienceFitScore
+      : undefined;
+  const readingComprehensionScore =
+    typeof taskEvaluation?.artifacts?.readingComprehensionScore === "number"
+      ? taskEvaluation.artifacts.readingComprehensionScore
+      : undefined;
+  const readingSourceGroundingScore =
+    typeof taskEvaluation?.artifacts?.readingSourceGroundingScore === "number"
+      ? taskEvaluation.artifacts.readingSourceGroundingScore
+      : undefined;
+  const readingQuestionAddressingScore =
+    typeof taskEvaluation?.artifacts?.readingQuestionAddressingScore === "number"
+      ? taskEvaluation.artifacts.readingQuestionAddressingScore
+      : undefined;
+  const listeningComprehensionScore =
+    typeof taskEvaluation?.artifacts?.listeningComprehensionScore === "number"
+      ? taskEvaluation.artifacts.listeningComprehensionScore
+      : undefined;
+  const listeningSourceGroundingScore =
+    typeof taskEvaluation?.artifacts?.listeningSourceGroundingScore === "number"
+      ? taskEvaluation.artifacts.listeningSourceGroundingScore
+      : undefined;
+  const listeningRepairBehaviorScore =
+    typeof taskEvaluation?.artifacts?.listeningRepairBehaviorScore === "number"
+      ? taskEvaluation.artifacts.listeningRepairBehaviorScore
       : undefined;
   const perceptionLanguageSignals =
     taskEvaluation?.artifacts &&
@@ -184,11 +218,53 @@ export async function GET(_: Request, context: AttemptRouteContext) {
       kind: "score",
     },
     {
+      key: "readingComprehensionScore",
+      label: "Reading comprehension",
+      value: readingComprehensionScore,
+      kind: "score",
+    },
+    {
+      key: "readingSourceGroundingScore",
+      label: "Source grounding",
+      value: readingSourceGroundingScore,
+      kind: "score",
+    },
+    {
+      key: "readingQuestionAddressingScore",
+      label: "Question addressing",
+      value: readingQuestionAddressingScore,
+      kind: "score",
+    },
+    {
+      key: "listeningComprehensionScore",
+      label: "Listening comprehension",
+      value: listeningComprehensionScore,
+      kind: "score",
+    },
+    {
+      key: "listeningSourceGroundingScore",
+      label: "Listening grounding",
+      value: listeningSourceGroundingScore,
+      kind: "score",
+    },
+    {
+      key: "listeningRepairBehaviorScore",
+      label: "Repair behavior",
+      value: listeningRepairBehaviorScore,
+      kind: "score",
+    },
+    {
       key: "vocabWords",
       label: "Target words used",
       value: Array.isArray(taskEvaluation?.artifacts?.requiredWordsUsed)
         ? taskEvaluation?.artifacts?.requiredWordsUsed.length
         : undefined,
+      kind: "count",
+    },
+    {
+      key: "writingWordCount",
+      label: "Words",
+      value: metrics.wordCount,
       kind: "count",
     },
     {
@@ -346,6 +422,12 @@ export async function GET(_: Request, context: AttemptRouteContext) {
           : undefined,
       turnTakingScore,
       audienceFitScore,
+      readingComprehensionScore,
+      readingSourceGroundingScore,
+      readingQuestionAddressingScore,
+      listeningComprehensionScore,
+      listeningSourceGroundingScore,
+      listeningRepairBehaviorScore,
     },
   };
   const nodeOutcomes = Array.isArray(attempt.nodeOutcomesJson)
@@ -413,6 +495,12 @@ export async function GET(_: Request, context: AttemptRouteContext) {
       isPlacement: Boolean((attempt.task.metaJson as { isPlacement?: boolean } | null)?.isPlacement),
       placementSessionId:
         ((attempt.task.metaJson as { placementSessionId?: string } | null)?.placementSessionId) || null,
+    },
+    task: {
+      taskId: attempt.task.id,
+      type: attempt.task.type,
+      prompt: attempt.task.prompt,
+      assessmentMode: taskAssessmentMode,
     },
     error:
       isFailed || isRetry

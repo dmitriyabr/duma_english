@@ -38,9 +38,15 @@ export async function POST(req: NextRequest) {
 
     const taskMeta = (task.metaJson || {}) as {
       supportsPronAssessment?: boolean;
-      assessmentMode?: "pa" | "stt";
+      assessmentMode?: "pa" | "stt" | "text";
       maxDurationSec?: number;
     };
+    if (taskMeta.assessmentMode === "text") {
+      return NextResponse.json(
+        { error: "This task expects text submission. Use /api/attempts/text." },
+        { status: 409 }
+      );
+    }
     const taskMode = taskMeta.assessmentMode === "pa" ? "pa" : "stt";
     const taskMaxDuration =
       typeof taskMeta.maxDurationSec === "number"

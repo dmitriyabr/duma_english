@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { evaluateTaskQuality } from "./evaluator";
 import { PERCEPTION_LANGUAGE_SIGNALS_VERSION } from "./perception/languageSignals";
+import { READING_ASSESSMENT_VERSION } from "./reading/assessment";
 
 test("target_vocab evaluation checks required words and reports missing words", async () => {
   const originalKey = process.env.OPENAI_API_KEY;
@@ -215,6 +216,93 @@ test("evaluateTaskQuality attaches discourse pragmatics dimensions for discourse
   assert.equal(rubricNames.includes("turn_taking_repair"), true);
   assert.equal(rubricNames.includes("cohesion"), true);
   assert.equal(rubricNames.includes("audience_fit"), true);
+
+  if (originalKey) process.env.OPENAI_API_KEY = originalKey;
+});
+
+test("writing_prompt deterministic evaluation emits writing artifacts and rewrite recommendation", async () => {
+  const originalKey = process.env.OPENAI_API_KEY;
+  delete process.env.OPENAI_API_KEY;
+
+  const result = await evaluateTaskQuality({
+    taskType: "writing_prompt",
+    taskPrompt:
+      "Write 5-7 sentences about a school challenge you solved. Include what happened, what you did, and what changed.",
+    transcript:
+      "Last week our team could not finish a science poster because we had too many ideas and no clear order. I suggested that we split the work into small parts. Then I organized the timeline and checked each section. Finally, we finished on time and explained our project clearly to the class.",
+    speechMetrics: { wordCount: 62, durationSec: 160, speechRate: 23 },
+  });
+
+  const artifacts = result.taskEvaluation.artifacts as {
+    writingWordCount?: number;
+    writingSentenceCount?: number;
+    writingConnectorCount?: number;
+    rewriteRecommended?: boolean;
+  };
+
+  assert.equal(result.source, "rules");
+  assert.ok((artifacts.writingWordCount || 0) >= 45);
+  assert.equal(artifacts.writingSentenceCount, 4);
+  assert.ok((artifacts.writingConnectorCount || 0) >= 1);
+  assert.equal(artifacts.rewriteRecommended, true);
+
+  if (originalKey) process.env.OPENAI_API_KEY = originalKey;
+});
+
+test("evaluateTaskQuality attaches reading assessment artifacts for reading tasks", async () => {
+  const originalKey = process.env.OPENAI_API_KEY;
+  delete process.env.OPENAI_API_KEY;
+
+  const result = await evaluateTaskQuality({
+    taskType: "reading_comprehension",
+    taskPrompt:
+      "Read the passage and answer in 3-4 sentences.\\nPassage: Amina reads library books every evening because stories help her learn new words.\\nQuestion: Why does Amina read library books every evening?",
+    transcript:
+      "Amina reads every evening because stories help her learn new words. She uses library books to improve vocabulary.",
+    speechMetrics: { speechRate: 112, fillerCount: 0 },
+  });
+
+  const artifacts = result.taskEvaluation.artifacts as {
+    readingAssessment?: {
+      version?: string;
+      scores?: {
+        overall?: number;
+      };
+    };
+  };
+  assert.equal(artifacts.readingAssessment?.version, READING_ASSESSMENT_VERSION);
+  assert.equal(typeof artifacts.readingAssessment?.scores?.overall, "number");
+  assert.equal(result.taskEvaluation.taskScore >= 60, true);
+
+  if (originalKey) process.env.OPENAI_API_KEY = originalKey;
+});
+
+test("evaluateTaskQuality attaches listening assessment artifacts for listening tasks", async () => {
+  const originalKey = process.env.OPENAI_API_KEY;
+  delete process.env.OPENAI_API_KEY;
+
+  const result = await evaluateTaskQuality({
+    taskType: "listening_comprehension",
+    taskPrompt:
+      "Listen and answer.\\nAudio: Ben missed the bus so he called his teacher before class.\\nQuestion: Why did Ben call his teacher?",
+    transcript:
+      "Ben called his teacher because he missed the bus and wanted to explain he would be late. Sorry, to clarify, he called before class.",
+    speechMetrics: { speechRate: 104, fillerCount: 0 },
+  });
+
+  const artifacts = result.taskEvaluation.artifacts as {
+    listeningAssessment?: {
+      version?: string;
+      scores?: {
+        overall?: number;
+      };
+    };
+    listeningRepairBehaviorScore?: number;
+  };
+  assert.equal(artifacts.listeningAssessment?.version, "listening-assessment-v1");
+  assert.equal(typeof artifacts.listeningAssessment?.scores?.overall, "number");
+  assert.equal(typeof artifacts.listeningRepairBehaviorScore, "number");
+  assert.equal(result.taskEvaluation.taskScore >= 60, true);
 
   if (originalKey) process.env.OPENAI_API_KEY = originalKey;
 });

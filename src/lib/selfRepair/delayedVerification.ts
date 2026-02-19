@@ -79,6 +79,7 @@ export function selectDelayedVerificationTaskType(sourceTaskType: string) {
     qa_prompt: "role_play",
     role_play: "qa_prompt",
     topic_talk: "qa_prompt",
+    listening_comprehension: "qa_prompt",
     filler_control: "speech_builder",
     speech_builder: "qa_prompt",
     argumentation: "register_switch",

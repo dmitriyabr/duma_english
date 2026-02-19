@@ -53,6 +53,7 @@ export function mapTaskTypeToActionFamily(taskType: string): PlannerActionFamily
     taskType === "target_vocab" ||
     taskType === "speech_builder" ||
     taskType === "reading_comprehension" ||
+    taskType === "listening_comprehension" ||
     taskType === "writing_prompt"
   ) {
     return "targeted_practice";

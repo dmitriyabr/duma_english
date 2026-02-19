@@ -64,3 +64,19 @@ test("composeScores can hide overall when strict reliability is on", () => {
 
   assert.equal(score.overallScore, null);
 });
+
+test("composeScores supports writing modality without speech score", () => {
+  const score = composeScores({
+    metrics: { wordCount: 72, durationSec: 120 },
+    taskScore: 81,
+    languageScore: 76,
+    attemptCount: 4,
+    modality: "writing",
+  });
+
+  assert.equal(score.speechScore, null);
+  assert.equal(score.taskScore, 81);
+  assert.equal(score.languageScore, 76);
+  assert.equal(score.overallScore, 79);
+  assert.equal(score.reliability, "medium");
+});

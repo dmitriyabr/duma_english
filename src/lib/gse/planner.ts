@@ -68,6 +68,7 @@ function taskDomainWeights(taskType: string): Record<DomainKey, number> {
   if (taskType === "target_vocab") return { vocab: 1, grammar: 0.45, lo: 0.4 };
   if (taskType === "read_aloud") return { vocab: 0.15, grammar: 0.35, lo: 1 };
   if (taskType === "reading_comprehension") return { vocab: 0.45, grammar: 0.78, lo: 0.9 };
+  if (taskType === "listening_comprehension") return { vocab: 0.42, grammar: 0.75, lo: 0.92 };
   if (taskType === "writing_prompt") return { vocab: 0.62, grammar: 0.92, lo: 0.9 };
   if (taskType === "qa_prompt") return { vocab: 0.5, grammar: 0.8, lo: 0.85 };
   if (taskType === "role_play") return { vocab: 0.5, grammar: 0.75, lo: 0.9 };
@@ -246,6 +247,7 @@ function nextDomainToProbe(recentTaskTypes: string[]) {
 function taskCluster(taskType: string) {
   if (taskType === "read_aloud") return "reading";
   if (taskType === "reading_comprehension") return "reading";
+  if (taskType === "listening_comprehension") return "listening";
   if (taskType === "writing_prompt") return "writing";
   if (taskType === "target_vocab") return "vocab";
   if (taskType === "filler_control") return "delivery";
@@ -1162,6 +1164,7 @@ export async function planNextTaskDecision(params: {
       : [
           "read_aloud",
           "reading_comprehension",
+          "listening_comprehension",
           "target_vocab",
           "writing_prompt",
           "qa_prompt",
@@ -1180,6 +1183,7 @@ export async function planNextTaskDecision(params: {
     taskTypes = [
       "read_aloud",
       "reading_comprehension",
+      "listening_comprehension",
       "target_vocab",
       "writing_prompt",
       "qa_prompt",
@@ -1288,7 +1292,15 @@ export async function planNextTaskDecision(params: {
     return typeof scores.taskScore === "number" && scores.taskScore < 55;
   });
   if (recoveryTriggered) {
-    const recoveryTypes = ["read_aloud", "reading_comprehension", "target_vocab", "writing_prompt", "qa_prompt", "filler_control"];
+    const recoveryTypes = [
+      "read_aloud",
+      "reading_comprehension",
+      "listening_comprehension",
+      "target_vocab",
+      "writing_prompt",
+      "qa_prompt",
+      "filler_control",
+    ];
     const reduced = taskTypes.filter((type) => recoveryTypes.includes(type));
     taskTypes = reduced.length > 0 ? reduced : recoveryTypes;
   }

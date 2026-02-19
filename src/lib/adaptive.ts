@@ -18,13 +18,14 @@ const CARRYOVER_CONFIDENCE = 0.8;
 
 const STAGE_GATE: Record<CEFRStage, string[]> = {
   A0: ["read_aloud", "target_vocab", "qa_prompt", "filler_control"],
-  A1: ["read_aloud", "reading_comprehension", "target_vocab", "qa_prompt", "filler_control", "role_play", "topic_talk", "writing_prompt"],
-  A2: ["read_aloud", "reading_comprehension", "target_vocab", "qa_prompt", "filler_control", "role_play", "topic_talk", "speech_builder", "writing_prompt"],
-  B1: ["read_aloud", "reading_comprehension", "target_vocab", "qa_prompt", "filler_control", "role_play", "topic_talk", "speech_builder", "writing_prompt"],
-  B2: ["read_aloud", "reading_comprehension", "target_vocab", "qa_prompt", "filler_control", "role_play", "topic_talk", "speech_builder", "writing_prompt"],
+  A1: ["read_aloud", "reading_comprehension", "listening_comprehension", "target_vocab", "qa_prompt", "filler_control", "role_play", "topic_talk", "writing_prompt"],
+  A2: ["read_aloud", "reading_comprehension", "listening_comprehension", "target_vocab", "qa_prompt", "filler_control", "role_play", "topic_talk", "speech_builder", "writing_prompt"],
+  B1: ["read_aloud", "reading_comprehension", "listening_comprehension", "target_vocab", "qa_prompt", "filler_control", "role_play", "topic_talk", "speech_builder", "writing_prompt"],
+  B2: ["read_aloud", "reading_comprehension", "listening_comprehension", "target_vocab", "qa_prompt", "filler_control", "role_play", "topic_talk", "speech_builder", "writing_prompt"],
   C1: [
     "read_aloud",
     "reading_comprehension",
+    "listening_comprehension",
     "target_vocab",
     "qa_prompt",
     "filler_control",
@@ -39,6 +40,7 @@ const STAGE_GATE: Record<CEFRStage, string[]> = {
   C2: [
     "read_aloud",
     "reading_comprehension",
+    "listening_comprehension",
     "target_vocab",
     "qa_prompt",
     "filler_control",
@@ -54,9 +56,9 @@ const STAGE_GATE: Record<CEFRStage, string[]> = {
 
 const SKILL_TO_TASKS: Record<SkillKey, string[]> = {
   pronunciation: ["read_aloud", "filler_control"],
-  fluency: ["topic_talk", "filler_control", "qa_prompt", "argumentation", "reading_comprehension", "writing_prompt"],
+  fluency: ["topic_talk", "filler_control", "qa_prompt", "argumentation", "reading_comprehension", "listening_comprehension", "writing_prompt"],
   tempo_control: ["filler_control", "speech_builder", "topic_talk"],
-  vocabulary: ["target_vocab", "topic_talk", "qa_prompt", "register_switch", "reading_comprehension", "writing_prompt"],
+  vocabulary: ["target_vocab", "topic_talk", "qa_prompt", "register_switch", "reading_comprehension", "listening_comprehension", "writing_prompt"],
   task_completion: [
     "qa_prompt",
     "role_play",
@@ -65,14 +67,15 @@ const SKILL_TO_TASKS: Record<SkillKey, string[]> = {
     "register_switch",
     "misunderstanding_repair",
     "reading_comprehension",
+    "listening_comprehension",
   ],
 };
 
 const BLUEPRINT_TO_TASKS: Record<BlueprintType, string[]> = {
-  guided_practice: ["read_aloud", "qa_prompt", "reading_comprehension", "writing_prompt"],
-  vocab_activation: ["target_vocab", "topic_talk", "writing_prompt"],
+  guided_practice: ["read_aloud", "qa_prompt", "reading_comprehension", "listening_comprehension", "writing_prompt"],
+  vocab_activation: ["target_vocab", "topic_talk", "listening_comprehension", "writing_prompt"],
   dialogue_turn: ["role_play", "qa_prompt"],
-  speech_structure: ["speech_builder", "topic_talk", "argumentation", "register_switch", "reading_comprehension", "writing_prompt"],
+  speech_structure: ["speech_builder", "topic_talk", "argumentation", "register_switch", "reading_comprehension", "listening_comprehension", "writing_prompt"],
   review: ["filler_control", "topic_talk"],
 };
 
@@ -136,6 +139,7 @@ function taskTypeToPrimarySkill(taskType: string): SkillKey {
     taskType === "speech_builder" ||
     taskType === "writing_prompt" ||
     taskType === "reading_comprehension" ||
+    taskType === "listening_comprehension" ||
     taskType === "argumentation" ||
     taskType === "register_switch" ||
     taskType === "misunderstanding_repair"

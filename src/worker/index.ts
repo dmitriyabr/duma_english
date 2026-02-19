@@ -16,6 +16,7 @@ import { inferCausalDiagnosis } from "../lib/causal/inference";
 import { evaluateAndPersistOodTransferVerdict } from "../lib/ood/transferVerdict";
 import { syncTransferRemediationQueueForVerdict } from "../lib/ood/transferRemediationQueue";
 import { upsertSameSessionRewardTrace } from "../lib/reward/function";
+import { countWritingWords, deriveWritingSpeechMetrics } from "../lib/writing/textMetrics";
 import {
   completeImmediateSelfRepairCycle,
   createImmediateSelfRepairCycle,
@@ -68,8 +69,9 @@ function buildCanonicalMetrics(params: {
   derivedMetrics: ReturnType<typeof calculateDerivedSpeechMetrics>;
   taskEvaluation: { taskScore: number; artifacts?: Record<string, unknown> };
   languageScore: number;
+  taskType: string;
 }): CanonicalMetric[] {
-  const { derivedMetrics, taskEvaluation, languageScore } = params;
+  const { derivedMetrics, taskEvaluation, languageScore, taskType } = params;
   const grammarAccuracy =
     typeof taskEvaluation.artifacts?.grammarAccuracy === "number"
       ? taskEvaluation.artifacts.grammarAccuracy
@@ -85,6 +87,18 @@ function buildCanonicalMetrics(params: {
   const registerScore =
     typeof taskEvaluation.artifacts?.registerScore === "number"
       ? taskEvaluation.artifacts.registerScore
+      : null;
+  const listeningComprehensionScore =
+    typeof taskEvaluation.artifacts?.listeningComprehensionScore === "number"
+      ? taskEvaluation.artifacts.listeningComprehensionScore
+      : null;
+  const listeningSourceGroundingScore =
+    typeof taskEvaluation.artifacts?.listeningSourceGroundingScore === "number"
+      ? taskEvaluation.artifacts.listeningSourceGroundingScore
+      : null;
+  const listeningRepairBehaviorScore =
+    typeof taskEvaluation.artifacts?.listeningRepairBehaviorScore === "number"
+      ? taskEvaluation.artifacts.listeningRepairBehaviorScore
       : null;
   const items: Array<CanonicalMetric | null> = [
     typeof derivedMetrics.speechRate === "number"
@@ -126,12 +140,50 @@ function buildCanonicalMetrics(params: {
     typeof registerScore === "number"
       ? { metricKey: "register_score", value: roundMetric(registerScore), source: "openai", reliability: "medium" }
       : null,
+    typeof listeningComprehensionScore === "number"
+      ? {
+          metricKey: "listening_comprehension_score",
+          value: roundMetric(listeningComprehensionScore),
+          source: "openai",
+          reliability: "medium",
+        }
+      : null,
+    typeof listeningSourceGroundingScore === "number"
+      ? {
+          metricKey: "listening_source_grounding_score",
+          value: roundMetric(listeningSourceGroundingScore),
+          source: "openai",
+          reliability: "medium",
+        }
+      : null,
+    typeof listeningRepairBehaviorScore === "number"
+      ? {
+          metricKey: "listening_repair_behavior_score",
+          value: roundMetric(listeningRepairBehaviorScore),
+          source: "openai",
+          reliability: "medium",
+        }
+      : null,
     (() => {
       const confidence = toPercentConfidence(derivedMetrics.confidence);
       if (confidence === null) return null;
       return { metricKey: "transcript_confidence", value: confidence, source: "azure", reliability: "high" };
     })(),
     { metricKey: "language_score", value: roundMetric(languageScore), source: "openai", reliability: "medium" },
+    taskType === "writing_prompt" && typeof derivedMetrics.wordCount === "number"
+      ? { metricKey: "writing_word_count", value: roundMetric(derivedMetrics.wordCount), source: "rules", reliability: "high" }
+      : null,
+    taskType === "writing_prompt" && typeof taskEvaluation.artifacts?.writingSentenceCount === "number"
+      ? {
+          metricKey: "writing_sentence_count",
+          value: roundMetric(taskEvaluation.artifacts.writingSentenceCount),
+          source: "rules",
+          reliability: "high",
+        }
+      : null,
+    taskType === "writing_prompt" && typeof taskEvaluation.artifacts?.revisionDelta === "number"
+      ? { metricKey: "writing_revision_delta", value: roundMetric(taskEvaluation.artifacts.revisionDelta), source: "rules", reliability: "medium" }
+      : null,
   ];
 
   return items.filter((item): item is CanonicalMetric => item !== null);
@@ -296,6 +348,9 @@ async function processAttempt(attemptId: string) {
   });
 
   if (!attempt || !attempt.audioObjectKey || attempt.status !== ATTEMPT_STATUS.PROCESSING) return;
+  const taskMeta = (attempt.task.metaJson || {}) as Record<string, unknown>;
+  const assessmentMode = typeof taskMeta.assessmentMode === "string" ? taskMeta.assessmentMode : null;
+  const isTextSubmission = assessmentMode === "text" || attempt.task.type === "writing_prompt";
   const taskInstance = await prisma.taskInstance.findUnique({
     where: { taskId: attempt.taskId },
     select: { id: true, decisionLogId: true, targetNodeIds: true },
@@ -315,75 +370,94 @@ async function processAttempt(attemptId: string) {
       where: { studentId: attempt.studentId, status: "completed" },
     });
 
-    let analysis:
-      | Awaited<ReturnType<typeof analyzeSpeechFromBuffer>>
-      | undefined;
-    let lastError: unknown = null;
-
-    for (let i = 0; i < 2; i += 1) {
-      try {
-        analysis = await analyzeSpeechFromBuffer(audioBuffer, {
-          taskPrompt: attempt.task.prompt,
-          taskType: attempt.task.type,
+    let analysis: Awaited<ReturnType<typeof analyzeSpeechFromBuffer>> | undefined;
+    if (isTextSubmission) {
+      const transcript = audioBuffer.toString("utf8").trim();
+      if (!transcript) {
+        throw new Error("Text submission is empty");
+      }
+      analysis = {
+        transcript,
+        metrics: deriveWritingSpeechMetrics({
+          text: transcript,
           durationSec: attempt.durationSec,
-          meta: (attempt.task.metaJson || {}) as {
-            referenceText?: string;
-            supportsPronAssessment?: boolean;
-          },
-        });
-        break;
-      } catch (error) {
-        lastError = error;
-        if (i === 0 && isTransientError(error)) {
-          await new Promise((resolve) => setTimeout(resolve, 1200));
-          continue;
+        }),
+        raw: {
+          source: "text_submission",
+          contentType: "text/plain",
+          wordCount: countWritingWords(transcript),
+          assessmentMode: "text",
+        },
+        provider: "mock",
+      };
+    } else {
+      let lastError: unknown = null;
+      for (let i = 0; i < 2; i += 1) {
+        try {
+          analysis = await analyzeSpeechFromBuffer(audioBuffer, {
+            taskPrompt: attempt.task.prompt,
+            taskType: attempt.task.type,
+            durationSec: attempt.durationSec,
+            meta: taskMeta as {
+              referenceText?: string;
+              supportsPronAssessment?: boolean;
+            },
+          });
+          break;
+        } catch (error) {
+          lastError = error;
+          if (i === 0 && isTransientError(error)) {
+            await new Promise((resolve) => setTimeout(resolve, 1200));
+            continue;
+          }
         }
       }
+      if (!analysis) throw lastError || new Error("Speech analysis failed");
     }
 
-    if (!analysis) throw lastError || new Error("Speech analysis failed");
-
     const derivedMetrics = calculateDerivedSpeechMetrics(analysis.metrics);
-    const retryDecision = evaluateSpeechRetryGate({
-      transcript: analysis.transcript,
-      metrics: derivedMetrics,
-      durationSec: attempt.durationSec,
-    });
-    if (retryDecision.shouldRetry) {
-      await prisma.attempt.updateMany({
-        where: { id: attempt.id, status: ATTEMPT_STATUS.PROCESSING },
-        data: {
-          status: ATTEMPT_STATUS.NEEDS_RETRY,
-          transcript: analysis.transcript,
-          speechMetricsJson: derivedMetrics,
-          rawRecognitionJson:
-            analysis.raw !== null && analysis.raw !== undefined
-              ? (analysis.raw as Prisma.InputJsonValue)
-              : Prisma.DbNull,
-          taskEvaluationJson: Prisma.DbNull,
-          feedbackJson: Prisma.DbNull,
-          scoresJson: Prisma.DbNull,
-          aiDebugJson: Prisma.DbNull,
-          nodeOutcomesJson: Prisma.DbNull,
-          errorCode: retryDecision.reasonCode,
-          errorMessage: retryDecision.message,
-          completedAt: new Date(),
-        },
+    if (!isTextSubmission) {
+      const retryDecision = evaluateSpeechRetryGate({
+        transcript: analysis.transcript,
+        metrics: derivedMetrics,
+        durationSec: attempt.durationSec,
       });
-      console.log(
-        JSON.stringify({
-          event: "attempt_needs_retry",
-          attemptId: attempt.id,
-          reasonCode: retryDecision.reasonCode,
-        })
-      );
-      return;
+      if (retryDecision.shouldRetry) {
+        await prisma.attempt.updateMany({
+          where: { id: attempt.id, status: ATTEMPT_STATUS.PROCESSING },
+          data: {
+            status: ATTEMPT_STATUS.NEEDS_RETRY,
+            transcript: analysis.transcript,
+            speechMetricsJson: derivedMetrics,
+            rawRecognitionJson:
+              analysis.raw !== null && analysis.raw !== undefined
+                ? (analysis.raw as Prisma.InputJsonValue)
+                : Prisma.DbNull,
+            taskEvaluationJson: Prisma.DbNull,
+            feedbackJson: Prisma.DbNull,
+            scoresJson: Prisma.DbNull,
+            aiDebugJson: Prisma.DbNull,
+            nodeOutcomesJson: Prisma.DbNull,
+            errorCode: retryDecision.reasonCode,
+            errorMessage: retryDecision.message,
+            completedAt: new Date(),
+          },
+        });
+        console.log(
+          JSON.stringify({
+            event: "attempt_needs_retry",
+            attemptId: attempt.id,
+            reasonCode: retryDecision.reasonCode,
+          })
+        );
+        return;
+      }
     }
     const topicRetryDecision = await evaluateTopicRetryGate({
       taskType: attempt.task.type,
       taskPrompt: attempt.task.prompt,
       transcript: analysis.transcript,
-      taskMeta: (attempt.task.metaJson || {}) as Record<string, unknown>,
+      taskMeta,
     });
     if (topicRetryDecision.shouldRetry) {
       await prisma.attempt.updateMany({
@@ -418,7 +492,6 @@ async function processAttempt(attemptId: string) {
       return;
     }
 
-    const taskMeta = (attempt.task.metaJson || {}) as Record<string, unknown>;
     const taskTargets = await prisma.taskGseTarget.findMany({
       where: { taskId: attempt.taskId },
       include: {
@@ -448,11 +521,13 @@ async function processAttempt(attemptId: string) {
       languageScore,
       attemptCount: attemptCount + 1,
       strictReliabilityGating: config.worker.strictReliabilityGating,
+      modality: isTextSubmission ? "writing" : "speech",
     });
     const canonicalMetrics = buildCanonicalMetrics({
       derivedMetrics,
       taskEvaluation: evaluated.taskEvaluation,
       languageScore,
+      taskType: attempt.task.type,
     });
     const causalDiagnosis = inferCausalDiagnosis({
       attemptId: attempt.id,
@@ -514,7 +589,6 @@ async function processAttempt(attemptId: string) {
         })
       );
     }
-
     await prisma.attemptMetric.deleteMany({
       where: { attemptId: attempt.id },
     });
@@ -691,6 +765,10 @@ async function processAttempt(attemptId: string) {
           attemptId: attempt.id,
           cycleId: immediateSelfRepairCycle.cycleId,
           created: immediateSelfRepairCycle.created,
+          status: immediateSelfRepairCycle.status,
+          budgetExhausted: immediateSelfRepairCycle.budgetExhausted,
+          escalationQueueItemId: immediateSelfRepairCycle.escalationQueueItemId,
+          budgetReasons: immediateSelfRepairCycle.budget?.reasons || [],
         })
       );
     }

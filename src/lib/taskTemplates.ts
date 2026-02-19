@@ -50,6 +50,21 @@ export const TASK_TEMPLATES: TaskTemplate[] = [
     },
   },
   {
+    type: "listening_comprehension",
+    level: 1,
+    prompt:
+      "Listen and answer.\nAudio: Ben missed the bus, so he called his teacher before class to explain he would be late.\nQuestion: Why did Ben call his teacher before class?",
+    assessmentMode: "stt",
+    constraints: { minSeconds: 25, maxSeconds: 90 },
+    maxDurationSec: 75,
+    meta: {
+      supportsPronAssessment: false,
+      rubricType: "listening_comprehension",
+      modality: "listening",
+      listeningPromptVersion: "listening-runtime-v1",
+    },
+  },
+  {
     type: "writing_prompt",
     level: 1,
     prompt:
@@ -231,6 +246,11 @@ export function buildTaskTemplate(type: string, options: TaskTemplateBuildOption
   if (base.type === "misunderstanding_repair") {
     next.prompt =
       "Repair a misunderstanding: clarify your idea, rephrase it, check understanding, and confirm the next step.";
+  }
+
+  if (base.type === "listening_comprehension") {
+    next.prompt =
+      "Listen and answer.\nAudio: Nora forgot her homework and asked her classmate for help after school.\nQuestion: What did Nora do after she forgot her homework?";
   }
 
   if (base.type === "writing_prompt") {

@@ -1,0 +1,14 @@
+{
+  "generatedAt": "2026-02-19T14:41:30.207Z",
+  "contractVersion": "writing-progression-dashboard-v1",
+  "windowDays": 30,
+  "totalWritingAttempts": 0,
+  "completedWritingAttempts": 0,
+  "averageTaskScore": null,
+  "averageLanguageScore": null,
+  "averageWordCount": null,
+  "rewriteRecommendedRate": null,
+  "revisionSubmissionRate": null,
+  "byStage": [],
+  "byTaskType": []
+}

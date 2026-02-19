@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { buildTaskTemplate } from "./taskTemplates";
 import {
+  extractListeningQuestion,
+  extractListeningScript,
   extractReadingPassage,
   extractReadingQuestion,
   extractReferenceText,
@@ -85,6 +87,11 @@ function fallbackTaskSpec(input: GenerateTaskSpecInput): GeneratedTaskSpec {
       "Read the passage and answer in 3-4 sentences.\nPassage: Musa waters the school garden every morning so vegetables can grow well in dry weather.\nQuestion: Why does Musa water the school garden every morning?",
       "Read the passage and answer in 3-4 sentences.\nPassage: Amina reads a short chapter each evening and writes two new words in her notebook.\nQuestion: How does Amina use reading to improve her English?",
       "Read the passage and answer in 3-4 sentences.\nPassage: The class planted trees around the playground because shade helps students rest after games.\nQuestion: Why did the class plant trees around the playground?",
+    ],
+    listening_comprehension: [
+      "Listen and answer in 3-4 sentences.\nAudio: Ben missed the bus, so he called his teacher before class to explain he would be late.\nQuestion: Why did Ben call his teacher before class?",
+      "Listen and answer in 3-4 sentences.\nAudio: Amina forgot her notebook and borrowed one from her classmate after the lesson.\nQuestion: What did Amina do after she forgot her notebook?",
+      "Listen and answer in 3-4 sentences.\nAudio: The coach moved practice indoors because heavy rain started before the game.\nQuestion: Why did the coach move practice indoors?",
     ],
     writing_prompt: [
       "Write 5-7 sentences about a school challenge you solved. Include the problem, your action, and the result.",
@@ -266,6 +273,15 @@ function taskTypeQualityGuidance(input: GenerateTaskSpecInput) {
       "4) Require 3-4 sentence response grounded in passage details.",
     ];
   }
+  if (taskType === "listening_comprehension") {
+    return [
+      "Task quality rules for listening_comprehension:",
+      "1) Instruction must include both 'Audio:' and 'Question:' sections.",
+      "2) Audio section should be 1-2 short concrete sentences suitable for child listening comprehension.",
+      "3) Question must require comprehension and be answerable from audio details.",
+      "4) Encourage clarification/repair cue in response when uncertain.",
+    ];
+  }
   if (taskType === "writing_prompt") {
     return [
       "Task quality rules for writing_prompt:",
@@ -340,6 +356,20 @@ function validatePromptQuality(spec: GeneratedTaskSpec, input: GenerateTaskSpecI
     }
     if (!/\\?$/.test(question) || countWords(question) < 5) {
       return { ok: false, reason: "reading_question_quality_low" };
+    }
+  }
+
+  if (taskType === "listening_comprehension") {
+    const script = extractListeningScript(prompt);
+    const question = extractListeningQuestion(prompt);
+    if (!script) return { ok: false, reason: "missing_listening_script" };
+    if (!question) return { ok: false, reason: "missing_listening_question" };
+    const scriptWords = countWords(script);
+    if (scriptWords < 12 || scriptWords > 45) {
+      return { ok: false, reason: "listening_script_length_out_of_range" };
+    }
+    if (!/\\?$/.test(question) || countWords(question) < 5) {
+      return { ok: false, reason: "listening_question_quality_low" };
     }
   }
 
@@ -497,6 +527,8 @@ export async function generateTaskSpec(input: GenerateTaskSpecInput): Promise<Ge
       ? "For read_aloud: instruction MUST include exact text to read in quotes, e.g. Read this aloud clearly: '...'."
       : taskType === "reading_comprehension"
       ? "For reading_comprehension: instruction MUST include both sections with exact labels: 'Passage:' and 'Question:'."
+      : taskType === "listening_comprehension"
+      ? "For listening_comprehension: instruction MUST include both sections with exact labels: 'Audio:' and 'Question:'."
       : "For non-read_aloud: do not ask learner to read a reference sentence.",
     ...taskTypeQualityGuidance(input),
     ...buildDisambiguationPromptGuidance(input.disambiguationProbe || {
@@ -519,7 +551,7 @@ export async function generateTaskSpec(input: GenerateTaskSpecInput): Promise<Ge
   ].join("\n");
 
   const systemContent =
-    "You design child English speaking tasks. Return strict JSON only with requested schema. No markdown.";
+    "You design child English learning tasks. Return strict JSON only with requested schema. No markdown.";
 
   try {
     const content = await chatJson(systemContent, prompt, {

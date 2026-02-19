@@ -61,3 +61,66 @@ export function extractRequiredWords(taskPrompt: string) {
 
   return uniquePreserveOrder(tokens).slice(0, 20);
 }
+
+export function extractReadingPassage(taskPrompt: string) {
+  const prompt = (taskPrompt || "").trim();
+  if (!prompt) return "";
+
+  const passageSection = prompt.match(/passage\s*:\s*([\s\S]*?)(?:\n+\s*question\s*:|$)/i);
+  if (passageSection?.[1]) {
+    return passageSection[1].trim();
+  }
+
+  const quoted = prompt.match(/["“”'‘’]([^"“”'‘’]{12,600})["“”'‘’]/);
+  if (quoted?.[1]) {
+    return quoted[1].trim();
+  }
+
+  return "";
+}
+
+export function extractReadingQuestion(taskPrompt: string) {
+  const prompt = (taskPrompt || "").trim();
+  if (!prompt) return "";
+
+  const questionSection = prompt.match(/question\s*:\s*([^\n]+)/i);
+  if (questionSection?.[1]) {
+    return questionSection[1].trim();
+  }
+
+  const trailingQuestion = prompt.match(/([A-Z][^!?]*\?)/);
+  if (trailingQuestion?.[1]) {
+    return trailingQuestion[1].trim();
+  }
+
+  return "";
+}
+
+export function extractListeningScript(taskPrompt: string) {
+  const prompt = (taskPrompt || "").trim();
+  if (!prompt) return "";
+
+  const audioSection = prompt.match(/(?:audio|listening\s+script)\s*:\s*([\s\S]*?)(?:\n+\s*question\s*:|$)/i);
+  if (audioSection?.[1]) {
+    return audioSection[1].trim();
+  }
+
+  const listenSection = prompt.match(/listen(?:\s+to)?(?:\s+this)?\s*[:\-]\s*([\s\S]*?)(?:\n+\s*question\s*:|$)/i);
+  if (listenSection?.[1]) {
+    return listenSection[1].trim();
+  }
+
+  return extractReadingPassage(prompt);
+}
+
+export function extractListeningQuestion(taskPrompt: string) {
+  const prompt = (taskPrompt || "").trim();
+  if (!prompt) return "";
+
+  const questionSection = prompt.match(/question\s*:\s*([^\n]+)/i);
+  if (questionSection?.[1]) {
+    return questionSection[1].trim();
+  }
+
+  return extractReadingQuestion(prompt);
+}

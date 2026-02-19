@@ -9,6 +9,16 @@ import {
   evaluateDiscoursePragmatics,
   isDiscoursePragmaticsTaskType,
 } from "./discourse/pragmatics";
+import {
+  evaluateReadingComprehension,
+  isReadingTaskType,
+  READING_ASSESSMENT_VERSION,
+} from "./reading/assessment";
+import {
+  evaluateListeningComprehension,
+  isListeningTaskType,
+  LISTENING_ASSESSMENT_VERSION,
+} from "./listening/assessment";
 import { inferPerceptionLanguageSignals } from "./perception/languageSignals";
 
 export type RubricCheck = {
@@ -263,6 +273,218 @@ function withDiscoursePragmatics(
       },
     },
     rubricChecks: [...taskEvaluation.rubricChecks, ...addedChecks],
+  };
+}
+
+function withReadingAssessment(
+  taskEvaluation: TaskEvaluation,
+  input: Pick<EvaluationInput, "taskType" | "taskPrompt" | "transcript">,
+): TaskEvaluation {
+  if (!isReadingTaskType(input.taskType)) {
+    return taskEvaluation;
+  }
+
+  const artifacts =
+    taskEvaluation.artifacts && typeof taskEvaluation.artifacts === "object"
+      ? taskEvaluation.artifacts
+      : {};
+  const assessment = evaluateReadingComprehension({
+    taskType: input.taskType,
+    taskPrompt: input.taskPrompt,
+    transcript: input.transcript,
+  });
+  const existingCheckIds = new Set(
+    taskEvaluation.rubricChecks.map((check) => slugify(check.name || "")),
+  );
+  const addedChecks = assessment.rubricChecks.filter(
+    (check) => !existingCheckIds.has(slugify(check.name)),
+  );
+  const blendedLanguageScore = Math.round(
+    clamp(
+      ((typeof taskEvaluation.languageScore === "number"
+        ? taskEvaluation.languageScore
+        : assessment.scores.overall) *
+        0.35) +
+        assessment.scores.overall * 0.65,
+    ),
+  );
+
+  return {
+    ...taskEvaluation,
+    taskScore: assessment.scores.overall,
+    languageScore: blendedLanguageScore,
+    artifacts: {
+      ...artifacts,
+      readingComprehensionScore: assessment.scores.overall,
+      readingQuestionAddressingScore: assessment.scores.questionAddressing,
+      readingSourceGroundingScore: assessment.scores.sourceGrounding,
+      readingDetailCoverageScore: assessment.scores.detailCoverage,
+      readingAssessment: {
+        version: READING_ASSESSMENT_VERSION,
+        passage: assessment.passage,
+        question: assessment.question,
+        scores: assessment.scores,
+        signals: assessment.signals,
+        feedback: assessment.feedback,
+      },
+    },
+    rubricChecks: [...taskEvaluation.rubricChecks, ...addedChecks],
+  };
+}
+
+function withReadingFeedback(
+  taskEvaluation: TaskEvaluation,
+  feedback: FeedbackResult,
+): FeedbackResult {
+  if (!isReadingTaskType(taskEvaluation.taskType)) {
+    return feedback;
+  }
+  const artifacts =
+    taskEvaluation.artifacts && typeof taskEvaluation.artifacts === "object"
+      ? taskEvaluation.artifacts
+      : {};
+  const readingAssessment =
+    artifacts.readingAssessment &&
+    typeof artifacts.readingAssessment === "object" &&
+    !Array.isArray(artifacts.readingAssessment)
+      ? (artifacts.readingAssessment as Record<string, unknown>)
+      : null;
+  const readingFeedback =
+    readingAssessment?.feedback &&
+    typeof readingAssessment.feedback === "object" &&
+    !Array.isArray(readingAssessment.feedback)
+      ? (readingAssessment.feedback as Record<string, unknown>)
+      : null;
+  if (!readingFeedback) return feedback;
+
+  const toStringArray = (value: unknown, fallback: string[]) => {
+    if (!Array.isArray(value)) return fallback;
+    const normalized = value.filter((row): row is string => typeof row === "string" && row.trim().length > 0);
+    return normalized.length > 0 ? normalized.slice(0, 3) : fallback;
+  };
+
+  return {
+    summary:
+      typeof readingFeedback.summary === "string" && readingFeedback.summary.trim().length > 0
+        ? readingFeedback.summary
+        : feedback.summary,
+    whatWentWell: toStringArray(readingFeedback.whatWentWell, feedback.whatWentWell),
+    whatToFixNow: toStringArray(readingFeedback.whatToFixNow, feedback.whatToFixNow),
+    exampleBetterAnswer:
+      typeof readingFeedback.exampleBetterAnswer === "string" &&
+      readingFeedback.exampleBetterAnswer.trim().length > 0
+        ? readingFeedback.exampleBetterAnswer
+        : feedback.exampleBetterAnswer,
+    nextMicroTask:
+      typeof readingFeedback.nextMicroTask === "string" && readingFeedback.nextMicroTask.trim().length > 0
+        ? readingFeedback.nextMicroTask
+        : feedback.nextMicroTask,
+  };
+}
+
+function withListeningAssessment(
+  taskEvaluation: TaskEvaluation,
+  input: Pick<EvaluationInput, "taskType" | "taskPrompt" | "transcript">,
+): TaskEvaluation {
+  if (!isListeningTaskType(input.taskType)) {
+    return taskEvaluation;
+  }
+
+  const artifacts =
+    taskEvaluation.artifacts && typeof taskEvaluation.artifacts === "object"
+      ? taskEvaluation.artifacts
+      : {};
+  const assessment = evaluateListeningComprehension({
+    taskType: input.taskType,
+    taskPrompt: input.taskPrompt,
+    transcript: input.transcript,
+  });
+  const existingCheckIds = new Set(
+    taskEvaluation.rubricChecks.map((check) => slugify(check.name || "")),
+  );
+  const addedChecks = assessment.rubricChecks.filter(
+    (check) => !existingCheckIds.has(slugify(check.name)),
+  );
+  const blendedLanguageScore = Math.round(
+    clamp(
+      ((typeof taskEvaluation.languageScore === "number"
+        ? taskEvaluation.languageScore
+        : assessment.scores.overall) *
+        0.3) +
+        assessment.scores.overall * 0.7,
+    ),
+  );
+
+  return {
+    ...taskEvaluation,
+    taskScore: assessment.scores.overall,
+    languageScore: blendedLanguageScore,
+    artifacts: {
+      ...artifacts,
+      listeningComprehensionScore: assessment.scores.comprehension,
+      listeningSourceGroundingScore: assessment.scores.sourceGrounding,
+      listeningRepairBehaviorScore: assessment.scores.repairBehavior,
+      listeningAssessment: {
+        version: LISTENING_ASSESSMENT_VERSION,
+        script: assessment.script,
+        question: assessment.question,
+        scores: assessment.scores,
+        signals: assessment.signals,
+        feedback: assessment.feedback,
+      },
+    },
+    rubricChecks: [...taskEvaluation.rubricChecks, ...addedChecks],
+  };
+}
+
+function withListeningFeedback(
+  taskEvaluation: TaskEvaluation,
+  feedback: FeedbackResult,
+): FeedbackResult {
+  if (!isListeningTaskType(taskEvaluation.taskType)) {
+    return feedback;
+  }
+  const artifacts =
+    taskEvaluation.artifacts && typeof taskEvaluation.artifacts === "object"
+      ? taskEvaluation.artifacts
+      : {};
+  const listeningAssessment =
+    artifacts.listeningAssessment &&
+    typeof artifacts.listeningAssessment === "object" &&
+    !Array.isArray(artifacts.listeningAssessment)
+      ? (artifacts.listeningAssessment as Record<string, unknown>)
+      : null;
+  const listeningFeedback =
+    listeningAssessment?.feedback &&
+    typeof listeningAssessment.feedback === "object" &&
+    !Array.isArray(listeningAssessment.feedback)
+      ? (listeningAssessment.feedback as Record<string, unknown>)
+      : null;
+  if (!listeningFeedback) return feedback;
+
+  const toStringArray = (value: unknown, fallback: string[]) => {
+    if (!Array.isArray(value)) return fallback;
+    const normalized = value.filter((row): row is string => typeof row === "string" && row.trim().length > 0);
+    return normalized.length > 0 ? normalized.slice(0, 3) : fallback;
+  };
+
+  return {
+    summary:
+      typeof listeningFeedback.summary === "string" && listeningFeedback.summary.trim().length > 0
+        ? listeningFeedback.summary
+        : feedback.summary,
+    whatWentWell: toStringArray(listeningFeedback.whatWentWell, feedback.whatWentWell),
+    whatToFixNow: toStringArray(listeningFeedback.whatToFixNow, feedback.whatToFixNow),
+    exampleBetterAnswer:
+      typeof listeningFeedback.exampleBetterAnswer === "string" &&
+      listeningFeedback.exampleBetterAnswer.trim().length > 0
+        ? listeningFeedback.exampleBetterAnswer
+        : feedback.exampleBetterAnswer,
+    nextMicroTask:
+      typeof listeningFeedback.nextMicroTask === "string" &&
+      listeningFeedback.nextMicroTask.trim().length > 0
+        ? listeningFeedback.nextMicroTask
+        : feedback.nextMicroTask,
   };
 }
 
@@ -782,6 +1004,180 @@ function evaluateSpeechBuilder(input: EvaluationInput): { taskEvaluation: TaskEv
   return { taskEvaluation, feedback };
 }
 
+function evaluateReadingComprehensionTask(
+  input: EvaluationInput,
+): { taskEvaluation: TaskEvaluation; feedback: FeedbackResult } {
+  const assessment = evaluateReadingComprehension({
+    taskType: input.taskType,
+    taskPrompt: input.taskPrompt,
+    transcript: input.transcript,
+  });
+  const taskEvaluation: TaskEvaluation = {
+    taskType: input.taskType,
+    taskScore: assessment.scores.overall,
+    languageScore: Math.round(
+      clamp(assessment.scores.overall * 0.78 + assessment.scores.sourceGrounding * 0.22),
+    ),
+    artifacts: {
+      readingComprehensionScore: assessment.scores.overall,
+      readingQuestionAddressingScore: assessment.scores.questionAddressing,
+      readingSourceGroundingScore: assessment.scores.sourceGrounding,
+      readingDetailCoverageScore: assessment.scores.detailCoverage,
+      readingAssessment: assessment,
+    },
+    rubricChecks: assessment.rubricChecks,
+    loChecks: [],
+    grammarChecks: [],
+    vocabChecks: [],
+    evidence: assessment.signals.evidenceSpans,
+    modelVersion: MODEL_VERSION,
+  };
+
+  return {
+    taskEvaluation,
+    feedback: assessment.feedback,
+  };
+}
+
+function evaluateListeningComprehensionTask(
+  input: EvaluationInput,
+): { taskEvaluation: TaskEvaluation; feedback: FeedbackResult } {
+  const assessment = evaluateListeningComprehension({
+    taskType: input.taskType,
+    taskPrompt: input.taskPrompt,
+    transcript: input.transcript,
+  });
+  const taskEvaluation: TaskEvaluation = {
+    taskType: input.taskType,
+    taskScore: assessment.scores.overall,
+    languageScore: Math.round(
+      clamp(assessment.scores.overall * 0.76 + assessment.scores.sourceGrounding * 0.24),
+    ),
+    artifacts: {
+      listeningComprehensionScore: assessment.scores.comprehension,
+      listeningSourceGroundingScore: assessment.scores.sourceGrounding,
+      listeningRepairBehaviorScore: assessment.scores.repairBehavior,
+      listeningAssessment: assessment,
+    },
+    rubricChecks: assessment.rubricChecks,
+    loChecks: [],
+    grammarChecks: [],
+    vocabChecks: [],
+    evidence: assessment.signals.evidenceSpans,
+    modelVersion: MODEL_VERSION,
+  };
+
+  return {
+    taskEvaluation,
+    feedback: assessment.feedback,
+  };
+}
+
+function computePromptCoverage(prompt: string, transcript: string) {
+  const promptTokens = new Set(
+    normalizeWords(prompt).filter((token) => token.length >= 4),
+  );
+  if (promptTokens.size === 0) return 0;
+  const transcriptTokens = new Set(normalizeWords(transcript));
+  let matched = 0;
+  for (const token of promptTokens) {
+    if (transcriptTokens.has(token)) matched += 1;
+  }
+  return matched / promptTokens.size;
+}
+
+function evaluateWritingPromptTask(
+  input: EvaluationInput,
+): { taskEvaluation: TaskEvaluation; feedback: FeedbackResult } {
+  const transcript = (input.transcript || "").trim();
+  const words = normalizeWords(transcript);
+  const sentences = splitSentences(transcript);
+  const wordCount = words.length;
+  const sentenceCount = sentences.length;
+  const connectorCount = (
+    transcript.match(/\b(because|then|however|therefore|finally|for example|for instance|so)\b/gi) || []
+  ).length;
+  const fragmentCount = sentences.filter((sentence) => normalizeWords(sentence).length < 4).length;
+  const grammarStability =
+    !/\b(i\s+is|he\s+are|she\s+are|they\s+is)\b/i.test(transcript) && fragmentCount <= 1;
+  const promptCoverage = computePromptCoverage(input.taskPrompt, transcript);
+
+  const checks: RubricCheck[] = [
+    {
+      name: "length_requirement",
+      pass: wordCount >= 45,
+      reason:
+        wordCount >= 45
+          ? "You wrote enough detail for the task."
+          : "Write a bit more detail (aim for at least 45 words).",
+      weight: 0.3,
+    },
+    {
+      name: "text_structure",
+      pass: sentenceCount >= 5 && connectorCount >= 1,
+      reason:
+        sentenceCount >= 5 && connectorCount >= 1
+          ? "Your writing has clear sentence flow."
+          : "Use 5-7 full sentences and add linking words (because, then, finally).",
+      weight: 0.32,
+    },
+    {
+      name: "prompt_alignment",
+      pass: promptCoverage >= 0.16,
+      reason:
+        promptCoverage >= 0.16
+          ? "Your response stays aligned with the writing mission."
+          : "Connect your response more directly to the prompt details.",
+      weight: 0.23,
+    },
+    {
+      name: "grammar_stability",
+      pass: grammarStability,
+      reason: grammarStability ? "Most sentences are stable and clear." : "Fix short fragments and basic grammar mismatches.",
+      weight: 0.15,
+    },
+  ];
+
+  const taskScore = scoreFromChecks(checks);
+  const languageScore = Math.round(
+    clamp(
+      40 +
+        Math.min(30, wordCount * 0.45) +
+        Math.min(16, connectorCount * 6) +
+        (grammarStability ? 12 : 0),
+    ),
+  );
+
+  const taskEvaluation: TaskEvaluation = {
+    taskType: input.taskType,
+    taskScore,
+    languageScore,
+    artifacts: {
+      writingWordCount: wordCount,
+      writingSentenceCount: sentenceCount,
+      writingConnectorCount: connectorCount,
+      writingPromptCoverage: Number(promptCoverage.toFixed(3)),
+      writingFragmentCount: fragmentCount,
+      writingGrammarStability: grammarStability,
+      revisionDelta: 0,
+      rewriteRecommended: taskScore < 85,
+    },
+    rubricChecks: checks,
+    loChecks: [],
+    grammarChecks: [],
+    vocabChecks: [],
+    evidence: sentences.slice(0, 4),
+    modelVersion: MODEL_VERSION,
+  };
+
+  const feedback = buildFeedbackFromEvaluation(
+    taskEvaluation,
+    "At first we could not finish our class poster because we had missing ideas. Then I suggested a quick plan and divided tasks. My team wrote the key points, and I checked the final version. Finally, we finished on time and presented with confidence.",
+    input.transcript,
+  );
+  return { taskEvaluation, feedback };
+}
+
 function selectExampleBetterAnswer(
   taskEvaluation: TaskEvaluation,
   transcript: string,
@@ -799,6 +1195,12 @@ function evaluateDeterministic(input: EvaluationInput) {
   switch (input.taskType) {
     case "read_aloud":
       return evaluateReadAloud(input);
+    case "reading_comprehension":
+      return evaluateReadingComprehensionTask(input);
+    case "listening_comprehension":
+      return evaluateListeningComprehensionTask(input);
+    case "writing_prompt":
+      return evaluateWritingPromptTask(input);
     case "target_vocab":
       return evaluateTargetVocab(input);
     case "role_play":
@@ -819,6 +1221,12 @@ function buildTaskSpecificPrompt(taskType: string) {
   const rubricMap: Record<string, string> = {
     read_aloud:
       "Artifacts required: referenceCoverage, omittedWords, insertedWords, mispronouncedHotspots.",
+    reading_comprehension:
+      "Artifacts required: readingComprehensionScore, readingQuestionAddressingScore, readingSourceGroundingScore, readingDetailCoverageScore, readingAssessment.",
+    listening_comprehension:
+      "Artifacts required: listeningComprehensionScore, listeningSourceGroundingScore, listeningRepairBehaviorScore, listeningAssessment.",
+    writing_prompt:
+      "Artifacts required: writingWordCount, writingSentenceCount, writingConnectorCount, writingPromptCoverage, writingFragmentCount, writingGrammarStability.",
     topic_talk:
       "Artifacts required: mainPointDetected, supportingDetailCount, offTopicRatio, coherenceSignals.",
     qa_prompt:
@@ -984,7 +1392,7 @@ export async function evaluateLoOnly(
   const limits = getEvaluationLimits(input.taskMeta);
   const compactInput = buildOpenAIInput(input);
   const prompt = [
-    "You evaluate ONLY Learning Objectives (LO) for this child speaking attempt.",
+    "You evaluate ONLY Learning Objectives (LO) for this child language attempt.",
     "Return one JSON object: { \"loChecks\": [ ... ] }. No markdown.",
     "Use only nodeIds from the provided options. Do not invent IDs.",
     ...(input.taskMeta?.placementMode === "placement_extended"
@@ -999,7 +1407,7 @@ export async function evaluateLoOnly(
     `Input: ${JSON.stringify(compactInput)}`,
   ].join("\n");
   const content = await chatJson(
-    "You are a strict speaking evaluator. Output one JSON object only. No markdown.",
+    "You are a strict language evaluator. Output one JSON object only. No markdown.",
     prompt,
     { openaiApiKey: apiKey, model, temperature: 0, maxTokens: limits.TOKEN_BUDGET_LO, runName: "gse_eval_lo", tags: ["gse", "eval_split", "lo"] }
   );
@@ -1030,7 +1438,7 @@ export async function evaluateGrammarOnly(
   const limits = getEvaluationLimits(input.taskMeta);
   const compactInput = buildOpenAIInput(input);
   const prompt = [
-    "You evaluate ONLY Grammar for this child speaking attempt.",
+    "You evaluate ONLY Grammar for this child language attempt.",
     "Return one JSON object: { \"grammarChecks\": [ ... ] }. No markdown.",
     "Use only descriptorIds from the provided options. Do not invent IDs.",
     ...(input.taskMeta?.placementMode === "placement_extended"
@@ -1046,7 +1454,7 @@ export async function evaluateGrammarOnly(
     `Input: ${JSON.stringify(compactInput)}`,
   ].join("\n");
   const content = await chatJson(
-    "You are a strict speaking evaluator. Output one JSON object only. No markdown.",
+    "You are a strict language evaluator. Output one JSON object only. No markdown.",
     prompt,
     {
       openaiApiKey: apiKey,
@@ -1091,7 +1499,7 @@ export async function evaluateVocabOnly(
   const limits = getEvaluationLimits(input.taskMeta);
   const compactInput = buildOpenAIInput(input);
   const prompt = [
-    "You evaluate ONLY Vocabulary for this child speaking attempt.",
+    "You evaluate ONLY Vocabulary for this child language attempt.",
     "Return one JSON object: { \"vocabChecks\": [ ... ] }. No markdown.",
     "Use only nodeIds from the provided options. Do not invent IDs.",
     ...(input.taskMeta?.placementMode === "placement_extended"
@@ -1107,7 +1515,7 @@ export async function evaluateVocabOnly(
     `Input: ${JSON.stringify(compactInput)}`,
   ].join("\n");
   const content = await chatJson(
-    "You are a strict speaking evaluator. Output one JSON object only. No markdown.",
+    "You are a strict language evaluator. Output one JSON object only. No markdown.",
     prompt,
     {
       openaiApiKey: apiKey,
@@ -1152,7 +1560,7 @@ async function evaluateGeneralOnly(
 } | null> {
   const compactInput = buildOpenAIInput(input);
   const prompt = [
-    "Evaluate overall task success and give feedback for this child speaking attempt. Do NOT evaluate LO/grammar/vocab — that is done separately.",
+    "Evaluate overall task success and give feedback for this child language attempt. Do NOT evaluate LO/grammar/vocab — that is done separately.",
     "Return one JSON object: { taskEvaluation: { taskType, taskScore, languageScore, artifacts, rubricChecks, evidence }, feedback: { summary, whatWentWell, whatToFixNow, exampleBetterAnswer, nextMicroTask } }.",
     "Scores 0..100. rubricChecks: at least 2 items, each { name, pass, reason, weight }. Total weight close to 1.",
     buildTaskSpecificPrompt(input.taskType),
@@ -1160,7 +1568,7 @@ async function evaluateGeneralOnly(
     `Input: ${JSON.stringify(compactInput)}`,
   ].join("\n");
   const content = await chatJson(
-    "You are a strict speaking evaluator. Output one JSON object only. No markdown.",
+    "You are a strict language evaluator. Output one JSON object only. No markdown.",
     prompt,
     {
       openaiApiKey: apiKey,
@@ -1383,20 +1791,29 @@ export async function evaluateTaskQuality(input: EvaluationInput) {
       vocabChecks: fromModel.parsed.taskEvaluation.vocabChecks || [],
     };
     const modelTaskEvaluation = withDiscoursePragmatics(
-      withPerceptionLanguageSignals(
-        attachStructuredChecks(baseTaskEvaluation, input.transcript),
-        input.transcript
+      withReadingAssessment(
+        withListeningAssessment(
+          withPerceptionLanguageSignals(
+            attachStructuredChecks(baseTaskEvaluation, input.transcript),
+            input.transcript,
+          ),
+          input,
+        ),
+        input,
       ),
       input,
     );
-    const normalizedFeedback = {
-      ...fromModel.parsed.feedback,
-      exampleBetterAnswer: selectExampleBetterAnswer(
-        modelTaskEvaluation,
-        input.transcript,
-        fromModel.parsed.feedback.exampleBetterAnswer
-      ),
-    };
+    const normalizedFeedback = withListeningFeedback(
+      modelTaskEvaluation,
+      withReadingFeedback(modelTaskEvaluation, {
+        ...fromModel.parsed.feedback,
+        exampleBetterAnswer: selectExampleBetterAnswer(
+          modelTaskEvaluation,
+          input.transcript,
+          fromModel.parsed.feedback.exampleBetterAnswer,
+        ),
+      }),
+    );
     return {
       taskEvaluation: modelTaskEvaluation,
       feedback: normalizedFeedback,
@@ -1409,15 +1826,25 @@ export async function evaluateTaskQuality(input: EvaluationInput) {
   }
 
   const fallback = evaluateDeterministic(input);
-  const normalizedFallback = {
-    taskEvaluation: withDiscoursePragmatics(
-      withPerceptionLanguageSignals(
-        attachStructuredChecks(fallback.taskEvaluation, input.transcript),
-        input.transcript
+  const fallbackTaskEvaluation = withDiscoursePragmatics(
+    withReadingAssessment(
+      withListeningAssessment(
+        withPerceptionLanguageSignals(
+          attachStructuredChecks(fallback.taskEvaluation, input.transcript),
+          input.transcript,
+        ),
+        input,
       ),
       input,
     ),
-    feedback: fallback.feedback,
+    input,
+  );
+  const normalizedFallback = {
+    taskEvaluation: fallbackTaskEvaluation,
+    feedback: withListeningFeedback(
+      fallbackTaskEvaluation,
+      withReadingFeedback(fallbackTaskEvaluation, fallback.feedback),
+    ),
   };
   console.log(JSON.stringify({ event: "fallback_used", taskType: input.taskType, reason: fromModel.debug.openai.reason }));
   return {

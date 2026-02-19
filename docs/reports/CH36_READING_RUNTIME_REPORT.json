@@ -1,0 +1,15 @@
+{
+  "generatedAt": "2026-02-19T14:34:43.721Z",
+  "contractVersion": "reading-runtime-report-v1",
+  "windowDays": 30,
+  "totalAttempts": 176,
+  "readingAttempts": 0,
+  "readingAttemptShare": 0,
+  "avgTaskScore": null,
+  "avgReadingComprehensionScore": null,
+  "avgSourceGroundingScore": null,
+  "avgQuestionAddressingScore": null,
+  "passRate": null,
+  "byStage": [],
+  "samples": []
+}

@@ -90,6 +90,7 @@ As of 2026-02-14:
 - `GET /api/quality/self-repair-budget` and `npm run self-repair:budget` provide CH-27 budget-exhaustion/escalation telemetry for immediate self-repair loops.
 - `GET /api/quality/language-signals` and `npm run language-signals:report` provide CH-31 language-id/code-switch telemetry and calibration sample payloads.
 - `GET /api/quality/locale-policy-context` and `npm run locale-policy:report` provide CH-33 localized cohort A/B uplift telemetry for locale-aware policy context.
+- `GET /api/quality/reading-runtime` and `npm run reading-runtime:report` provide CH-36 reading runtime coverage, score quality, and stage-level pass metrics.
 
 ## Placement Architecture (Current)
 

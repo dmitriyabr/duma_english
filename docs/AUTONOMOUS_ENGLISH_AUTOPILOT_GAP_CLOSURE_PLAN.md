@@ -125,6 +125,7 @@ Source baseline: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` + current code
 | CH-36 | Reading runtime + assessment pipeline | DONE | Agent_1 | 2026-02-19T14:14:21Z | 2026-02-19T14:42:10Z | `569b2e6`, `2c9ae76` | `src/lib/reading/assessment.ts`, `src/lib/evaluator.ts`, `src/app/api/quality/reading-runtime/route.ts`, `src/scripts/ch36_reading_runtime_report.ts`, `docs/reports/CH36_READING_RUNTIME_REPORT.json`, `docs/CH36_READING_RUNTIME_ASSESSMENT_PIPELINE.md` | Reading task/eval/evidence contour integrated with mastery graph and reading runtime quality telemetry/report stack |
 | CH-37 | Writing runtime + assessment pipeline | IN_PROGRESS | Agent_3 | 2026-02-19T14:14:32Z |  |  |  | Added as next free critical-path row after CH-35/CH-36 claims by peers; implementing writing task/eval/evidence/mastery integration |
 | CH-38 | Listening runtime + assessment pipeline | IN_PROGRESS | Agent_2 | 2026-02-19T14:45:07Z |  |  |  | Added and claimed as next free critical-path row after CH-35 closeout; implementing listening tasks + comprehension/repair assessment integration into policy loop |
+| CH-39 | Unified cross-modality placement and mastery | IN_PROGRESS | Agent_1 | 2026-02-19T14:43:45Z |  |  |  | Added as next free critical-path row after CH-37/CH-38 in-flight; implementing unified placement orchestration and confidence-bounded mastery across speaking/listening/reading/writing |
 
 ## 3.3) Decision Log
 

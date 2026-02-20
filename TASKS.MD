@@ -101,6 +101,10 @@ Build an autonomous speaking trainer where every learning decision is based on G
 
 20. **Planner pool (spaced repetition):** (a) Fully mastered nodes (verified and decayedMastery ≥ 70) are excluded from the pool so they don’t take slots; when they decay (value &lt; 70 or overdue), the same row re-enters on the next load. (b) Lower-level refresh: any not-fully-mastered nodes from the **previous stage bundle** (with or without evidence; default state if no row) are candidates; we add a **random sample** of them to the pool, **fewer than** current-level pool size (cap 20), so prev-stage stays a minority.
 
+21. **CH-44 (operational playbooks):** Runbook triggers for retry_loop, cause_plateau, weak_transfer_high_indomain, fast_progress_low_reliability; incident outcomes report; GET /api/quality/operational-playbooks, `npm run operational-playbooks:report` → `docs/reports/CH44_OPERATIONAL_PLAYBOOKS_REPORT.json`. See `docs/CH44_OPERATIONAL_PLAYBOOKS.md`.
+
+22. **CH-45 (SLO enforcement):** Planner latency SLO (p95 vs budget); dashboard GET /api/quality/slo-dashboard, `npm run slo:dashboard`, `npm run slo:canary`; when SLO_PLANNER_ENFORCE=true and breach, task/next uses rule-only planner (useRuleOnly). See `docs/CH45_SLO_ENFORCEMENT.md`.
+
 ## 4) Critical Open Gaps (brain-level only)
 1. **Planner vs promotion bundle alignment:** Exercises are chosen from “any nodes in stage band”; progress is counted only on **bundle** nodes (A1 Grammar/Vocab/Can-Do). So tasks often don’t target the same nodes that move the “path to next level” bar. Done: we lift promotion to placement when placement > bundle promotion and prefer target-stage bundle nodes in planner. Fast credit implemented: when placement is above a bundle stage, nodes with value≥50 and ≥1 direct count as covered.
 2. Incidental vocab disambiguation still needs calibration:
@@ -194,3 +198,5 @@ Authoritative docs are in:
 18. `docs/CH33_LOCALE_ADAPTATION_POLICY_CONTEXT.md` (locale/L1 policy context propagation + LearnerTwinSnapshot linkage + A/B uplift telemetry/report)
 19. `docs/CH36_READING_RUNTIME_ASSESSMENT_PIPELINE.md` (reading task/evaluation/evidence runtime integrated with mastery graph + quality metrics endpoint/report)
 20. `docs/CH43_TEACHER_COPILOT_V2.md` (teacher student API copilot payload: blockers, transfer/retention health, ETA, recent decisions; Copilot section on student page)
+21. `docs/CH44_OPERATIONAL_PLAYBOOKS.md` (runbook triggers + incident outcomes report: retry loop, cause plateau, weak transfer, fast progress low reliability)
+22. `docs/CH45_SLO_ENFORCEMENT.md` (SLO dashboard, planner latency budget, enforcement fallback, canary checks)

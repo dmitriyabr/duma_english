@@ -130,6 +130,8 @@ Source baseline: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` + current code
 | CH-41 | Regression suites for blueprint invariants | DONE | Agent | 2026-02-20T14:30:00Z | 2026-02-20T14:30:00Z | (see commit) | `docs/CH41_BLUEPRINT_INVARIANTS.md`, `src/lib/invariants/blueprintInvariants.test.ts`, `npm run test:invariants`, `.github/workflows/blueprint-invariants.yml` | Invariant test pack: causal, transfer, retention, retry, policy/reward versioning, targetNodeIds; CI workflow runs pack on PR/push |
 | CH-42 | Shadow-mode + stop-loss rollout automation | DONE | Agent | 2026-02-20T15:00:00Z | 2026-02-20T15:00:00Z | (see commit) | `docs/CH42_SHADOW_STOPLOSS_ROLLOUT.md`, `src/lib/rollout/controller.ts`, `src/lib/contracts/rolloutController.ts`, `src/scripts/ch42_rollout_controller.ts`, `GET /api/quality/rollout-status`, `docs/reports/CH42_ROLLOUT_*` | Stop-loss from shadow/retention/transfer; state + NDJSON log; --evaluate/--rollback-drill; rollout-status API |
 | CH-43 | Parent/Teacher Copilot v2 | DONE | Agent | 2026-02-20T16:00:00Z | 2026-02-20T16:00:00Z | `9ff0b5c` | `docs/CH43_TEACHER_COPILOT_V2.md`, `src/app/api/teacher/students/[studentId]/route.ts`, `src/app/teacher/students/[studentId]/page.tsx` | Teacher API returns `copilot` (blockerCauses, transferRetentionHealth, etaToNextMilestone, recentDecisions); teacher student page shows Copilot section |
+| CH-44 | Operational playbooks automation | DONE | Agent | 2026-02-20T17:00:00Z | 2026-02-20T17:00:00Z | (see commit) | `docs/CH44_OPERATIONAL_PLAYBOOKS.md`, `src/lib/contracts/operationalPlaybooks.ts`, `src/lib/playbooks/triggers.ts`, `src/lib/quality/operationalPlaybooksReport.ts`, GET /api/quality/operational-playbooks, `npm run operational-playbooks:report` | Runbooks retry_loop, cause_plateau, weak_transfer_high_indomain, fast_progress_low_reliability; incident outcomes report |
+| CH-45 | Latency/reliability SLO enforcement | DONE | Agent | 2026-02-20T17:00:00Z | 2026-02-20T17:00:00Z | (see commit) | `docs/CH45_SLO_ENFORCEMENT.md`, `src/lib/contracts/sloDashboard.ts`, `src/lib/quality/sloDashboard.ts`, GET /api/quality/slo-dashboard, `npm run slo:dashboard`, `npm run slo:canary`; planner useRuleOnly when SLO_PLANNER_ENFORCE | SLO dashboard (planner p95 vs budget); breach → rule-only fallback; canary log |
 
 ## 3.3) Decision Log
 
@@ -175,6 +177,8 @@ Source baseline: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` + current code
 | 2026-02-18 | CH-29 | Добавлен retention probes protocol `retention-probes-v1`: direct-evidence anchors теперь формируют delayed probes по окнам `7/30/90` с grace `21d` и статусами `passed/failed/missed/pending`; stage confidence теперь получает retention-adjustment (`baseConfidence -> adjustedConfidence`), а cohort observability публикуется через contract/API/report (`/api/quality/retention-cohort`, `ch29_retention_cohort_report.ts`) с разбивкой по stage/domain |
 | 2026-02-20 | CH-38 | Добавлен listening transfer/retention quality stack: контракт `listening-transfer-retention-report-v1`, модуль `buildListeningTransferRetentionReport` (окно completed attempts, фильтр listening по типу, OODTaskSpec, retention 7/30d), API `/api/quality/listening-transfer-retention`, скрипт `ch38_listening_transfer_retention_report.ts` и артефакт `docs/reports/CH38_LISTENING_TRANSFER_RETENTION_REPORT.json` |
 | 2026-02-20 | CH-42 | Добавлен rollout controller: контракт rollout state + log entry, evaluateRolloutDecision() по shadow/retention/transfer с stop-loss порогами; state file + NDJSON log; ch42_rollout_controller.ts (--evaluate, --rollback-drill, --apply); GET /api/quality/rollout-status; docs/CH42_SHADOW_STOPLOSS_ROLLOUT.md |
+| 2026-02-20 | CH-44 | Operational playbooks: контракт operational-playbooks-v1, триггеры retry_loop / cause_plateau / weak_transfer_high_indomain / fast_progress_low_reliability в src/lib/playbooks/triggers.ts, отчёт buildOperationalPlaybooksReport, API GET /api/quality/operational-playbooks, скрипт operational-playbooks:report. |
+| 2026-02-20 | CH-45 | SLO: контракт slo-dashboard-v1, дашборд planner latency p95 vs budget; isPlannerSloBreached для enforcement; planNextTaskDecision(useRuleOnly) и task/next при SLO_PLANNER_ENFORCE переходят на rule-only; API slo-dashboard, скрипты slo:dashboard и slo:canary. |
 | 2026-02-20 | CH-43 | Teacher student API расширен блоком copilot: blockerCauses из blockedBundlesReadable, transferRetentionHealth (retention gate + 7d/30d + transfer pass rate из OODTaskSpec), etaToNextMilestone из readinessScore/blockedByNodeDescriptors, recentDecisions из PlannerDecisionLog с дескрипторами целей; на странице студента добавлена секция Copilot (blockers, transfer/retention, ETA, последние решения). |
 | 2026-02-20 | CH-41 | Добавлен regression test pack для blueprint invariants: src/lib/invariants/blueprintInvariants.test.ts (causal taxonomy/diagnosis, needs_retry, reward/policy versioning, planner targetNodeIds, transfer/retention protocols); npm run test:invariants; workflow .github/workflows/blueprint-invariants.yml на PR/push |
 | 2026-02-20 | CH-40 | Добавлен model/prompt registry (CH-40): контракт model-prompt-registry-v1, модуль getModelPromptRegistry/getReleaseTag в src/lib/registry/modelPromptRegistry.ts с импортом версий из evaluator/causal/policy/reward/shadow/db types; экспорт EVALUATOR_MODEL_VERSION, CAUSAL_INFERENCE_MODEL_VERSION, POLICY_VERSION; API GET /api/quality/model-prompt-registry, скрипт ch40_model_prompt_registry_report.ts, артефакт CH40_MODEL_PROMPT_REGISTRY.json; поддержка immutable release tag через REGISTRY_RELEASE_TAG |
@@ -371,13 +375,13 @@ Source baseline: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` + current code
   Done: интерфейс показывает blocker-causes, transfer/retention health, ETA to next milestone, decision traces (без шума).  
   Артефакт: GET /api/teacher/students/[studentId] расширен полем `copilot`; секция Copilot на странице студента (blockers, transfer/retention, ETA, recent decisions).
 
-- [ ] **CH-44 — Operational playbooks automation**  
+- [x] **CH-44 — Operational playbooks automation**  
   Done: автоматизированы runbooks `retry loop`, `cause plateau`, `weak transfer despite high in-domain`, `fast progress low reliability`.  
-  Артефакт: runbook triggers + incident outcomes report.
+  Артефакт: runbook triggers (`src/lib/playbooks/triggers.ts`) + incident outcomes report (GET /api/quality/operational-playbooks, `npm run operational-playbooks:report`).
 
-- [ ] **CH-45 — Latency/reliability SLO enforcement**  
-  Done: бюджеты latency и reliability для критических модулей enforced; деградации переводят поток в deterministic fallback без потери инвариантов.  
-  Артефакт: SLO dashboard + synthetic canary checks.
+- [x] **CH-45 — Latency/reliability SLO enforcement**  
+  Done: бюджеты latency для planner (p95); при breach и SLO_PLANNER_ENFORCE=true поток переходит в rule-only fallback; SLO dashboard + canary.  
+  Артефакт: GET /api/quality/slo-dashboard, `npm run slo:dashboard`, `npm run slo:canary`, planner useRuleOnly fallback.
 
 ## 5) Финальный критерий "world-class readiness"
 

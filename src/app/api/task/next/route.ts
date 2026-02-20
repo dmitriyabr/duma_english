@@ -37,6 +37,11 @@ import {
   extractLocaleSignalSample,
   LOCALE_POLICY_CONTEXT_VERSION,
 } from "@/lib/localization/localePolicyContext";
+import { buildCrossModalityPlacementSnapshot } from "@/lib/placement";
+import {
+  PLACEMENT_DOMAIN_TO_TASK_TYPE,
+  type CrossModalityPlacementSummary,
+} from "@/lib/placement/crossModality";
 
 const ALL_TASK_TYPES = [
   "read_aloud",
@@ -159,7 +164,18 @@ export async function GET(req: Request) {
   });
   const targetWords = vocabDue.map((item) => item.lemma.toLowerCase());
 
-  const coldStartActive = Boolean(profile?.coldStartActive ?? true);
+  let coldStartActive = Boolean(profile?.coldStartActive ?? true);
+  let crossModality: CrossModalityPlacementSummary | null = null;
+  if (coldStartActive) {
+    crossModality = await buildCrossModalityPlacementSnapshot(student.studentId);
+    if (crossModality.stopCriteriaSatisfied) {
+      await prisma.learnerProfile.update({
+        where: { studentId: student.studentId },
+        data: { coldStartActive: false },
+      });
+      coldStartActive = false;
+    }
+  }
   const fastLaneDecision = evaluateFastLaneDecision({
     projectionConfidence: projection.confidence,
     placementConfidence: projection.placementConfidence,
@@ -200,18 +216,24 @@ export async function GET(req: Request) {
     grammar: projection.domainStages.grammar.stage,
     communication: projection.domainStages.communication.stage,
   };
+  const allowedForStage = stageEligibleTaskTypes(projection.promotionStage);
   const decision = await planNextTaskDecision({
     studentId: student.studentId,
     stage: projection.promotionStage,
     ageBand: profile?.ageBand || "9-11",
     candidateTaskTypes: (() => {
-      const allowedForStage = stageEligibleTaskTypes(projection.promotionStage);
       if (
         effectiveRequestedType &&
         effectiveRequestedType.length > 0 &&
         (forceRequestedType || allowedForStage.includes(effectiveRequestedType))
       ) {
         return [effectiveRequestedType, ...allowedForStage];
+      }
+      if (coldStartActive && crossModality && crossModality.missingDomains.length > 0) {
+        const preferred = crossModality.missingDomains
+          .map((d) => PLACEMENT_DOMAIN_TO_TASK_TYPE[d])
+          .filter((t) => allowedForStage.includes(t));
+        return [...new Set([...preferred, ...allowedForStage])];
       }
       return allowedForStage;
     })(),

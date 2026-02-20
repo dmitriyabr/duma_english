@@ -34,6 +34,8 @@
     "advanced-discourse:report": "tsx src/scripts/ch35_advanced_discourse_task_families_report.ts",
     "reading-runtime:report": "tsx src/scripts/ch36_reading_runtime_report.ts",
     "writing:progression:report": "tsx src/scripts/ch37_writing_progression_dashboard_report.ts",
+    "listening:transfer-retention:report": "tsx src/scripts/ch38_listening_transfer_retention_report.ts",
+    "placement:confidence:report": "tsx src/scripts/ch39_placement_confidence_report.ts",
     "policy-log:validate": "tsx src/scripts/ch04_policy_decision_log_validator.ts",
     "transfer:verdict:audit": "tsx src/scripts/ch15_transfer_verdict_audit.ts"
   },

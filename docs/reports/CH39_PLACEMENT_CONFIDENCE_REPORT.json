@@ -1,0 +1,50 @@
+{
+  "generatedAt": "2026-02-20T15:15:14.473Z",
+  "contractVersion": "placement-confidence-report-v1",
+  "windowDays": 90,
+  "totalPlacements": 0,
+  "byDomain": [
+    {
+      "domain": "speaking",
+      "placementCount": 0,
+      "totalSampleCount": 0,
+      "avgConfidence": null,
+      "avgUncertainty": null
+    },
+    {
+      "domain": "listening",
+      "placementCount": 0,
+      "totalSampleCount": 0,
+      "avgConfidence": null,
+      "avgUncertainty": null
+    },
+    {
+      "domain": "reading",
+      "placementCount": 0,
+      "totalSampleCount": 0,
+      "avgConfidence": null,
+      "avgUncertainty": null
+    },
+    {
+      "domain": "writing",
+      "placementCount": 0,
+      "totalSampleCount": 0,
+      "avgConfidence": null,
+      "avgUncertainty": null
+    },
+    {
+      "domain": "grammar",
+      "placementCount": 0,
+      "totalSampleCount": 0,
+      "avgConfidence": null,
+      "avgUncertainty": null
+    },
+    {
+      "domain": "vocabulary",
+      "placementCount": 0,
+      "totalSampleCount": 0,
+      "avgConfidence": null,
+      "avgUncertainty": null
+    }
+  ]
+}

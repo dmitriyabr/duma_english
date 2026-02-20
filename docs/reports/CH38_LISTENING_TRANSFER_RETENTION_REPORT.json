@@ -1,0 +1,23 @@
+{
+  "generatedAt": "2026-02-20T15:10:02.565Z",
+  "contractVersion": "listening-transfer-retention-report-v1",
+  "windowDays": 30,
+  "totalAttempts": 176,
+  "listeningAttempts": 0,
+  "scoredListeningAttempts": 0,
+  "avgTaskScore": null,
+  "passRate": null,
+  "transfer": {
+    "evaluableCount": 0,
+    "passCount": 0,
+    "failCount": 0,
+    "passRate": null
+  },
+  "retention": {
+    "window7dCount": 0,
+    "window7dPassRate": null,
+    "window30dCount": 0,
+    "window30dPassRate": null
+  },
+  "byStage": []
+}

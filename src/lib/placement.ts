@@ -7,6 +7,10 @@ import { generateTaskSpec } from "./taskGenerator";
 import { assignTaskTargetsFromCatalog } from "./gse/planner";
 import { getBundleNodeIdsForStageAndDomain } from "./gse/bundles";
 import { ATTEMPT_STATUS, isAttemptRetryStatus } from "./attemptStatus";
+import {
+  summarizeCrossModalityPlacement,
+  type CrossModalityAttemptRow,
+} from "./placement/crossModality";
 
 export type PlacementItemView = {
   id: string;
@@ -49,6 +53,7 @@ const MAX_QUESTIONS = 14;
 const SIGMA_STOP = 0.35;
 const CARRYOVER_CONFIDENCE = 0.8;
 const CARRYOVER_MIN_STAGE_INDEX = 4; // B2
+const CROSS_MODALITY_WINDOW_DAYS = 90;
 
 const CORE_SKILLS: SkillKey[] = [
   "pronunciation",
@@ -486,6 +491,40 @@ async function computeSkillSnapshot(sessionId: string) {
   return snapshot;
 }
 
+export async function buildCrossModalityPlacementSnapshot(studentId: string) {
+  const since = new Date(Date.now() - CROSS_MODALITY_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+  const rows = await prisma.attempt.findMany({
+    where: {
+      studentId,
+      status: "completed",
+      createdAt: { gte: since },
+    },
+    orderBy: { createdAt: "desc" },
+    take: 500,
+    select: {
+      taskEvaluationJson: true,
+      scoresJson: true,
+      task: {
+        select: {
+          type: true,
+          metaJson: true,
+        },
+      },
+    },
+  });
+
+  const mappedRows: CrossModalityAttemptRow[] = rows.map((row) => ({
+    taskType: row.task?.type || null,
+    taskMetaJson: row.task?.metaJson || null,
+    taskEvaluationJson: row.taskEvaluationJson,
+    scoresJson: row.scoresJson,
+  }));
+
+  return summarizeCrossModalityPlacement({
+    rows: mappedRows,
+  });
+}
+
 async function applyCarryoverIfNeeded(params: {
   studentId: string;
   stage: string;
@@ -822,6 +861,11 @@ export async function finishPlacement(sessionId: string) {
         domain: string;
         reason: string;
       }>;
+      crossModalityStopReady: boolean;
+      crossModalityCoverageRate: number;
+      crossModalityConfidence: number;
+      crossModalityMaxUncertainty: number;
+      crossModalityPlacement: ReturnType<typeof summarizeCrossModalityPlacement>;
       coverage: number | null;
       reliability: number | null;
     };
@@ -855,6 +899,7 @@ export async function finishPlacement(sessionId: string) {
       carryoverNodes: carryover.carryoverNodes.slice(0, 30),
     },
   });
+  const crossModalityPlacement = await buildCrossModalityPlacementSnapshot(session.studentId);
   await prisma.learnerProfile.update({
     where: { studentId: session.studentId },
     data: {
@@ -885,6 +930,11 @@ export async function finishPlacement(sessionId: string) {
         retentionGate: stageProjection.retentionGate,
         blockedBundles: stageProjection.blockedBundles,
         carryoverApplied: carryover.carryoverApplied,
+        crossModalityStopReady: crossModalityPlacement.stopCriteriaSatisfied,
+        crossModalityCoverageRate: crossModalityPlacement.coverageRate,
+        crossModalityConfidence: crossModalityPlacement.overallConfidence,
+        crossModalityMaxUncertainty: crossModalityPlacement.maxUncertainty,
+        crossModalityPlacement,
       },
       readinessScore: stageProjection.score,
     },
@@ -904,6 +954,11 @@ export async function finishPlacement(sessionId: string) {
     carryoverNodes: carryover.carryoverNodes.slice(0, 40),
     uncertainNodes,
     promotionReady: stageProjection.promotionReady,
+    crossModalityStopReady: crossModalityPlacement.stopCriteriaSatisfied,
+    crossModalityCoverageRate: crossModalityPlacement.coverageRate,
+    crossModalityConfidence: crossModalityPlacement.overallConfidence,
+    crossModalityMaxUncertainty: crossModalityPlacement.maxUncertainty,
+    crossModalityPlacement,
     blockedBundles: stageProjection.blockedBundles.map((item) => ({
       bundleKey: item.bundleKey,
       title: item.title,

@@ -197,7 +197,10 @@ export async function GET(
     lo: ds.communication.stage as CEFRStageType,
   } : undefined;
 
-  const [catalogNodesByBand, bundleReadiness] = await Promise.all([
+  const since30d = new Date();
+  since30d.setDate(since30d.getDate() - 30);
+
+  const [catalogNodesByBand, bundleReadiness, recentDecisionsRows, oodSummary] = await Promise.all([
     Promise.all(
       STAGES.map(async (stage) => {
         const range = mapStageToGseRange(stage);
@@ -208,6 +211,16 @@ export async function GET(
       })
     ).then((pairs) => Object.fromEntries(pairs)),
     computeStageBundleReadiness(studentId, placementStage as CEFRStageType | undefined, domainPlacementStages),
+    prisma.plannerDecisionLog.findMany({
+      where: { studentId },
+      orderBy: { decisionTs: "desc" },
+      take: 10,
+      select: { decisionTs: true, chosenTaskType: true, selectionReason: true, targetNodeIds: true },
+    }),
+    prisma.oODTaskSpec.findMany({
+      where: { studentId, createdAt: { gte: since30d }, taskInstanceId: { not: null } },
+      select: { verdict: true },
+    }),
   ]);
 
   const perStageCredited: Record<string, number> = {};
@@ -258,6 +271,58 @@ export async function GET(
     };
   }
 
+  const decisionNodeIds = new Set<string>();
+  for (const d of recentDecisionsRows) {
+    for (const id of d.targetNodeIds) decisionNodeIds.add(id);
+  }
+  const nodeIdToDescriptor =
+    decisionNodeIds.size > 0
+      ? await prisma.gseNode
+          .findMany({
+            where: { nodeId: { in: Array.from(decisionNodeIds) } },
+            select: { nodeId: true, descriptor: true },
+          })
+          .then((rows) => new Map(rows.map((r) => [r.nodeId, r.descriptor])))
+      : new Map<string, string>();
+
+  const promotionReadiness = progress?.promotionReadiness;
+  const blockedBundlesReadable = promotionReadiness?.blockedBundlesReadable ?? [];
+  const blockerCauses = [...new Set(blockedBundlesReadable.map((b) => b.reasonLabel))].filter(Boolean);
+  const retention = promotionReadiness?.retention as { blendedPassRate?: number | null; windows?: Array<{ windowDays: number; passRate?: number | null }> } | undefined;
+  const retentionGate = promotionReadiness?.retentionGate as { passed?: boolean; required?: boolean } | undefined;
+  const transferEvaluable = oodSummary.filter((o) => o.verdict && o.verdict !== "none").length;
+  const transferPassCount = oodSummary.filter((o) => o.verdict === "transfer_pass").length;
+  const transferPassRate = transferEvaluable > 0 ? Number((transferPassCount / transferEvaluable).toFixed(4)) : null;
+  const retentionWindow7 = retention?.windows?.find((w) => w.windowDays === 7);
+  const retentionWindow30 = retention?.windows?.find((w) => w.windowDays === 30);
+  const etaScore = promotionReadiness?.readinessScore != null ? Math.round((promotionReadiness.readinessScore as number) * 100) : null;
+  const blockerCount = promotionReadiness?.blockedByNodeDescriptors?.length ?? 0;
+  const etaToNextMilestone =
+    etaScore != null && blockerCount > 0
+      ? `Readiness ${etaScore}%. ${blockerCount} node(s) to verify for next milestone.`
+      : etaScore != null
+        ? `Readiness ${etaScore}%.`
+        : "Not enough data yet.";
+
+  const copilot = {
+    blockerCauses,
+    transferRetentionHealth: {
+      retentionGatePassed: retentionGate?.passed ?? null,
+      retentionGateRequired: retentionGate?.required ?? null,
+      retentionPassRate7d: retentionWindow7?.passRate ?? null,
+      retentionPassRate30d: retentionWindow30?.passRate ?? null,
+      transferPassRate,
+      transferEvaluableCount: transferEvaluable,
+    },
+    etaToNextMilestone,
+    recentDecisions: recentDecisionsRows.map((d) => ({
+      createdAt: d.decisionTs.toISOString(),
+      chosenTaskType: d.chosenTaskType,
+      selectionReason: d.selectionReason,
+      targetDescriptors: d.targetNodeIds.map((id) => nodeIdToDescriptor.get(id) ?? id).slice(0, 5),
+    })),
+  };
+
   return NextResponse.json({
     student: {
       id: student.id,
@@ -282,6 +347,7 @@ export async function GET(
     recentNodeOutcomes: recentNodeOutcomes.slice(0, 80),
     domainBundleBlockers,
     domainPromotionPath,
+    copilot,
     limits: {
       recentAttemptsLimit,
       masteryLimit,

@@ -134,12 +134,32 @@ type DomainPathEntry = {
   achieved: BundleBlocker[];
 };
 
+type Copilot = {
+  blockerCauses: string[];
+  transferRetentionHealth: {
+    retentionGatePassed: boolean | null;
+    retentionGateRequired: boolean | null;
+    retentionPassRate7d: number | null;
+    retentionPassRate30d: number | null;
+    transferPassRate: number | null;
+    transferEvaluableCount: number;
+  };
+  etaToNextMilestone: string;
+  recentDecisions: Array<{
+    createdAt: string;
+    chosenTaskType: string;
+    selectionReason: string;
+    targetDescriptors: string[];
+  }>;
+};
+
 type StudentProfile = {
   catalogNodesByBand?: Record<string, number>;
   perStageCredited?: Record<string, number>;
   perStageBundleTotal?: Record<string, number>;
   domainBundleBlockers?: Record<string, BundleBlocker[]>;
   domainPromotionPath?: Record<string, DomainPathEntry>;
+  copilot?: Copilot;
   student: {
     id: string;
     displayName: string;
@@ -419,7 +439,7 @@ export default function TeacherStudentProfilePage() {
     );
   }
 
-  const { student, progress, recentAttempts, fullMastery, catalogNodesByBand, perStageCredited, perStageBundleTotal, domainBundleBlockers } = data;
+  const { student, progress, recentAttempts, fullMastery, catalogNodesByBand, perStageCredited, perStageBundleTotal, domainBundleBlockers, copilot } = data;
   const pr = progress.promotionReadiness;
   const np = progress.nodeProgress;
 
@@ -496,6 +516,76 @@ export default function TeacherStudentProfilePage() {
               )}
             </div>
           </div>
+
+          {/* Section 2b: Copilot overview */}
+          {copilot && (
+            <div className="card" style={{ marginBottom: 24, padding: "16px 20px" }}>
+              <h2 style={{ fontFamily: "var(--font-display)", fontSize: "1.1rem", marginBottom: 12 }}>
+                Copilot
+              </h2>
+              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                {copilot.blockerCauses.length > 0 && (
+                  <div>
+                    <strong style={{ fontSize: "0.85rem", color: "var(--ink-2)" }}>Blockers</strong>
+                    <ul style={{ margin: "4px 0 0", paddingLeft: 18, fontSize: "0.9rem" }}>
+                      {copilot.blockerCauses.map((c, i) => (
+                        <li key={i}>{c}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                <div>
+                  <strong style={{ fontSize: "0.85rem", color: "var(--ink-2)" }}>Transfer & retention</strong>
+                  <div style={{ marginTop: 4, fontSize: "0.9rem" }}>
+                    {copilot.transferRetentionHealth.retentionGateRequired != null && (
+                      <span style={{ marginRight: 12 }}>
+                        Retention gate: {copilot.transferRetentionHealth.retentionGatePassed ? "passed" : "not passed"}
+                        {copilot.transferRetentionHealth.retentionGateRequired ? " (required)" : ""}
+                      </span>
+                    )}
+                    {copilot.transferRetentionHealth.retentionPassRate7d != null && (
+                      <span style={{ marginRight: 12 }}>7d: {(copilot.transferRetentionHealth.retentionPassRate7d * 100).toFixed(0)}%</span>
+                    )}
+                    {copilot.transferRetentionHealth.retentionPassRate30d != null && (
+                      <span style={{ marginRight: 12 }}>30d: {(copilot.transferRetentionHealth.retentionPassRate30d * 100).toFixed(0)}%</span>
+                    )}
+                    {copilot.transferRetentionHealth.transferEvaluableCount > 0 && (
+                      <span>
+                        Transfer: {(copilot.transferRetentionHealth.transferPassRate != null ? copilot.transferRetentionHealth.transferPassRate * 100 : 0).toFixed(0)}% ({copilot.transferRetentionHealth.transferEvaluableCount} tasks)
+                      </span>
+                    )}
+                    {!copilot.transferRetentionHealth.retentionGateRequired &&
+                      copilot.transferRetentionHealth.retentionPassRate7d == null &&
+                      copilot.transferRetentionHealth.transferEvaluableCount === 0 && (
+                        <span style={{ color: "var(--ink-2)" }}>No data yet</span>
+                      )}
+                  </div>
+                </div>
+                <div>
+                  <strong style={{ fontSize: "0.85rem", color: "var(--ink-2)" }}>ETA to next milestone</strong>
+                  <p style={{ margin: "4px 0 0", fontSize: "0.9rem" }}>{copilot.etaToNextMilestone}</p>
+                </div>
+                {copilot.recentDecisions.length > 0 && (
+                  <div>
+                    <strong style={{ fontSize: "0.85rem", color: "var(--ink-2)" }}>Recent decisions</strong>
+                    <ul style={{ margin: "4px 0 0", paddingLeft: 18, fontSize: "0.85rem", listStyle: "none" }}>
+                      {copilot.recentDecisions.slice(0, 5).map((d, i) => (
+                        <li key={i} style={{ marginBottom: 6 }}>
+                          <span style={{ color: "var(--ink-2)" }}>{formatDateShort(d.createdAt)}</span>{" "}
+                          <strong>{d.chosenTaskType}</strong> — {d.selectionReason}
+                          {d.targetDescriptors.length > 0 && (
+                            <div style={{ marginTop: 2, color: "var(--ink-2)", fontSize: "0.8rem" }}>
+                              {d.targetDescriptors.slice(0, 3).join(" · ")}
+                            </div>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Section 3: Domain Focus Cards */}
           <div className="grid three" style={{ marginBottom: 24 }}>

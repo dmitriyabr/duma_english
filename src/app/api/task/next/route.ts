@@ -21,6 +21,7 @@ import {
   applyFastLaneToDiagnosticMode,
   evaluateFastLaneDecision,
 } from "@/lib/policy/fastLane";
+import { isPlannerSloBreached } from "@/lib/quality/sloDashboard";
 import {
   buildImmediateSelfRepairPrompt,
   findPendingImmediateSelfRepairCycle,
@@ -217,10 +218,13 @@ export async function GET(req: Request) {
     communication: projection.domainStages.communication.stage,
   };
   const allowedForStage = stageEligibleTaskTypes(projection.promotionStage);
+  const useRuleOnly =
+    process.env.SLO_PLANNER_ENFORCE === "true" ? await isPlannerSloBreached({ windowDays: 1 }) : false;
   const decision = await planNextTaskDecision({
     studentId: student.studentId,
     stage: projection.promotionStage,
     ageBand: profile?.ageBand || "9-11",
+    useRuleOnly: useRuleOnly || undefined,
     candidateTaskTypes: (() => {
       if (
         effectiveRequestedType &&

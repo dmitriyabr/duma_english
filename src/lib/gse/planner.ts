@@ -1153,6 +1153,8 @@ export async function planNextTaskDecision(params: {
     communication?: string;
   };
   causalSnapshot?: CausalSnapshot | null;
+  /** When true, skip shadow value model and use rule-only selection (SLO fallback). */
+  useRuleOnly?: boolean;
 }) : Promise<PlannerDecision> {
   const startedAt = Date.now();
   const candidateTaskTypes = dedupe(
@@ -1386,21 +1388,23 @@ export async function planNextTaskDecision(params: {
     utility: row.utility,
   }));
   let shadowPolicyForSelection: ShadowPolicyTrace | null = null;
-  try {
-    shadowPolicyForSelection = await evaluateShadowValueDecision({
-      candidates: shadowCandidates,
-      rulesChosenTaskType:
-        topByPolicyUtility?.taskType || shadowCandidates[0]?.taskType || "target_vocab",
-      requiresVerificationCoverage: verificationRequired,
-    });
-  } catch (error) {
-    console.error(
-      JSON.stringify({
-        event: "planner_shadow_policy_selection_error",
-        studentId: params.studentId,
-        message: error instanceof Error ? error.message : String(error),
-      })
-    );
+  if (!params.useRuleOnly) {
+    try {
+      shadowPolicyForSelection = await evaluateShadowValueDecision({
+        candidates: shadowCandidates,
+        rulesChosenTaskType:
+          topByPolicyUtility?.taskType || shadowCandidates[0]?.taskType || "target_vocab",
+        requiresVerificationCoverage: verificationRequired,
+      });
+    } catch (error) {
+      console.error(
+        JSON.stringify({
+          event: "planner_shadow_policy_selection_error",
+          studentId: params.studentId,
+          message: error instanceof Error ? error.message : String(error),
+        })
+      );
+    }
   }
   const learnedValueByTaskType = new Map<string, number>();
   for (const row of shadowPolicyForSelection?.candidateScores || []) {
@@ -1418,6 +1422,8 @@ export async function planNextTaskDecision(params: {
         verificationRequired,
       }),
     })),
+    ruleWeight: params.useRuleOnly ? 1 : undefined,
+    learnedWeight: params.useRuleOnly ? 0 : undefined,
   });
   const scoredWithHybrid = ruleScored
     .map((row) => {

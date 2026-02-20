@@ -119,7 +119,9 @@ export type EvaluationInput = {
   }>;
 };
 
-const MODEL_VERSION = "eval-v2";
+/** Exported for model/prompt registry (CH-40). */
+export const EVALUATOR_MODEL_VERSION = "eval-v2" as const;
+const MODEL_VERSION = EVALUATOR_MODEL_VERSION;
 
 const SPLIT_LO_CANDIDATES = 16;
 const SPLIT_GRAMMAR_CANDIDATES = 14;

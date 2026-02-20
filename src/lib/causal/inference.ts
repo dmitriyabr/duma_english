@@ -2,6 +2,9 @@ import { causalDiagnosisContractSchema, causalCoreLabels, normalizeCausalLabel, 
 import type { TaskEvaluation } from "@/lib/evaluator";
 import type { SpeechMetrics } from "@/lib/scoring";
 
+/** Exported for model/prompt registry (CH-40). */
+export const CAUSAL_INFERENCE_MODEL_VERSION = "causal-inference-v1" as const;
+
 type InferenceScores = {
   taskScore?: number | null;
   languageScore?: number | null;
@@ -230,7 +233,7 @@ export function inferCausalDiagnosis(input: CausalInferenceInput) {
   return causalDiagnosisContractSchema.parse({
     attemptId: input.attemptId,
     studentId: input.studentId,
-    modelVersion: input.modelVersion || "causal-inference-v1",
+    modelVersion: input.modelVersion || CAUSAL_INFERENCE_MODEL_VERSION,
     topLabel: top.label,
     topProbability: top.p,
     entropy,

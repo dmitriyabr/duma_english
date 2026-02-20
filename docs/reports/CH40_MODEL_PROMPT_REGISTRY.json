@@ -1,0 +1,13 @@
+{
+  "generatedAt": "2026-02-20T15:20:47.932Z",
+  "contractVersion": "model-prompt-registry-v1",
+  "releaseTag": "release-2026-02-20",
+  "evaluatorModelVersion": "eval-v2",
+  "causalInferenceModelVersion": "causal-inference-v1",
+  "causalTaxonomyVersion": "causal-taxonomy-v1",
+  "causalRemediationPolicyVersion": "cause-remediation-v1",
+  "policyVersion": "policy-hybrid-guardrailed-v1",
+  "rewardVersion": "reward-composite-v1",
+  "shadowModelVersion": "shadow-linear-contextual-v1",
+  "taskGeneratorPromptVersion": "task-generator-prompt-v1"
+}

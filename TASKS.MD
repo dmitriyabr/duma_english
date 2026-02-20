@@ -86,12 +86,14 @@ Build an autonomous speaking trainer where every learning decision is based on G
 8. Evaluation prompt hygiene:
 - target options are capped to fit the evaluator limits (LO<=4, Grammar<=6, Vocab<=8).
 - prompt sections are normalized as `Target ... options` and `Candidate ... options` to avoid ambiguity.
-15. **CH-38 / CH-39 (listening transfer-retention, cross-modality placement):**  
+15. **CH-40 (model/prompt registry):** All judge/generator/causal/policy model and prompt versions are centralised in `getModelPromptRegistry()` (`src/lib/registry/modelPromptRegistry.ts`); GET `/api/quality/model-prompt-registry`, `npm run model-prompt-registry:report` → `docs/reports/CH40_MODEL_PROMPT_REGISTRY.json`; immutable release tag via `REGISTRY_RELEASE_TAG` or date-based `release-YYYY-MM-DD`.
+
+16. **CH-38 / CH-39 (listening transfer-retention, cross-modality placement):**  
 - Listening transfer/retention report: `buildListeningTransferRetentionReport` (window attempts, listening filter, OODTaskSpec, retention 7/30d), API `GET /api/quality/listening-transfer-retention`, script `npm run listening:transfer-retention:report` → `docs/reports/CH38_LISTENING_TRANSFER_RETENTION_REPORT.json`.  
 - Cold-start cross-modality: in `task/next`, when cold start is active we call `buildCrossModalityPlacementSnapshot`; if `stopCriteriaSatisfied` we set `coldStartActive=false`; if `missingDomains` we prefer task types for those domains (e.g. listening → listening_comprehension) in planner candidate list.  
 - Placement confidence report by domain: from PromotionAudit (placement=true, crossModalityPlacement), API `GET /api/quality/placement-confidence`, script `npm run placement:confidence:report` → `docs/reports/CH39_PLACEMENT_CONFIDENCE_REPORT.json`.
 
-16. **Planner pool (spaced repetition):** (a) Fully mastered nodes (verified and decayedMastery ≥ 70) are excluded from the pool so they don’t take slots; when they decay (value &lt; 70 or overdue), the same row re-enters on the next load. (b) Lower-level refresh: any not-fully-mastered nodes from the **previous stage bundle** (with or without evidence; default state if no row) are candidates; we add a **random sample** of them to the pool, **fewer than** current-level pool size (cap 20), so prev-stage stays a minority.
+17. **Planner pool (spaced repetition):** (a) Fully mastered nodes (verified and decayedMastery ≥ 70) are excluded from the pool so they don’t take slots; when they decay (value &lt; 70 or overdue), the same row re-enters on the next load. (b) Lower-level refresh: any not-fully-mastered nodes from the **previous stage bundle** (with or without evidence; default state if no row) are candidates; we add a **random sample** of them to the pool, **fewer than** current-level pool size (cap 20), so prev-stage stays a minority.
 
 ## 4) Critical Open Gaps (brain-level only)
 1. **Planner vs promotion bundle alignment:** Exercises are chosen from “any nodes in stage band”; progress is counted only on **bundle** nodes (A1 Grammar/Vocab/Can-Do). So tasks often don’t target the same nodes that move the “path to next level” bar. Done: we lift promotion to placement when placement > bundle promotion and prefer target-stage bundle nodes in planner. Fast credit implemented: when placement is above a bundle stage, nodes with value≥50 and ≥1 direct count as covered.

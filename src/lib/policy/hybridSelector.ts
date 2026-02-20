@@ -1,4 +1,6 @@
-const DEFAULT_POLICY_VERSION = "policy-hybrid-guardrailed-v1";
+/** Exported for model/prompt registry (CH-40). */
+export const POLICY_VERSION = "policy-hybrid-guardrailed-v1" as const;
+const DEFAULT_POLICY_VERSION = POLICY_VERSION;
 const DEFAULT_RULE_WEIGHT = 0.45;
 const DEFAULT_LEARNED_WEIGHT = 0.55;
 const DEFAULT_EXPLORATION_FLOOR = 0.08;

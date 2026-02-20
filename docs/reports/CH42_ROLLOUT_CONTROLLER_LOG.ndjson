@@ -1,0 +1,1 @@
+{"timestamp":"2026-02-20T15:32:18.571Z","contractVersion":"rollout-controller-v1","policyVersion":"policy-hybrid-guardrailed-v1","phase":"shadow_only","decision":"ramp_up","reason":"stop_loss_ok_suggest_ramp_5","metricsSnapshot":{"shadowHighRiskPer1k":null,"retentionPassRate":null,"transferPassRate":null,"retentionSampleSize":0,"transferSampleSize":0}}

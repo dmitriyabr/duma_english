@@ -128,6 +128,7 @@ Source baseline: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` + current code
 | CH-39 | Unified cross-modality placement and mastery | DONE | Agent_1 | 2026-02-19T14:43:45Z | 2026-02-20T12:00:00Z | (see commit) | `docs/CH39_CROSS_MODALITY_PLACEMENT.md`, `src/lib/placement.ts`, `src/lib/placement/crossModality.ts`, `src/app/api/task/next/route.ts`, `src/lib/contracts/placementConfidenceReport.ts`, `src/lib/quality/placementConfidenceReport.ts`, `src/app/api/quality/placement-confidence/route.ts`, `src/scripts/ch39_placement_confidence_report.ts`, `docs/reports/CH39_PLACEMENT_CONFIDENCE_REPORT.json` | Cold-start uses cross-modality snapshot (stopCriteriaSatisfied ends cold start; missingDomains bias task types); placement confidence report by domain from PromotionAudit |
 | CH-40 | Model/prompt registry | DONE | Agent | 2026-02-20T14:00:00Z | 2026-02-20T14:00:00Z | (see commit) | `docs/CH40_MODEL_PROMPT_REGISTRY.md`, `src/lib/registry/modelPromptRegistry.ts`, `src/lib/contracts/modelPromptRegistry.ts`, `src/app/api/quality/model-prompt-registry/route.ts`, `src/scripts/ch40_model_prompt_registry_report.ts`, `docs/reports/CH40_MODEL_PROMPT_REGISTRY.json` | All judge/generator/causal/policy versions in one registry; GET /api/quality/model-prompt-registry; releaseTag from REGISTRY_RELEASE_TAG or date-based; script + artifact |
 | CH-41 | Regression suites for blueprint invariants | DONE | Agent | 2026-02-20T14:30:00Z | 2026-02-20T14:30:00Z | (see commit) | `docs/CH41_BLUEPRINT_INVARIANTS.md`, `src/lib/invariants/blueprintInvariants.test.ts`, `npm run test:invariants`, `.github/workflows/blueprint-invariants.yml` | Invariant test pack: causal, transfer, retention, retry, policy/reward versioning, targetNodeIds; CI workflow runs pack on PR/push |
+| CH-42 | Shadow-mode + stop-loss rollout automation | DONE | Agent | 2026-02-20T15:00:00Z | 2026-02-20T15:00:00Z | (see commit) | `docs/CH42_SHADOW_STOPLOSS_ROLLOUT.md`, `src/lib/rollout/controller.ts`, `src/lib/contracts/rolloutController.ts`, `src/scripts/ch42_rollout_controller.ts`, `GET /api/quality/rollout-status`, `docs/reports/CH42_ROLLOUT_*` | Stop-loss from shadow/retention/transfer; state + NDJSON log; --evaluate/--rollback-drill; rollout-status API |
 
 ## 3.3) Decision Log
 
@@ -172,6 +173,7 @@ Source baseline: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` + current code
 | 2026-02-19 | CH-37 | Добавлен writing runtime protocol `writing-runtime-assessment-v1`: введён text-attempt ingestion (`/api/attempts/text`), UI контур `/write` + revise loop, writing deterministic evaluation/scoring/worker metrics (`writing_word_count`, `writing_sentence_count`, `writing_revision_delta`) и quality stack (`/api/quality/writing-progression`, `ch37_writing_progression_dashboard_report.ts`) с артефактом `docs/reports/CH37_WRITING_PROGRESSION_DASHBOARD.json`; дополнительно зафиксирован `src/lib/listening/assessment.ts` как обязательный модуль для уже импортируемого evaluator listening path, чтобы clean build оставался воспроизводимым. |
 | 2026-02-18 | CH-29 | Добавлен retention probes protocol `retention-probes-v1`: direct-evidence anchors теперь формируют delayed probes по окнам `7/30/90` с grace `21d` и статусами `passed/failed/missed/pending`; stage confidence теперь получает retention-adjustment (`baseConfidence -> adjustedConfidence`), а cohort observability публикуется через contract/API/report (`/api/quality/retention-cohort`, `ch29_retention_cohort_report.ts`) с разбивкой по stage/domain |
 | 2026-02-20 | CH-38 | Добавлен listening transfer/retention quality stack: контракт `listening-transfer-retention-report-v1`, модуль `buildListeningTransferRetentionReport` (окно completed attempts, фильтр listening по типу, OODTaskSpec, retention 7/30d), API `/api/quality/listening-transfer-retention`, скрипт `ch38_listening_transfer_retention_report.ts` и артефакт `docs/reports/CH38_LISTENING_TRANSFER_RETENTION_REPORT.json` |
+| 2026-02-20 | CH-42 | Добавлен rollout controller: контракт rollout state + log entry, evaluateRolloutDecision() по shadow/retention/transfer с stop-loss порогами; state file + NDJSON log; ch42_rollout_controller.ts (--evaluate, --rollback-drill, --apply); GET /api/quality/rollout-status; docs/CH42_SHADOW_STOPLOSS_ROLLOUT.md |
 | 2026-02-20 | CH-41 | Добавлен regression test pack для blueprint invariants: src/lib/invariants/blueprintInvariants.test.ts (causal taxonomy/diagnosis, needs_retry, reward/policy versioning, planner targetNodeIds, transfer/retention protocols); npm run test:invariants; workflow .github/workflows/blueprint-invariants.yml на PR/push |
 | 2026-02-20 | CH-40 | Добавлен model/prompt registry (CH-40): контракт model-prompt-registry-v1, модуль getModelPromptRegistry/getReleaseTag в src/lib/registry/modelPromptRegistry.ts с импортом версий из evaluator/causal/policy/reward/shadow/db types; экспорт EVALUATOR_MODEL_VERSION, CAUSAL_INFERENCE_MODEL_VERSION, POLICY_VERSION; API GET /api/quality/model-prompt-registry, скрипт ch40_model_prompt_registry_report.ts, артефакт CH40_MODEL_PROMPT_REGISTRY.json; поддержка immutable release tag через REGISTRY_RELEASE_TAG |
 | 2026-02-20 | CH-39 | Cold-start в task/next переведён на cross-modality: при cold start вызывается `buildCrossModalityPlacementSnapshot`; при `stopCriteriaSatisfied` cold start завершается (coldStartActive=false); при наличии missingDomains типы заданий для недостающих доменов ставятся в начало candidateTaskTypes (PLACEMENT_DOMAIN_TO_TASK_TYPE). Добавлен placement confidence report: контракт `placement-confidence-report-v1`, агрегация по PromotionAudit (placement=true, crossModalityPlacement.byDomain), API `/api/quality/placement-confidence`, скрипт `ch39_placement_confidence_report.ts`, артефакт `docs/reports/CH39_PLACEMENT_CONFIDENCE_REPORT.json` |
@@ -337,9 +339,9 @@ Source baseline: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` + current code
   Done: отдельный task/eval/evidence контур для reading интегрирован в общий mastery graph.  
   Артефакт: reading attempts in production + quality metrics.
 
-- [ ] **CH-37 — Writing runtime + assessment pipeline**  
+- [x] **CH-37 — Writing runtime + assessment pipeline**  
   Done: writing контур с rubric/evidence/mastery updates и child UX для редакции/переписывания.  
-  Артефакт: writing progression dashboard.
+  Артефакт: writing progression dashboard (`/api/quality/writing-progression`, `npm run writing:progression:report`, docs/reports/CH37_WRITING_PROGRESSION_DASHBOARD.json).
 
 - [x] **CH-38 — Listening runtime + assessment pipeline**  
   Done: listening задачи и оценка comprehension/repair behavior подключены к policy loop.  
@@ -359,9 +361,9 @@ Source baseline: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` + current code
   Done: регрессии на causal quality, transfer, retention, retry precision и invariants из blueprint в src/lib/invariants/blueprintInvariants.test.ts; npm run test:invariants; CI workflow Blueprint Invariants на PR/push.  
   Артефакт: invariant test pack in CI (`.github/workflows/blueprint-invariants.yml`).
 
-- [ ] **CH-42 — Shadow-mode + stop-loss rollout automation**  
-  Done: новые policy versions проходят shadow, progressive ramp, auto rollback по стоп-лоссу.  
-  Артефакт: rollout controller logs + rollback drills.
+- [x] **CH-42 — Shadow-mode + stop-loss rollout automation**  
+  Done: контроллер оценивает stop-loss по shadow (highRiskPer1k), retention (overallPassRate), transfer (passRate); state + append-only NDJSON log; скрипт --evaluate [--apply], --rollback-drill [--apply]; GET /api/quality/rollout-status.  
+  Артефакт: rollout controller logs (CH42_ROLLOUT_CONTROLLER_LOG.ndjson) + rollback drills (--rollback-drill).
 
 - [ ] **CH-43 — Parent/Teacher Copilot v2**  
   Done: интерфейс показывает blocker-causes, transfer/retention health, ETA to next milestone, decision traces (без шума).  

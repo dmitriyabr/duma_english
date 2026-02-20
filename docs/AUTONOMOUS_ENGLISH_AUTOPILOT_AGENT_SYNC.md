@@ -857,6 +857,8 @@ Last updated: 2026-02-17
 
 `[2026-02-19T14:47:42Z] Agent_3 | CH-37 | Implementation commit done: e55be01 (writing runtime/eval/worker/UI/text-attempt API/quality dashboard + report). Also committed missing `src/lib/listening/*` module required by already-imported evaluator path to keep clean build reproducible.`
 
+`[2026-02-20T15:00:00Z] Agent | CH-42 | Rollout controller: contract (state + log entry), evaluateRolloutDecision (shadow/retention/transfer stop-loss), ch42_rollout_controller.ts (--evaluate, --rollback-drill, --apply), GET /api/quality/rollout-status, docs/CH42_SHADOW_STOPLOSS_ROLLOUT.md, GAP_CLOSURE_PLAN + TASKS.MD updated.`
+
 `[2026-02-20T14:30:00Z] Agent | CH-41 | Blueprint invariant test pack: src/lib/invariants/blueprintInvariants.test.ts (causal, transfer, retention, retry, policy/reward, targetNodeIds); npm run test:invariants; .github/workflows/blueprint-invariants.yml; docs/CH41_BLUEPRINT_INVARIANTS.md; GAP_CLOSURE_PLAN + TASKS.MD updated.`
 
 `[2026-02-20T14:00:00Z] Agent | CH-40 | Model/prompt registry implemented: contract model-prompt-registry-v1, getModelPromptRegistry/getReleaseTag in src/lib/registry/modelPromptRegistry.ts, version exports from evaluator/causal/policy; API GET /api/quality/model-prompt-registry, script npm run model-prompt-registry:report, docs/CH40_MODEL_PROMPT_REGISTRY.md, GAP_CLOSURE_PLAN + TASKS.MD updated.`

@@ -38,6 +38,7 @@
     "listening:transfer-retention:report": "tsx src/scripts/ch38_listening_transfer_retention_report.ts",
     "placement:confidence:report": "tsx src/scripts/ch39_placement_confidence_report.ts",
     "model-prompt-registry:report": "tsx src/scripts/ch40_model_prompt_registry_report.ts",
+    "rollout:controller": "tsx src/scripts/ch42_rollout_controller.ts",
     "policy-log:validate": "tsx src/scripts/ch04_policy_decision_log_validator.ts",
     "transfer:verdict:audit": "tsx src/scripts/ch15_transfer_verdict_audit.ts"
   },

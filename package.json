@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "tsx --test src/**/*.test.ts",
+    "test:invariants": "tsx --test src/lib/invariants/blueprintInvariants.test.ts",
     "worker": "prisma migrate deploy && tsx src/worker/index.ts",
     "gse:import:github": "tsx src/scripts/gse_import_from_github.ts",
     "gse:import:official": "tsx src/scripts/gse_import_from_official_api.ts",

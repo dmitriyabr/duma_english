@@ -1,0 +1,29 @@
+# CH-41: Regression suite for blueprint invariants.
+# Runs invariant test pack on PR and push to catch regressions.
+name: Blueprint Invariants
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - codex/autopilot-execution-plan
+
+jobs:
+  invariants:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run blueprint invariant tests
+        run: npm run test:invariants

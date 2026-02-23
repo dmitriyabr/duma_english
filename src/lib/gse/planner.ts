@@ -27,6 +27,10 @@ import {
   runGuardrailedHybridSelector,
   type HybridSelectorResult,
 } from "@/lib/policy/hybridSelector";
+import {
+  MEMORY_FRESH_QUEUE_TYPE,
+  MEMORY_REVIEW_QUEUE_TYPE,
+} from "@/lib/memory/scheduler";
 import { getBundleNodeIdsForStageAndDomain } from "./bundles";
 import { computeDecayedMastery } from "./mastery";
 import { mapStageToGseRange } from "./utils";
@@ -37,6 +41,7 @@ const ADVANCED_DISCOURSE_TASK_TYPES = [
   "register_switch",
   "misunderstanding_repair",
 ] as const;
+const OPEN_MEMORY_QUEUE_STATUSES = ["pending", "in_progress"] as const;
 
 function stageAllowsTaskType(stage: string, taskType: string) {
   if (ADVANCED_DISCOURSE_TASK_TYPES.includes(taskType as (typeof ADVANCED_DISCOURSE_TASK_TYPES)[number])) {
@@ -362,11 +367,12 @@ type CandidateScore = {
   ruleUtility?: number;
   learnedValue?: number;
   propensity?: number;
+  memoryQueueHits: number;
   hardConstraintReasons?: string[];
   blockedByHardConstraints?: boolean;
   estimatedDifficulty: number;
   selectionReason: string;
-  selectionReasonType: "weakness" | "overdue" | "uncertainty" | "verification";
+  selectionReasonType: "weakness" | "overdue" | "uncertainty" | "verification" | "memory_due";
 };
 
 type PlannerCausalRemediation = CausalRemediationTrace & {
@@ -424,7 +430,8 @@ export type PlannerDecision = {
   expectedGain: number;
   estimatedDifficulty: number;
   selectionReason: string;
-  selectionReasonType: "weakness" | "overdue" | "uncertainty" | "verification";
+  selectionReasonType: "weakness" | "overdue" | "uncertainty" | "verification" | "memory_due";
+  memoryQueueHits: number;
   verificationTargetNodeIds: string[];
   primaryGoal: string;
   candidateScores: CandidateScore[];
@@ -968,12 +975,14 @@ function scoreCandidate(params: {
   qualityDomainFocus?: DomainKey | null;
   verificationNodeIds?: string[];
   recentlyTargetedNodeIds?: string[];
+  memoryDueNodeIds?: string[];
 }) {
   const domainWeights = taskDomainWeights(params.taskType);
   const targetDomain = nextDomainToProbe(params.recentTaskTypes);
   const preferredSet = new Set(params.preferredNodeIds || []);
   const verificationSet = new Set(params.verificationNodeIds || []);
   const recentlyTargetedSet = new Set(params.recentlyTargetedNodeIds || []);
+  const memoryDueSet = new Set(params.memoryDueNodeIds || []);
   const preferredNodes = params.nodes
     .filter((node) => preferredSet.has(node.nodeId))
     .sort((a, b) => a.decayedMastery - b.decayedMastery);
@@ -1070,6 +1079,9 @@ function scoreCandidate(params: {
       ? 0.9
       : -0.55
     : 0;
+  const memoryQueueHits = targetNodes.filter((node) => memoryDueSet.has(node.nodeId)).length;
+  const memoryDueBoost = memoryQueueHits * 1.2;
+  const memoryBacklogPenalty = memoryDueSet.size > 0 && memoryQueueHits === 0 ? 0.8 : 0;
   const baseUtility =
     expectedGain -
     engagementRisk * 1.6 -
@@ -1081,7 +1093,9 @@ function scoreCandidate(params: {
     preferredBoost +
     domainRotationBonus +
     qualityDomainBoost +
-    verificationGain;
+    verificationGain +
+    memoryDueBoost -
+    memoryBacklogPenalty;
   const weakest = targetNodes[0];
   const rawDesc = weakest?.descriptor?.trim();
   const weakestLabel =
@@ -1090,7 +1104,9 @@ function scoreCandidate(params: {
       : rawDesc;
   const domainLabel = weakest?.domain || targetDomain;
   const selectionReasonType: CandidateScore["selectionReasonType"] =
-    verificationGain > 0
+    memoryQueueHits > 0
+      ? "memory_due"
+      : verificationGain > 0
       ? "verification"
       : weakest && weakest.daysSinceEvidence > weakest.halfLifeDays
       ? "overdue"
@@ -1098,7 +1114,9 @@ function scoreCandidate(params: {
       ? "uncertainty"
       : "weakness";
   const selectionReason = weakest
-    ? verificationGain > 0
+    ? memoryQueueHits > 0
+      ? `Memory due: review node "${weakestLabel}" before forgetting (hits=${memoryQueueHits}).`
+      : verificationGain > 0
       ? `Verification priority: confirm node "${weakestLabel}" with expected gain ${round(expectedGain)}.`
       : `Targets ${domainLabel} node "${weakestLabel}" (${Math.round(weakest.decayedMastery)}) with expected gain ${round(expectedGain)}.`
     : `No node evidence yet; using stage ${params.stage} defaults.`;
@@ -1132,6 +1150,7 @@ function scoreCandidate(params: {
     causalRemediationDomain: "mixed",
     causalRemediationInterferencePriorBoost: 0,
     utility: round(baseUtility),
+    memoryQueueHits,
     estimatedDifficulty,
     selectionReason,
     selectionReasonType,
@@ -1155,8 +1174,11 @@ export async function planNextTaskDecision(params: {
   causalSnapshot?: CausalSnapshot | null;
   /** When true, skip shadow value model and use rule-only selection (SLO fallback). */
   useRuleOnly?: boolean;
+  /** Enable memory queue integration into candidate scoring and override logic. */
+  memoryRuntimeEnabled?: boolean;
 }) : Promise<PlannerDecision> {
   const startedAt = Date.now();
+  const memoryRuntimeEnabled = params.memoryRuntimeEnabled !== false;
   const candidateTaskTypes = dedupe(
     params.requestedType ? [params.requestedType, ...params.candidateTaskTypes] : params.candidateTaskTypes
   ).filter(Boolean);
@@ -1204,7 +1226,15 @@ export async function planNextTaskDecision(params: {
     lo: nextStage(ds?.communication ?? params.stage),
   };
 
-  const [nodeStates, recentAttempts, recentInstances, vocabBundleIds, grammarBundleIds, loBundleIds] = await Promise.all([
+  const [
+    nodeStates,
+    recentAttempts,
+    recentInstances,
+    vocabBundleIds,
+    grammarBundleIds,
+    loBundleIds,
+    memoryDueRows,
+  ] = await Promise.all([
     loadNodeState({
       studentId: params.studentId,
       stage: params.stage,
@@ -1227,7 +1257,31 @@ export async function planNextTaskDecision(params: {
     getBundleNodeIdsForStageAndDomain(domainTargets.vocab, "vocab"),
     getBundleNodeIdsForStageAndDomain(domainTargets.grammar, "grammar"),
     getBundleNodeIdsForStageAndDomain(domainTargets.lo, "lo"),
+    memoryRuntimeEnabled
+      ? prisma.reviewQueueItem.findMany({
+          where: {
+            studentId: params.studentId,
+            queueType: { in: [MEMORY_FRESH_QUEUE_TYPE, MEMORY_REVIEW_QUEUE_TYPE] },
+            status: { in: [...OPEN_MEMORY_QUEUE_STATUSES] },
+            dueAt: { lte: new Date() },
+          },
+          orderBy: [{ priority: "asc" }, { dueAt: "asc" }],
+          take: 60,
+          select: {
+            nodeId: true,
+            queueType: true,
+          },
+        })
+      : Promise.resolve([]),
   ]);
+  const memoryDueNodeIds = dedupe(memoryDueRows.map((row) => row.nodeId));
+  const memoryFreshDueCount = memoryDueRows.filter(
+    (row) => row.queueType === MEMORY_FRESH_QUEUE_TYPE,
+  ).length;
+  const memoryReviewDueCount = memoryDueRows.filter(
+    (row) => row.queueType === MEMORY_REVIEW_QUEUE_TYPE,
+  ).length;
+  const memoryDueCount = memoryDueRows.length;
   const targetStageBundleNodeIds = [...new Set([...vocabBundleIds, ...grammarBundleIds, ...loBundleIds])];
 
   const inPool = new Set(nodeStates.map((n) => n.nodeId));
@@ -1317,6 +1371,7 @@ export async function planNextTaskDecision(params: {
     .some((item) => item.targetNodeIds.some((nodeId) => verificationTargetNodeIds.includes(nodeId)));
   // Verification first, then target-stage bundle nodes (so exercises align with progress), then other preferred
   const mergedPreferredNodeIds = dedupe([
+    ...memoryDueNodeIds,
     ...verificationTargetNodeIds,
     ...targetStageBundleNodeIds,
     ...(params.preferredNodeIds || []),
@@ -1333,6 +1388,7 @@ export async function planNextTaskDecision(params: {
       qualityDomainFocus: params.qualityDomainFocus,
       verificationNodeIds: verificationTargetNodeIds,
       recentlyTargetedNodeIds,
+      memoryDueNodeIds,
     })
   );
   const domainByTaskType = Object.fromEntries(
@@ -1453,6 +1509,21 @@ export async function planNextTaskDecision(params: {
   if (!chosen || chosen.targetNodeIds.length === 0) {
     throw new Error("Planner decision failed: no GSE targets resolved.");
   }
+  const topMemoryDueCandidate =
+    scoredWithHybrid.find(
+      (row) =>
+        row.memoryQueueHits > 0 &&
+        hybridSelection.candidateActionSet.includes(row.taskType),
+    ) || scoredWithHybrid.find((row) => row.memoryQueueHits > 0) || null;
+  const memoryDueOverrideApplied = Boolean(
+    memoryDueCount > 0 &&
+      chosen.memoryQueueHits === 0 &&
+      topMemoryDueCandidate &&
+      topMemoryDueCandidate.targetNodeIds.length > 0,
+  );
+  if (memoryDueOverrideApplied && topMemoryDueCandidate) {
+    chosen = topMemoryDueCandidate;
+  }
 
   const topCandidate = topByPolicyUtility;
   const topConstraintReasons = topCandidate
@@ -1570,9 +1641,16 @@ export async function planNextTaskDecision(params: {
   const finalSelectionReason =
     (ambiguityTriggerApplied
       ? `${chosen.selectionReason} Causal ambiguity trigger selected a diagnostic probe.`
-      : chosen.selectionReason) + causalSelectionReason + causalTemplateReason;
+      : chosen.selectionReason) +
+    (memoryDueOverrideApplied
+      ? " Memory backlog is due now, so planner forced a memory-targeted slot."
+      : "") +
+    causalSelectionReason +
+    causalTemplateReason;
   const finalSelectionReasonType: CandidateScore["selectionReasonType"] = ambiguityTriggerApplied
-    ? "uncertainty"
+    ? chosen.memoryQueueHits > 0
+      ? "memory_due"
+      : "uncertainty"
     : chosen.selectionReasonType;
 
   const overdueCount = nodeStates.filter((node) => node.daysSinceEvidence > node.halfLifeDays).length;
@@ -1588,6 +1666,9 @@ export async function planNextTaskDecision(params: {
   const activeConstraints = ambiguityTriggerApplied
     ? dedupe([...hybridPolicy.activeConstraints, "ambiguity_trigger"])
     : hybridPolicy.activeConstraints;
+  const effectiveActiveConstraints = memoryDueOverrideApplied
+    ? dedupe([...activeConstraints, "memory_due_override"])
+    : activeConstraints;
   const candidateSetForLogging =
     scoredForLogging.length > 0 ? scoredForLogging : [chosen];
 
@@ -1601,7 +1682,7 @@ export async function planNextTaskDecision(params: {
         propensity: chosenPropensity,
         candidateActionSet: hybridPolicy.candidateActionSet,
         preActionScores: hybridPolicy.preActionScores,
-        activeConstraints,
+        activeConstraints: effectiveActiveConstraints,
         constraintMask: hybridPolicy.constraintMask,
         expectedGain: chosen.expectedGain,
         successProbability: chosen.successProbability,
@@ -1611,6 +1692,14 @@ export async function planNextTaskDecision(params: {
         explorationBonus: chosen.explorationBonus,
         verificationGain: chosen.verificationGain,
         utility: chosen.utility,
+        memoryQueueHits: chosen.memoryQueueHits,
+        memoryQueueDue: {
+          dueCount: memoryDueCount,
+          freshDueCount: memoryFreshDueCount,
+          reviewDueCount: memoryReviewDueCount,
+          dueNodeIds: memoryDueNodeIds.slice(0, 20),
+        },
+        memoryDueOverrideApplied,
         rotationApplied,
         rotationReason,
         qualityDomainFocus: params.qualityDomainFocus || null,
@@ -1655,7 +1744,10 @@ export async function planNextTaskDecision(params: {
       causalRemediationTemplateKey: causalRemediationSummary.chosenTemplateKey,
       causalRemediationTemplateDomain: causalRemediationSummary.chosenDomain,
       chosenPropensity,
-      activeConstraints,
+      activeConstraints: effectiveActiveConstraints,
+      memoryQueueHits: chosen.memoryQueueHits,
+      memoryDueCount,
+      memoryDueOverrideApplied,
       shadowPolicyEvaluated: Boolean(shadowPolicy),
       shadowPolicyDisagreement: shadowPolicy?.disagreement ?? null,
       shadowPolicyBlockedBySafetyGuard: shadowPolicy?.blockedBySafetyGuard ?? null,
@@ -1676,6 +1768,7 @@ export async function planNextTaskDecision(params: {
     estimatedDifficulty: chosen.estimatedDifficulty,
     selectionReason: finalSelectionReason,
     selectionReasonType: finalSelectionReasonType,
+    memoryQueueHits: chosen.memoryQueueHits,
     verificationTargetNodeIds,
     primaryGoal,
     candidateScores: scoredWithHybrid,

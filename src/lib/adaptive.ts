@@ -10,6 +10,8 @@ import {
 } from "./curriculum";
 import { nextTargetNodesForStudent } from "./gse/planner";
 import { projectLearnerStageFromGse, refreshLearnerProfileFromGse, DomainStages } from "./gse/stageProjection";
+import { evaluatePolicyReadinessGate } from "./policy/readinessGate";
+import { featureFlags } from "./featureFlags";
 
 const STAGE_ORDER: CEFRStage[] = ["A0", "A1", "A2", "B1", "B2", "C1", "C2"];
 const COLD_START_TARGET_ATTEMPTS = 8;
@@ -373,6 +375,9 @@ export async function recomputeMastery(studentId: string) {
       carryoverSummary: { carryoverApplied: true, source: "gse_only" },
     });
   }
+  const policyGate = featureFlags.policyGateV1
+    ? await evaluatePolicyReadinessGate({ windowDays: 90 })
+    : null;
 
   await prisma.promotionAudit.create({
     data: {
@@ -387,7 +392,10 @@ export async function recomputeMastery(studentId: string) {
         currentStageStats: projection.currentStageStats,
         targetStageStats: projection.targetStageStats,
         stressGate: projection.stressGate,
+        retentionOperational: projection.retentionOperational,
+        retentionCertification: projection.retentionCertification,
         retentionGate: projection.retentionGate,
+        policyGate,
         targetStage: projection.targetStage,
         blockedBundles: projection.blockedBundles,
       } as Prisma.InputJsonValue,
@@ -444,7 +452,13 @@ export async function buildLearningPlan(params: {
   ]).filter(Boolean);
   const fatigue = await recentFatigue(params.studentId);
   // Gate productive tasks by weakest productive domain
-  const gateStage = [projection.domainStages.grammar.stage, projection.domainStages.communication.stage]
+  const gateStage = [
+    projection.domainStages.grammar.stage,
+    projection.domainStages.speaking.stage,
+    projection.domainStages.listening.stage,
+    projection.domainStages.reading.stage,
+    projection.domainStages.writing.stage,
+  ]
     .reduce<CEFRStage>((min, s) => stageIndex(s) < stageIndex(min) ? s : min, stage);
   const allowed = allowedTasksForStage(gateStage);
   const selectedType = pickTaskType({

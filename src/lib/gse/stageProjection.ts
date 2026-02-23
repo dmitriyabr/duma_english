@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { CEFRStage, SkillKey } from "@/lib/curriculum";
+import { featureFlags } from "@/lib/featureFlags";
 import type { MilestoneStressGateResult } from "@/lib/ood/stressGate";
 import { evaluateStudentMilestoneStressGate } from "@/lib/ood/stressGate";
 import {
@@ -45,6 +46,10 @@ export type DomainStageInfo = {
 };
 
 export type DomainStages = {
+  speaking: DomainStageInfo;
+  listening: DomainStageInfo;
+  reading: DomainStageInfo;
+  writing: DomainStageInfo;
   vocab: DomainStageInfo;
   grammar: DomainStageInfo;
   communication: DomainStageInfo;
@@ -64,6 +69,9 @@ export type StageProjection = {
   targetStage: CEFRStage;
   targetStageStats: StageBandStats;
   stressGate: MilestoneStressGateResult;
+  retentionOperational: RetentionPromotionGateResult;
+  retentionCertification: RetentionPromotionGateResult;
+  /** Backward-compatible alias (kept for existing APIs/clients). */
   retentionGate: RetentionPromotionGateResult;
   retention: RetentionConfidenceSummary;
   blockedByNodes: string[];
@@ -387,15 +395,34 @@ async function loadRetentionEvidenceRows(params: {
 }
 
 function computeDomainStages(rows: MasteryRow[], placementMode?: boolean): DomainStages {
+  const speakingRows = rows.filter(r => r.node.type === "GSE_LO" && r.node.skill === "speaking");
+  const listeningRows = rows.filter(r => r.node.type === "GSE_LO" && r.node.skill === "listening");
+  const readingRows = rows.filter(r => r.node.type === "GSE_LO" && r.node.skill === "reading");
+  const writingRows = rows.filter(r => r.node.type === "GSE_LO" && r.node.skill === "writing");
   const vocabRows = rows.filter(r => r.node.type === "GSE_VOCAB");
   const grammarRows = rows.filter(r => r.node.type === "GSE_GRAMMAR");
-  const commRows = rows.filter(r => r.node.type === "GSE_LO" && r.node.skill === "speaking");
+  const commRows = rows.filter(
+    (r) =>
+      r.node.type === "GSE_LO" &&
+      (r.node.skill === "speaking" ||
+        r.node.skill === "listening" ||
+        r.node.skill === "reading" ||
+        r.node.skill === "writing"),
+  );
 
+  const speakingProjection = projectPlacementStage(speakingRows, placementMode);
+  const listeningProjection = projectPlacementStage(listeningRows, placementMode);
+  const readingProjection = projectPlacementStage(readingRows, placementMode);
+  const writingProjection = projectPlacementStage(writingRows, placementMode);
   const vocabProjection = projectPlacementStage(vocabRows, placementMode);
   const grammarProjection = projectPlacementStage(grammarRows, placementMode);
   const commProjection = projectPlacementStage(commRows, placementMode);
 
   return {
+    speaking: { stage: speakingProjection.stage, confidence: speakingProjection.confidence },
+    listening: { stage: listeningProjection.stage, confidence: listeningProjection.confidence },
+    reading: { stage: readingProjection.stage, confidence: readingProjection.confidence },
+    writing: { stage: writingProjection.stage, confidence: writingProjection.confidence },
     vocab: { stage: vocabProjection.stage, confidence: vocabProjection.confidence },
     grammar: { stage: grammarProjection.stage, confidence: grammarProjection.confidence },
     communication: { stage: commProjection.stage, confidence: commProjection.confidence },
@@ -453,7 +480,7 @@ export async function projectLearnerStageFromGse(
       now,
     }),
   ]);
-  const retentionGate = evaluateRetentionPromotionGateFromRows({
+  const retentionOperational = evaluateRetentionPromotionGateFromRows({
     rows: retentionEvidenceRows.map((row) => ({
       studentId: row.studentId,
       nodeId: row.nodeId,
@@ -461,8 +488,21 @@ export async function projectLearnerStageFromGse(
       score: row.score,
     })),
     targetStage,
+    mode: "operational",
     now,
   });
+  const retentionCertification = evaluateRetentionPromotionGateFromRows({
+    rows: retentionEvidenceRows.map((row) => ({
+      studentId: row.studentId,
+      nodeId: row.nodeId,
+      createdAt: row.createdAt,
+      score: row.score,
+    })),
+    targetStage,
+    mode: "certification",
+    now,
+  });
+  const retentionGate = retentionCertification;
   const toStats = (stage: CEFRStage, row?: (typeof bundleReadiness.stageRows)[number]): StageBandStats => ({
     stage,
     total: row?.bundleRows.reduce((sum, item) => sum + item.totalRequired, 0) || 0,
@@ -501,7 +541,10 @@ export async function projectLearnerStageFromGse(
   const stressGateBlocksPromotion =
     stressGate.required && bundlePromotionReady && !stressGate.passed;
   const retentionGateBlocksPromotion =
-    retentionGate.required && bundlePromotionReady && !retentionGate.passed;
+    !featureFlags.retentionGateV2 &&
+    retentionGate.required &&
+    bundlePromotionReady &&
+    !retentionGate.passed;
   const promotionReady =
     bundlePromotionReady &&
     !stressGateBlocksPromotion &&
@@ -615,6 +658,8 @@ export async function projectLearnerStageFromGse(
     targetStage,
     targetStageStats: targetStats,
     stressGate,
+    retentionOperational,
+    retentionCertification,
     retentionGate,
     retention,
     blockedByNodes,
@@ -668,6 +713,8 @@ export async function refreshLearnerProfileFromGse(params: {
     currentStageStats: projection.currentStageStats,
     targetStageStats: projection.targetStageStats,
     stressGate: projection.stressGate,
+    retentionOperational: projection.retentionOperational,
+    retentionCertification: projection.retentionCertification,
     retentionGate: projection.retentionGate,
     retention: projection.retention,
     domainStages: projection.domainStages,
@@ -719,6 +766,8 @@ export async function refreshLearnerProfileFromGse(params: {
         currentStageStats: projection.currentStageStats,
         targetStageStats: projection.targetStageStats,
         stressGate: projection.stressGate,
+        retentionOperational: projection.retentionOperational,
+        retentionCertification: projection.retentionCertification,
         retentionGate: projection.retentionGate,
         retention: projection.retention,
         blockedByNodes: projection.blockedByNodes,

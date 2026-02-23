@@ -220,6 +220,46 @@ test("evaluateTaskQuality attaches discourse pragmatics dimensions for discourse
   if (originalKey) process.env.OPENAI_API_KEY = originalKey;
 });
 
+test("deterministic fallback keeps advanced discourse task-specific artifacts", async () => {
+  const originalKey = process.env.OPENAI_API_KEY;
+  delete process.env.OPENAI_API_KEY;
+
+  const argumentation = await evaluateTaskQuality({
+    taskType: "argumentation",
+    taskPrompt: "Argue for or against school uniforms.",
+    transcript:
+      "I think uniforms should stay because they reduce pressure. However, some students want more style, so schools can allow one free-style day.",
+    speechMetrics: { speechRate: 108, fillerCount: 0 },
+  });
+  const registerSwitch = await evaluateTaskQuality({
+    taskType: "register_switch",
+    taskPrompt: "Say one formal and one casual version.",
+    transcript:
+      "Formal: I would appreciate an extension until tomorrow. Casual: Hey, can I get one more day?",
+    speechMetrics: { speechRate: 106, fillerCount: 0 },
+  });
+  const repair = await evaluateTaskQuality({
+    taskType: "misunderstanding_repair",
+    taskPrompt: "Repair a misunderstanding politely.",
+    transcript:
+      "Sorry, I meant Tuesday. Could you repeat the date? Okay, got it, Tuesday.",
+    speechMetrics: { speechRate: 102, fillerCount: 0 },
+  });
+
+  const argumentationArtifacts = argumentation.taskEvaluation.artifacts as Record<string, unknown>;
+  const registerArtifacts = registerSwitch.taskEvaluation.artifacts as Record<string, unknown>;
+  const repairArtifacts = repair.taskEvaluation.artifacts as Record<string, unknown>;
+
+  assert.equal(typeof argumentationArtifacts.argumentStructureScore, "number");
+  assert.equal(typeof registerArtifacts.registerSwitchDetected, "boolean");
+  assert.equal(typeof repairArtifacts.repairCueCount, "number");
+  assert.equal(argumentation.taskEvaluation.taskType, "argumentation");
+  assert.equal(registerSwitch.taskEvaluation.taskType, "register_switch");
+  assert.equal(repair.taskEvaluation.taskType, "misunderstanding_repair");
+
+  if (originalKey) process.env.OPENAI_API_KEY = originalKey;
+});
+
 test("writing_prompt deterministic evaluation emits writing artifacts and rewrite recommendation", async () => {
   const originalKey = process.env.OPENAI_API_KEY;
   delete process.env.OPENAI_API_KEY;
@@ -293,16 +333,61 @@ test("evaluateTaskQuality attaches listening assessment artifacts for listening 
   const artifacts = result.taskEvaluation.artifacts as {
     listeningAssessment?: {
       version?: string;
+      sourceReference?: string;
       scores?: {
         overall?: number;
       };
     };
     listeningRepairBehaviorScore?: number;
+    listeningEvaluationMode?: string;
   };
-  assert.equal(artifacts.listeningAssessment?.version, "listening-assessment-v1");
+  assert.equal(artifacts.listeningAssessment?.version, "listening-assessment-v2");
   assert.equal(typeof artifacts.listeningAssessment?.scores?.overall, "number");
+  assert.equal(
+    artifacts.listeningAssessment?.sourceReference === "task_meta" ||
+      artifacts.listeningAssessment?.sourceReference === "prompt_parse",
+    true,
+  );
+  assert.equal(
+    artifacts.listeningEvaluationMode === "llm" ||
+      artifacts.listeningEvaluationMode === "fallback",
+    true,
+  );
   assert.equal(typeof artifacts.listeningRepairBehaviorScore, "number");
   assert.equal(result.taskEvaluation.taskScore >= 60, true);
+
+  if (originalKey) process.env.OPENAI_API_KEY = originalKey;
+});
+
+test("evaluateTaskQuality uses hidden listening reference from task meta when prompt has no script", async () => {
+  const originalKey = process.env.OPENAI_API_KEY;
+  delete process.env.OPENAI_API_KEY;
+
+  const result = await evaluateTaskQuality({
+    taskType: "listening_comprehension",
+    taskPrompt: "Listen to the audio and answer.\\nQuestion: Why did Ben call his teacher?",
+    transcript:
+      "He called because he missed the bus and wanted to explain he would be late before class.",
+    speechMetrics: { speechRate: 106, fillerCount: 0 },
+    taskMeta: {
+      listeningScript:
+        "Ben missed the bus, so he called his teacher before class to explain he would be late.",
+      listeningQuestion: "Why did Ben call his teacher?",
+    },
+  });
+
+  const artifacts = result.taskEvaluation.artifacts as {
+    listeningAssessment?: {
+      sourceReference?: string;
+      script?: string;
+    };
+  };
+  assert.equal(artifacts.listeningAssessment?.sourceReference, "task_meta");
+  assert.equal(
+    String(artifacts.listeningAssessment?.script || "").includes("missed the bus"),
+    true,
+  );
+  assert.equal(result.taskEvaluation.taskScore >= 55, true);
 
   if (originalKey) process.env.OPENAI_API_KEY = originalKey;
 });

@@ -16,6 +16,7 @@ import {
 } from "./reading/assessment";
 import {
   evaluateListeningComprehension,
+  evaluateListeningComprehensionFallback,
   isListeningTaskType,
   LISTENING_ASSESSMENT_VERSION,
 } from "./listening/assessment";
@@ -384,10 +385,10 @@ function withReadingFeedback(
   };
 }
 
-function withListeningAssessment(
+async function withListeningAssessment(
   taskEvaluation: TaskEvaluation,
-  input: Pick<EvaluationInput, "taskType" | "taskPrompt" | "transcript">,
-): TaskEvaluation {
+  input: Pick<EvaluationInput, "taskType" | "taskPrompt" | "transcript" | "taskMeta">,
+): Promise<TaskEvaluation> {
   if (!isListeningTaskType(input.taskType)) {
     return taskEvaluation;
   }
@@ -396,10 +397,21 @@ function withListeningAssessment(
     taskEvaluation.artifacts && typeof taskEvaluation.artifacts === "object"
       ? taskEvaluation.artifacts
       : {};
-  const assessment = evaluateListeningComprehension({
+  const assessment = await evaluateListeningComprehension({
     taskType: input.taskType,
     taskPrompt: input.taskPrompt,
     transcript: input.transcript,
+    taskMeta: input.taskMeta || null,
+    hiddenReference: {
+      script:
+        typeof input.taskMeta?.listeningScript === "string"
+          ? input.taskMeta.listeningScript
+          : null,
+      question:
+        typeof input.taskMeta?.listeningQuestion === "string"
+          ? input.taskMeta.listeningQuestion
+          : null,
+    },
   });
   const existingCheckIds = new Set(
     taskEvaluation.rubricChecks.map((check) => slugify(check.name || "")),
@@ -426,8 +438,11 @@ function withListeningAssessment(
       listeningComprehensionScore: assessment.scores.comprehension,
       listeningSourceGroundingScore: assessment.scores.sourceGrounding,
       listeningRepairBehaviorScore: assessment.scores.repairBehavior,
+      listeningEvaluationMode: assessment.evaluationMode,
       listeningAssessment: {
         version: LISTENING_ASSESSMENT_VERSION,
+        evaluationMode: assessment.evaluationMode,
+        sourceReference: assessment.sourceReference,
         script: assessment.script,
         question: assessment.question,
         scores: assessment.scores,
@@ -880,6 +895,186 @@ function evaluateTopicTalk(input: EvaluationInput): { taskEvaluation: TaskEvalua
   return { taskEvaluation, feedback };
 }
 
+function evaluateArgumentationTask(input: EvaluationInput): { taskEvaluation: TaskEvaluation; feedback: FeedbackResult } {
+  const text = input.transcript.toLowerCase();
+  const sentenceCount = splitSentences(input.transcript).length;
+  const hasClaim = /\b(i think|i believe|in my view|my position|should|must)\b/.test(text);
+  const hasReason = /\b(because|since|therefore|so|this means)\b/.test(text);
+  const hasCounterpoint = /\b(however|although|on the other hand|some people)\b/.test(text);
+
+  const checks: RubricCheck[] = [
+    {
+      name: "argument_structure",
+      pass: hasClaim && hasReason,
+      reason:
+        hasClaim && hasReason
+          ? "Your argument has a clear claim and reason."
+          : "State your position and support it with a reason.",
+      weight: 0.45,
+    },
+    {
+      name: "supporting_reasons",
+      pass: hasReason,
+      reason: hasReason ? "You supported your claim with a reason." : "Add a clear supporting reason.",
+      weight: 0.35,
+    },
+    {
+      name: "counterpoint",
+      pass: hasCounterpoint || sentenceCount >= 4,
+      reason:
+        hasCounterpoint || sentenceCount >= 4
+          ? "You acknowledged another side or expanded your argument."
+          : "Add one counterpoint or a second perspective.",
+      weight: 0.2,
+    },
+  ];
+
+  const taskEvaluation: TaskEvaluation = {
+    taskType: input.taskType,
+    taskScore: scoreFromChecks(checks),
+    languageScore: Math.round(clamp(54 + Number(hasClaim) * 12 + Number(hasReason) * 12 + Number(hasCounterpoint) * 10)),
+    artifacts: {
+      argumentStructureScore: Math.round((Number(hasClaim) * 0.4 + Number(hasReason) * 0.4 + Number(hasCounterpoint) * 0.2) * 100),
+      hasClaim,
+      hasReason,
+      hasCounterpoint,
+      sentenceCount,
+    },
+    rubricChecks: checks,
+    loChecks: [],
+    grammarChecks: [],
+    vocabChecks: [],
+    evidence: [input.transcript.slice(0, 220)],
+    modelVersion: MODEL_VERSION,
+  };
+
+  const feedback = buildFeedbackFromEvaluation(
+    taskEvaluation,
+    "I believe schools should include more project work because students remember ideas better when they apply them. Some people worry about time, however project work can be short and still effective.",
+    input.transcript,
+  );
+  return { taskEvaluation, feedback };
+}
+
+function evaluateRegisterSwitchTask(input: EvaluationInput): { taskEvaluation: TaskEvaluation; feedback: FeedbackResult } {
+  const text = input.transcript.toLowerCase();
+  const formalCueCount = (text.match(/\b(therefore|however|would|could|regarding|sincerely|please)\b/g) || []).length;
+  const conversationalCueCount = (text.match(/\b(hey|yeah|kinda|gonna|wanna|you know)\b/g) || []).length;
+  const switchDetected = formalCueCount > 0 && conversationalCueCount > 0;
+
+  const checks: RubricCheck[] = [
+    {
+      name: "register_control",
+      pass: switchDetected,
+      reason:
+        switchDetected
+          ? "You showed both formal and conversational register."
+          : "Show both a formal and a casual version of your response.",
+      weight: 0.5,
+    },
+    {
+      name: "audience_fit",
+      pass: formalCueCount > 0,
+      reason:
+        formalCueCount > 0
+          ? "You used audience-aware formal language."
+          : "Add one formal phrasing for a formal audience.",
+      weight: 0.3,
+    },
+    {
+      name: "coherence",
+      pass: splitSentences(input.transcript).length >= 2,
+      reason: splitSentences(input.transcript).length >= 2 ? "Your switch stayed understandable." : "Use at least two clear sentences.",
+      weight: 0.2,
+    },
+  ];
+
+  const taskEvaluation: TaskEvaluation = {
+    taskType: input.taskType,
+    taskScore: scoreFromChecks(checks),
+    languageScore: Math.round(clamp(52 + Math.min(20, formalCueCount * 5) + Math.min(20, conversationalCueCount * 5))),
+    artifacts: {
+      registerSwitchDetected: switchDetected,
+      formalCueCount,
+      conversationalCueCount,
+    },
+    rubricChecks: checks,
+    loChecks: [],
+    grammarChecks: [],
+    vocabChecks: [],
+    evidence: [input.transcript.slice(0, 220)],
+    modelVersion: MODEL_VERSION,
+  };
+
+  const feedback = buildFeedbackFromEvaluation(
+    taskEvaluation,
+    "Formal: I would like to request a short extension on the assignment, as I need one extra day. Casual: Hey, can I get one more day for the task? I need a little extra time.",
+    input.transcript,
+  );
+  return { taskEvaluation, feedback };
+}
+
+function evaluateMisunderstandingRepairTask(
+  input: EvaluationInput,
+): { taskEvaluation: TaskEvaluation; feedback: FeedbackResult } {
+  const text = input.transcript.toLowerCase();
+  const repairCueCount = (text.match(/\b(sorry|i mean|to clarify|let me rephrase|what i meant)\b/g) || []).length;
+  const clarificationCueCount = (text.match(/\b(do you mean|can you repeat|could you clarify)\b/g) || []).length;
+  const resolutionCueCount = (text.match(/\b(okay i understand|got it|so you mean)\b/g) || []).length;
+
+  const checks: RubricCheck[] = [
+    {
+      name: "turn_taking_repair",
+      pass: repairCueCount + clarificationCueCount >= 1,
+      reason:
+        repairCueCount + clarificationCueCount >= 1
+          ? "You used repair language to fix misunderstanding."
+          : "Use one repair phrase when misunderstanding happens.",
+      weight: 0.5,
+    },
+    {
+      name: "question_answered",
+      pass: clarificationCueCount >= 1 || resolutionCueCount >= 1,
+      reason:
+        clarificationCueCount >= 1 || resolutionCueCount >= 1
+          ? "You asked for or confirmed clarification."
+          : "Ask one clarification question or confirm understanding.",
+      weight: 0.3,
+    },
+    {
+      name: "coherence",
+      pass: splitSentences(input.transcript).length >= 2,
+      reason: splitSentences(input.transcript).length >= 2 ? "Your repair flow is coherent." : "Use at least two clear sentences.",
+      weight: 0.2,
+    },
+  ];
+
+  const taskEvaluation: TaskEvaluation = {
+    taskType: input.taskType,
+    taskScore: scoreFromChecks(checks),
+    languageScore: Math.round(clamp(50 + repairCueCount * 10 + clarificationCueCount * 12 + resolutionCueCount * 8)),
+    artifacts: {
+      repairCueCount,
+      clarificationCueCount,
+      resolutionCueCount,
+      repairFlowStable: repairCueCount + clarificationCueCount + resolutionCueCount >= 2,
+    },
+    rubricChecks: checks,
+    loChecks: [],
+    grammarChecks: [],
+    vocabChecks: [],
+    evidence: [input.transcript.slice(0, 220)],
+    modelVersion: MODEL_VERSION,
+  };
+
+  const feedback = buildFeedbackFromEvaluation(
+    taskEvaluation,
+    "Sorry, I meant Tuesday, not Thursday. Could you repeat the deadline one more time? Okay, got it, the deadline is Tuesday.",
+    input.transcript,
+  );
+  return { taskEvaluation, feedback };
+}
+
 function evaluateFillerControl(input: EvaluationInput): { taskEvaluation: TaskEvaluation; feedback: FeedbackResult } {
   const words = normalizeWords(input.transcript);
   const fillers = words.filter((w) => ["um", "uh", "like"].includes(w));
@@ -1044,10 +1239,21 @@ function evaluateReadingComprehensionTask(
 function evaluateListeningComprehensionTask(
   input: EvaluationInput,
 ): { taskEvaluation: TaskEvaluation; feedback: FeedbackResult } {
-  const assessment = evaluateListeningComprehension({
+  const assessment = evaluateListeningComprehensionFallback({
     taskType: input.taskType,
     taskPrompt: input.taskPrompt,
     transcript: input.transcript,
+    taskMeta: input.taskMeta || null,
+    hiddenReference: {
+      script:
+        typeof input.taskMeta?.listeningScript === "string"
+          ? input.taskMeta.listeningScript
+          : null,
+      question:
+        typeof input.taskMeta?.listeningQuestion === "string"
+          ? input.taskMeta.listeningQuestion
+          : null,
+    },
   });
   const taskEvaluation: TaskEvaluation = {
     taskType: input.taskType,
@@ -1059,6 +1265,7 @@ function evaluateListeningComprehensionTask(
       listeningComprehensionScore: assessment.scores.comprehension,
       listeningSourceGroundingScore: assessment.scores.sourceGrounding,
       listeningRepairBehaviorScore: assessment.scores.repairBehavior,
+      listeningEvaluationMode: assessment.evaluationMode,
       listeningAssessment: assessment,
     },
     rubricChecks: assessment.rubricChecks,
@@ -1213,6 +1420,12 @@ function evaluateDeterministic(input: EvaluationInput) {
       return evaluateFillerControl(input);
     case "speech_builder":
       return evaluateSpeechBuilder(input);
+    case "argumentation":
+      return evaluateArgumentationTask(input);
+    case "register_switch":
+      return evaluateRegisterSwitchTask(input);
+    case "misunderstanding_repair":
+      return evaluateMisunderstandingRepairTask(input);
     case "topic_talk":
     default:
       return evaluateTopicTalk(input);
@@ -1241,6 +1454,12 @@ function buildTaskSpecificPrompt(taskType: string) {
       "Artifacts required: fillerDensityPer100Words, topFillers, selfCorrections.",
     speech_builder:
       "Artifacts required: startPresent, mainIdeaPresent, examplePresent, endingPresent, orderQuality.",
+    argumentation:
+      "Artifacts required: argumentStructureScore, hasClaim, hasReason, hasCounterpoint.",
+    register_switch:
+      "Artifacts required: registerSwitchDetected, formalCueCount, conversationalCueCount.",
+    misunderstanding_repair:
+      "Artifacts required: repairCueCount, clarificationCueCount, resolutionCueCount, repairFlowStable.",
   };
   return rubricMap[taskType] || rubricMap.topic_talk;
 }
@@ -1792,17 +2011,13 @@ export async function evaluateTaskQuality(input: EvaluationInput) {
       grammarChecks: fromModel.parsed.taskEvaluation.grammarChecks || [],
       vocabChecks: fromModel.parsed.taskEvaluation.vocabChecks || [],
     };
+    const withSignals = withPerceptionLanguageSignals(
+      attachStructuredChecks(baseTaskEvaluation, input.transcript),
+      input.transcript,
+    );
+    const listeningEnhanced = await withListeningAssessment(withSignals, input);
     const modelTaskEvaluation = withDiscoursePragmatics(
-      withReadingAssessment(
-        withListeningAssessment(
-          withPerceptionLanguageSignals(
-            attachStructuredChecks(baseTaskEvaluation, input.transcript),
-            input.transcript,
-          ),
-          input,
-        ),
-        input,
-      ),
+      withReadingAssessment(listeningEnhanced, input),
       input,
     );
     const normalizedFeedback = withListeningFeedback(
@@ -1828,17 +2043,16 @@ export async function evaluateTaskQuality(input: EvaluationInput) {
   }
 
   const fallback = evaluateDeterministic(input);
+  const fallbackWithSignals = withPerceptionLanguageSignals(
+    attachStructuredChecks(fallback.taskEvaluation, input.transcript),
+    input.transcript,
+  );
+  const fallbackListeningEnhanced = await withListeningAssessment(
+    fallbackWithSignals,
+    input,
+  );
   const fallbackTaskEvaluation = withDiscoursePragmatics(
-    withReadingAssessment(
-      withListeningAssessment(
-        withPerceptionLanguageSignals(
-          attachStructuredChecks(fallback.taskEvaluation, input.transcript),
-          input.transcript,
-        ),
-        input,
-      ),
-      input,
-    ),
+    withReadingAssessment(fallbackListeningEnhanced, input),
     input,
   );
   const normalizedFallback = {

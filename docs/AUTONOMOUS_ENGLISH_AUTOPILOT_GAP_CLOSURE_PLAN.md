@@ -85,6 +85,23 @@ Source baseline: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` + current code
 
 ## 3.2) Active Task Registry
 
+### 3.2.1) Runtime-First FX Registry (World-Class Recovery)
+
+| FX | Task | Status | Owner | Start (UTC) | End (UTC) | Commits | Artifacts | Notes |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| FX-01 | Real Listening Runtime Channel | DONE | Team | 2026-02-23T09:44:53Z | 2026-02-23T10:33:35Z | `pending` | `src/lib/listening/runtime.ts`, `src/app/api/listening/assets/[assetId]/route.ts`, `src/app/api/task/next/route.ts`, `src/app/task/page.tsx`, `src/app/record/page.tsx` | Listening payload + hidden script server-side + playback gate in UI |
+| FX-02 | Listening Evaluation v2 (No Text Leakage Bias) | DONE | Team | 2026-02-23T09:44:53Z | 2026-02-23T10:33:35Z | `pending` | `src/lib/listening/assessment.ts`, `src/lib/evaluator.ts`, `src/lib/listening/assessment.test.ts`, `src/lib/evaluator.test.ts` | Hidden-reference scoring + LLM primary + deterministic anti-leak fallback |
+| FX-03 | Retention Gate v2 (Speed-First) | DONE | Team | 2026-02-23T09:44:53Z | 2026-02-23T10:33:35Z | `pending` | `src/lib/retention/promotionGate.ts`, `src/lib/gse/stageProjection.ts`, `src/lib/progress.ts` | Operational progression decoupled from long-window certification |
+| FX-04 | Memory Scheduler Into Task Selection Runtime | DONE | Team | 2026-02-23T09:44:53Z | 2026-02-23T10:33:35Z | `pending` | `src/lib/gse/planner.ts`, `src/app/api/task/next/route.ts`, `src/app/api/planner/simulate/route.ts` | Runtime memory due queue affects selection with `memory_due` reason |
+| FX-05 | Child-Facing Causal Feedback | DONE | Team | 2026-02-23T09:44:53Z | 2026-02-23T10:33:35Z | `pending` | `src/lib/causal/coach.ts`, `src/app/api/attempts/[id]/route.ts`, `src/app/results/page.tsx` | Cause-specific child-safe reason cards and actions in results |
+| FX-06 | CEFR Coverage Contract v2 | DONE | Team | 2026-02-23T09:44:53Z | 2026-02-23T10:33:35Z | `pending` | `src/lib/contracts/cefrCoverageMatrix.ts`, `src/lib/contracts/cefrCoverageMatrix.test.ts` | Coverage contract expanded to 4 modalities + discourse/pragmatics |
+| FX-07 | Mastery/Stage Domain Expansion | DONE | Team | 2026-02-23T09:44:53Z | 2026-02-23T10:33:35Z | `pending` | `src/lib/gse/stageProjection.ts`, `src/app/progress/page.tsx`, `src/app/teacher/students/[studentId]/page.tsx` | Domain stages now model speaking/listening/reading/writing directly |
+| FX-08 | OPE + Replay Policy Gate Integration | DONE | Team | 2026-02-23T09:44:53Z | 2026-02-23T10:33:35Z | `pending` | `src/lib/policy/readinessGate.ts`, `src/lib/adaptive.ts`, `src/lib/placement.ts`, `src/lib/progress.ts` | Promotion audit now carries policy readiness gate outcome |
+| FX-09 | Shadow Policy v2 (Learned Weights) | DONE | Team | 2026-02-23T09:44:53Z | 2026-02-23T10:33:35Z | `pending` | `prisma/schema.prisma`, `prisma/migrations/20260223113000_fx09_shadow_model_snapshot/migration.sql`, `src/lib/shadow/valueModel.ts` | Learned snapshot-backed shadow scoring with safe legacy fallback path |
+| FX-10 | Deterministic Fallback for Advanced Discourse | DONE | Team | 2026-02-23T09:44:53Z | 2026-02-23T10:33:35Z | `pending` | `src/lib/evaluator.ts`, `src/lib/evaluator.test.ts` | Task-specific fallback for `argumentation/register_switch/misunderstanding_repair` |
+| FX-11 | C2 Claim Layer (Evidence-Based) | DONE | Team | 2026-02-23T09:44:53Z | 2026-02-23T10:33:35Z | `pending` | `src/lib/claims/c2Claim.ts`, `src/lib/progress.ts`, `src/app/progress/page.tsx`, `src/app/teacher/students/[studentId]/page.tsx` | Claim state separated from stage with explicit missing evidence |
+| FX-12 | Rollout, Observability, Guardrails | DONE | Codex | 2026-02-23T10:10:00Z | 2026-02-23T10:33:35Z | `pending` | `src/lib/featureFlags.ts`, `src/lib/quality/runtimeRolloutDashboard.ts`, `src/app/api/quality/runtime-rollout/route.ts`, `docs/FX12_ROLLOUT_GUARDRAILS.md` | Runtime feature-flag gating + unified rollout dashboard + rollback playbook |
+
 | CH | Task | Status | Owner | Start (UTC) | End (UTC) | Commits | Artifacts | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | CH-01 | CEFR coverage matrix contract | DONE | Team | 2026-02-17T20:54:09Z | 2026-02-17T20:54:09Z | `169ef5e` | `docs/CEFR_COVERAGE_MATRIX_CONTRACT.md`, `src/scripts/cefr_coverage_report.ts` | Coverage matrix, report script, tests added |
@@ -137,6 +154,10 @@ Source baseline: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` + current code
 
 | Date (UTC) | CH | Decision |
 | --- | --- | --- |
+| 2026-02-23 | FX-12 | Feature flags доведены до runtime-гейтов: `memory_runtime_v1` теперь управляет planner memory injection/override и sync в `task/next`; `policy_gate_v1` управляет inclusion policy gate в `PromotionAudit`; `shadow_model_v2` переключает shadow scoring между learned snapshot и legacy static weights |
+| 2026-02-23 | FX-12 | Добавлен unified observability endpoint `GET /api/quality/runtime-rollout` + report script `npm run runtime-rollout:report` для метрик: listening authenticity, memory backlog hit-rate, causal coach exposure, promotion blocks by reason |
+| 2026-02-23 | FX-12 | Зафиксирован rollback playbook по каждому флагу в `docs/FX12_ROLLOUT_GUARDRAILS.md`, включая env switches, expected runtime effect и verify-шаги |
+| 2026-02-23 | FX-03 | Retention split закреплен как policy decision: `retentionOperational` влияет на перераспределение задач без hard-stop, `retentionCertification` остается quality/certification контуром |
 | 2026-02-17 | BOARD | Обновлены execution docs: реестр с `Start/End/Commits/Artifacts`, универсальный prompt v2, chat-log протокол для `AUTONOMOUS_ENGLISH_AUTOPILOT_AGENT_SYNC.md` |
 | 2026-02-17 | BOARD | Процесс упрощён: одна ветка, отдельный файл задач, отдельный файл общения, обязательная запись в общение после каждого шага |
 | 2026-02-17 | CH-01 | Интегрированы рабочие изменения из агентской ветки в `codex/autopilot-execution-plan` |

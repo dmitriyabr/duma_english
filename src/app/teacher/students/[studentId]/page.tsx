@@ -15,6 +15,10 @@ type Progress = {
   promotionStage?: string;
   streak: number;
   domainStages?: {
+    speaking: DomainStageInfo;
+    listening: DomainStageInfo;
+    reading: DomainStageInfo;
+    writing: DomainStageInfo;
     vocab: DomainStageInfo;
     grammar: DomainStageInfo;
     communication: DomainStageInfo;
@@ -71,6 +75,12 @@ type Progress = {
       achieved?: Array<{ nodeId: string; descriptor: string; value: number }>;
     }>;
   };
+  claimStatus?: {
+    level: "C2";
+    certified: boolean;
+    certificationTimestamp: string | null;
+    missingEvidence: string[];
+  } | null;
 };
 
 type Attempt = {
@@ -447,6 +457,10 @@ export default function TeacherStudentProfilePage() {
   const domainNodes = {
     vocab: fullMastery.filter((m) => m.type === "GSE_VOCAB"),
     grammar: fullMastery.filter((m) => m.type === "GSE_GRAMMAR"),
+    speaking: fullMastery.filter((m) => m.type === "GSE_LO" && m.skill === "speaking"),
+    listening: fullMastery.filter((m) => m.type === "GSE_LO" && m.skill === "listening"),
+    reading: fullMastery.filter((m) => m.type === "GSE_LO" && m.skill === "reading"),
+    writing: fullMastery.filter((m) => m.type === "GSE_LO" && m.skill === "writing"),
     communication: fullMastery.filter((m) => m.type === "GSE_LO"),
   };
   const vocabStats = computeDomainStats(domainNodes.vocab, domainBundleBlockers?.vocab);
@@ -497,6 +511,30 @@ export default function TeacherStudentProfilePage() {
                     stage={progress.domainStages.grammar.stage}
                     pct={STAGE_PCT[progress.domainStages.grammar.stage] ?? 50}
                     detail={confLabel(progress.domainStages.grammar.confidence)}
+                  />
+                  <DomainBar
+                    label="Speaking"
+                    stage={progress.domainStages.speaking.stage}
+                    pct={STAGE_PCT[progress.domainStages.speaking.stage] ?? 50}
+                    detail={confLabel(progress.domainStages.speaking.confidence)}
+                  />
+                  <DomainBar
+                    label="Listening"
+                    stage={progress.domainStages.listening.stage}
+                    pct={STAGE_PCT[progress.domainStages.listening.stage] ?? 50}
+                    detail={confLabel(progress.domainStages.listening.confidence)}
+                  />
+                  <DomainBar
+                    label="Reading"
+                    stage={progress.domainStages.reading.stage}
+                    pct={STAGE_PCT[progress.domainStages.reading.stage] ?? 50}
+                    detail={confLabel(progress.domainStages.reading.confidence)}
+                  />
+                  <DomainBar
+                    label="Writing"
+                    stage={progress.domainStages.writing.stage}
+                    pct={STAGE_PCT[progress.domainStages.writing.stage] ?? 50}
+                    detail={confLabel(progress.domainStages.writing.confidence)}
                   />
                   <DomainBar
                     label="Communication"
@@ -584,6 +622,29 @@ export default function TeacherStudentProfilePage() {
                   </div>
                 )}
               </div>
+            </div>
+          )}
+
+          {progress.claimStatus && (
+            <div className="card" style={{ marginBottom: 24, padding: "16px 20px" }}>
+              <h2 style={{ fontFamily: "var(--font-display)", fontSize: "1.1rem", marginBottom: 8 }}>
+                C2 Claim Status
+              </h2>
+              <p style={{ margin: 0, fontSize: "0.95rem" }}>
+                {progress.claimStatus.certified ? "Certified" : "Not certified yet"}
+              </p>
+              {progress.claimStatus.certificationTimestamp && (
+                <p className="subtitle" style={{ marginTop: 6 }}>
+                  Certified at {formatDate(progress.claimStatus.certificationTimestamp)}
+                </p>
+              )}
+              {!progress.claimStatus.certified && progress.claimStatus.missingEvidence.length > 0 && (
+                <ul style={{ margin: "8px 0 0", paddingLeft: 18, fontSize: "0.9rem" }}>
+                  {progress.claimStatus.missingEvidence.slice(0, 6).map((item, index) => (
+                    <li key={index}>{item}</li>
+                  ))}
+                </ul>
+              )}
             </div>
           )}
 

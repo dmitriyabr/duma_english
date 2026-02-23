@@ -14,10 +14,24 @@ type Skill = {
   source?: string;
 };
 
+type DomainStageInfo = {
+  stage: string;
+  confidence: number;
+};
+
 type ProgressData = {
   stage?: string;
   placementStage?: string;
   promotionStage?: string;
+  domainStages?: {
+    speaking: DomainStageInfo;
+    listening: DomainStageInfo;
+    reading: DomainStageInfo;
+    writing: DomainStageInfo;
+    vocab: DomainStageInfo;
+    grammar: DomainStageInfo;
+    communication: DomainStageInfo;
+  };
   placementUncertainty?: number | null;
   whyDifferent?: string;
   ageBand?: string;
@@ -30,6 +44,13 @@ type ProgressData = {
   } | null;
   streak: number;
   focus: string | null;
+  claimStatus?: {
+    level: "C2";
+    certified: boolean;
+    certificationTimestamp: string | null;
+    missingEvidence: string[];
+    modalities: Record<string, { passed: boolean; stage: string; evidenceCount: number }>;
+  } | null;
   recentAttempts: { id: string; createdAt: string; scores: { overallScore?: number } }[];
   skills: Skill[];
   mastery?: Array<{
@@ -182,6 +203,47 @@ export default function ProgressPage() {
                   {data.weeklyFocusReason && <p className="subtitle">{data.weeklyFocusReason}</p>}
                 </div>
               </div>
+              {data.domainStages && (
+                <>
+                  <div className="spacer" />
+                  <div className="grid two">
+                    {[
+                      { label: "Speaking", info: data.domainStages.speaking },
+                      { label: "Listening", info: data.domainStages.listening },
+                      { label: "Reading", info: data.domainStages.reading },
+                      { label: "Writing", info: data.domainStages.writing },
+                      { label: "Vocabulary", info: data.domainStages.vocab },
+                      { label: "Grammar", info: data.domainStages.grammar },
+                      { label: "Communication (derived)", info: data.domainStages.communication },
+                    ].map(({ label, info }) => (
+                      <div className="metric" key={label}>
+                        <span>{label}</span>
+                        <strong>{info.stage}</strong>
+                        <p className="subtitle">Confidence: {(info.confidence * 100).toFixed(0)}%</p>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+              {data.claimStatus && (
+                <>
+                  <div className="spacer" />
+                  <div className="metric">
+                    <span>C2 claim</span>
+                    <strong>{data.claimStatus.certified ? "Certified" : "Not certified yet"}</strong>
+                    {data.claimStatus.certificationTimestamp && (
+                      <p className="subtitle">
+                        Certified at: {new Date(data.claimStatus.certificationTimestamp).toLocaleString()}
+                      </p>
+                    )}
+                    {!data.claimStatus.certified && data.claimStatus.missingEvidence.length > 0 && (
+                      <p className="subtitle">
+                        Missing: {data.claimStatus.missingEvidence.slice(0, 4).join("; ")}
+                      </p>
+                    )}
+                  </div>
+                </>
+              )}
               <div className="spacer" />
               <div className="grid two">
                 {data.skills.map((skill) => (

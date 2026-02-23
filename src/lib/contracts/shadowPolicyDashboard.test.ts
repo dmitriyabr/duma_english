@@ -7,7 +7,9 @@ import {
 } from "./shadowPolicyDashboard";
 
 const validTrace = {
-  modelVersion: "shadow-linear-contextual-v1",
+  modelVersion: "shadow-learned-v2:model-default",
+  modelSnapshotVersion: "shadow-learned-v2:model-default",
+  modelTrainedAt: "2026-02-23T00:00:00.000Z",
   generatedAt: "2026-02-18T00:00:00.000Z",
   trainingWindowDays: 30,
   trainingSampleSize: 12,
@@ -50,7 +52,7 @@ test("shadow trace parser extracts valid trace from utility json", () => {
   });
 
   assert.ok(parsed);
-  assert.equal(parsed?.modelVersion, "shadow-linear-contextual-v1");
+  assert.equal(parsed?.modelVersion, "shadow-learned-v2:model-default");
   assert.equal(parsed?.blockedBySafetyGuard, true);
 });
 
@@ -76,7 +78,7 @@ test("dashboard schema accepts valid aggregate payload", () => {
     disagreementAfterSafetyRate: 0.1,
     blockedBySafetyGuardRate: 0.4,
     averageValueGap: 0.18,
-    modelVersions: [{ modelVersion: "shadow-linear-contextual-v1", count: 8 }],
+    modelVersions: [{ modelVersion: "shadow-learned-v2:model-default", count: 8 }],
     safetyCounters: {
       highRiskDisagreementCount: 2,
       verificationGuardTrips: 3,
@@ -88,10 +90,10 @@ test("dashboard schema accepts valid aggregate payload", () => {
   assert.equal(parsed.tracedDecisions, 8);
 });
 
-test("trace schema enforces model version", () => {
+test("trace schema requires non-empty model version", () => {
   const parsed = shadowPolicyTraceSchema.safeParse({
     ...validTrace,
-    modelVersion: "shadow-unknown-v0",
+    modelVersion: "",
   });
   assert.equal(parsed.success, false);
 });

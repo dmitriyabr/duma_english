@@ -7,6 +7,14 @@ export const taskNextResponseSchema = z
     taskId: z.string(),
     type: z.string(),
     prompt: z.string(),
+    listening: z
+      .object({
+        audioUrl: z.string(),
+        durationSec: z.number(),
+        assetId: z.string(),
+      })
+      .nullable()
+      .optional(),
     assessmentMode: z.string(),
     maxDurationSec: z.number(),
     constraints: z
@@ -96,6 +104,14 @@ export const attemptDetailsResponseSchema = z
             createdAt: z.coerce.date(),
           })
           .nullable(),
+        causalCoach: z
+          .object({
+            reasonTitle: z.string(),
+            reasonBody: z.string(),
+            nextAction: z.string(),
+          })
+          .nullable()
+          .optional(),
         gseEvidence: z.array(z.unknown()),
         evidenceMatrix: z.array(z.unknown()),
         consistencyFlag: z.string().nullable(),

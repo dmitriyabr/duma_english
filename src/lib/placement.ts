@@ -7,6 +7,8 @@ import { generateTaskSpec } from "./taskGenerator";
 import { assignTaskTargetsFromCatalog } from "./gse/planner";
 import { getBundleNodeIdsForStageAndDomain } from "./gse/bundles";
 import { ATTEMPT_STATUS, isAttemptRetryStatus } from "./attemptStatus";
+import { evaluatePolicyReadinessGate } from "./policy/readinessGate";
+import { featureFlags } from "./featureFlags";
 import {
   summarizeCrossModalityPlacement,
   type CrossModalityAttemptRow,
@@ -907,6 +909,9 @@ export async function finishPlacement(sessionId: string) {
       cycleWeek: 1,
     },
   });
+  const policyGate = featureFlags.policyGateV1
+    ? await evaluatePolicyReadinessGate({ windowDays: 90 })
+    : null;
 
   await prisma.promotionAudit.create({
     data: {
@@ -927,7 +932,10 @@ export async function finishPlacement(sessionId: string) {
         currentStageStats: stageProjection.currentStageStats,
         targetStageStats: stageProjection.targetStageStats,
         stressGate: stageProjection.stressGate,
+        retentionOperational: stageProjection.retentionOperational,
+        retentionCertification: stageProjection.retentionCertification,
         retentionGate: stageProjection.retentionGate,
+        policyGate,
         blockedBundles: stageProjection.blockedBundles,
         carryoverApplied: carryover.carryoverApplied,
         crossModalityStopReady: crossModalityPlacement.stopCriteriaSatisfied,

@@ -1,46 +1,42 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  evaluateListeningComprehensionFallback,
   LISTENING_ASSESSMENT_VERSION,
-  evaluateListeningComprehension,
-  isListeningTaskType,
 } from "./assessment";
 
-test("isListeningTaskType detects listening family", () => {
-  assert.equal(isListeningTaskType("listening_comprehension"), true);
-  assert.equal(isListeningTaskType("topic_talk"), false);
-});
-
-test("evaluateListeningComprehension returns listening rubric checks", () => {
-  const assessment = evaluateListeningComprehension({
+test("listening fallback scores from hidden reference even when prompt has no script", () => {
+  const assessment = evaluateListeningComprehensionFallback({
     taskType: "listening_comprehension",
-    taskPrompt:
-      "Listen and answer.\nAudio: Ben missed the bus so he called his teacher before class.\nQuestion: Why did Ben call his teacher?",
+    taskPrompt: "Listen to the audio and answer.\nQuestion: Why did Ben call his teacher?",
     transcript:
-      "Ben called his teacher because he missed the bus and wanted to explain he would be late.",
+      "He called because he missed the bus and wanted to explain he would be late before class.",
+    hiddenReference: {
+      script:
+        "Ben missed the bus, so he called his teacher before class to explain he would be late.",
+      question: "Why did Ben call his teacher?",
+    },
   });
 
   assert.equal(assessment.version, LISTENING_ASSESSMENT_VERSION);
-  assert.equal(assessment.rubricChecks.length, 3);
-  assert.ok(assessment.scores.comprehension >= 55);
-  assert.ok(assessment.scores.sourceGrounding >= 50);
+  assert.equal(assessment.sourceReference, "task_meta");
+  assert.equal(assessment.scores.sourceGrounding >= 35, true);
+  assert.equal(assessment.scores.overall >= 55, true);
 });
 
-test("repair cues increase listening repair behavior score", () => {
-  const base = evaluateListeningComprehension({
+test("listening fallback penalizes question-copy stuffing", () => {
+  const assessment = evaluateListeningComprehensionFallback({
     taskType: "listening_comprehension",
-    taskPrompt:
-      "Audio: Maya forgot her notebook and borrowed one from a classmate.\nQuestion: What did Maya borrow?",
-    transcript: "Maya borrowed a notebook from her classmate.",
+    taskPrompt: "Listen to the audio and answer.\nQuestion: Why did Ben call his teacher?",
+    transcript: "Why did Ben call his teacher? Why did Ben call his teacher?",
+    hiddenReference: {
+      script:
+        "Ben missed the bus, so he called his teacher before class to explain he would be late.",
+      question: "Why did Ben call his teacher?",
+    },
   });
 
-  const withRepair = evaluateListeningComprehension({
-    taskType: "listening_comprehension",
-    taskPrompt:
-      "Audio: Maya forgot her notebook and borrowed one from a classmate.\nQuestion: What did Maya borrow?",
-    transcript:
-      "Maya borrowed a notebook from her classmate. Sorry, to clarify, she borrowed it because she forgot hers.",
-  });
-
-  assert.ok(withRepair.scores.repairBehavior >= base.scores.repairBehavior);
+  assert.equal(assessment.signals.antiLeakPenalty > 0, true);
+  assert.equal(assessment.scores.sourceGrounding < 40, true);
+  assert.equal(assessment.scores.overall < 65, true);
 });

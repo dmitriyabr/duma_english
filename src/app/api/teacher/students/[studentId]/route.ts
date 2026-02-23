@@ -190,7 +190,17 @@ export async function GET(
   const STAGES = ["A1", "A2", "B1", "B2", "C1", "C2"] as const;
   type CEFRStageType = "A0" | "A1" | "A2" | "B1" | "B2" | "C1" | "C2";
   const placementStage = (progress as { placementStage?: string }).placementStage;
-  const ds = (progress as { domainStages?: { vocab: { stage: string }; grammar: { stage: string }; communication: { stage: string } } }).domainStages;
+  const ds = (progress as {
+    domainStages?: {
+      speaking: { stage: string };
+      listening: { stage: string };
+      reading: { stage: string };
+      writing: { stage: string };
+      vocab: { stage: string };
+      grammar: { stage: string };
+      communication: { stage: string };
+    };
+  }).domainStages;
   const domainPlacementStages = ds ? {
     vocab: ds.vocab.stage as CEFRStageType,
     grammar: ds.grammar.stage as CEFRStageType,

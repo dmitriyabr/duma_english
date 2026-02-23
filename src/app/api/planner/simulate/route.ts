@@ -4,6 +4,7 @@ import { getStudentFromRequest } from "@/lib/auth";
 import { planNextTaskDecision } from "@/lib/gse/planner";
 import { projectLearnerStageFromGse } from "@/lib/gse/stageProjection";
 import { prisma } from "@/lib/db";
+import { getRuntimeFeatureFlags } from "@/lib/featureFlags";
 
 const schema = z.object({
   requestedType: z.string().min(2).optional(),
@@ -42,6 +43,7 @@ export async function POST(req: NextRequest) {
   if (!student) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const runtimeFeatureFlags = getRuntimeFeatureFlags();
 
   const body = schema.safeParse(await req.json().catch(() => ({})));
   if (!body.success) {
@@ -69,6 +71,7 @@ export async function POST(req: NextRequest) {
     studentId: student.studentId,
     stage: projection.promotionStage,
     ageBand: profile?.ageBand || "9-11",
+    memoryRuntimeEnabled: runtimeFeatureFlags.memory_runtime_v1,
     candidateTaskTypes:
       body.data.candidateTaskTypes && body.data.candidateTaskTypes.length > 0
         ? body.data.candidateTaskTypes
@@ -98,6 +101,7 @@ export async function POST(req: NextRequest) {
     expectedGain: decision.expectedGain,
     targetNodeIds: decision.targetNodeIds,
     targetNodeDescriptors: decision.targetNodeDescriptors,
+    memoryQueueHits: decision.memoryQueueHits,
     domainsTargeted: decision.domainsTargeted,
     diagnosticMode: decision.diagnosticMode,
     primaryGoal: decision.primaryGoal,
@@ -106,5 +110,6 @@ export async function POST(req: NextRequest) {
     ambiguityTrigger: decision.ambiguityTrigger,
     hybridPolicy: decision.hybridPolicy,
     shadowPolicy: decision.shadowPolicy,
+    runtimeFeatureFlags,
   });
 }

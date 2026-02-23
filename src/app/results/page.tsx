@@ -67,6 +67,11 @@ type AttemptResult = {
       wordCount?: number;
     } | null;
     taskEvaluation?: TaskEvaluation | null;
+    causalCoach?: {
+      reasonTitle: string;
+      reasonBody: string;
+      nextAction: string;
+    } | null;
     language?: {
       grammar?: {
         grammarAccuracy?: number;
@@ -181,10 +186,22 @@ const PROCESSING_HINTS = [
 ];
 
 function retryHeadline(reasonCode?: string | null) {
-  if (reasonCode === "RETRY_OFF_TOPIC") {
-    return "🧭 I'm sorry, this sounds like another topic. Let's read the task and try again.";
+  if (reasonCode === "RETRY_TOO_SHORT") {
+    return "Nice try. Make it a bit longer so we can score it well.";
   }
-  return "🎤 I'm sorry, I didn't hear you well. Can you try again?";
+  if (reasonCode === "RETRY_NO_SPEECH") {
+    return "I could not hear your voice. Try again and speak clearly.";
+  }
+  if (reasonCode === "RETRY_TOO_QUIET") {
+    return "Your voice was too quiet. Try again a little louder.";
+  }
+  if (reasonCode === "RETRY_UNINTELLIGIBLE") {
+    return "Some words were unclear. Try again slowly and clearly.";
+  }
+  if (reasonCode === "RETRY_OFF_TOPIC") {
+    return "This answer sounds like another topic. Read the task and try again.";
+  }
+  return "I didn't catch that clearly. Please try once more.";
 }
 
 export default function ResultsPage() {
@@ -237,6 +254,7 @@ export default function ResultsPage() {
   });
   const checks = (taskEvaluation?.rubricChecks || []).filter((check) => !!check.name && check.reason);
   const transcript = data?.results?.transcript;
+  const causalCoach = data?.results?.causalCoach;
   const gseEvidence = data?.results?.gseEvidence || [];
   const incidentalFindings = data?.results?.incidentalFindings || [];
   const activationTransitions = data?.results?.activationTransitions || [];
@@ -418,6 +436,18 @@ export default function ResultsPage() {
                         </article>
                       )}
                     </div>
+                  </section>
+                )}
+
+                {causalCoach && (
+                  <section className="results-panel">
+                    <article className="results-mini-card">
+                      <p className="results-mini-title">{causalCoach.reasonTitle}</p>
+                      <p className="results-summary-text">{causalCoach.reasonBody}</p>
+                      <p className="results-summary-text">
+                        <strong>Next action:</strong> {causalCoach.nextAction}
+                      </p>
+                    </article>
                   </section>
                 )}
 

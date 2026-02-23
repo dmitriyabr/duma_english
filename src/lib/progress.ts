@@ -1,6 +1,7 @@
 import { prisma } from "./db";
 import { nextTargetNodesForStudent } from "./gse/planner/pool";
 import { projectLearnerStageFromGse } from "./gse/stageProjection";
+import { buildC2ClaimStatus } from "./claims/c2Claim";
 
 type SkillTrend = {
   skillKey: string;
@@ -28,6 +29,11 @@ function trendFromDelta(delta: number | null): SkillTrend["trend"] {
   if (delta > 2) return "up";
   if (delta < -2) return "down";
   return "flat";
+}
+
+function asObject(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return value as Record<string, unknown>;
 }
 
 const STAGE_ORDER = ["A0", "A1", "A2", "B1", "B2", "C1", "C2"] as const;
@@ -77,6 +83,11 @@ async function computeStreak(studentId: string) {
 export async function getStudentProgress(studentId: string) {
   const profile = await prisma.learnerProfile.findUnique({ where: { studentId } });
   const projection = await projectLearnerStageFromGse(studentId);
+  const latestPromotionAudit = await prisma.promotionAudit.findFirst({
+    where: { studentId },
+    orderBy: { createdAt: "desc" },
+    select: { reasonsJson: true },
+  });
   const attempts = await prisma.attempt.findMany({
     where: { studentId, status: "completed" },
     orderBy: { createdAt: "desc" },
@@ -140,6 +151,76 @@ export async function getStudentProgress(studentId: string) {
       select: { nodeId: true },
     }),
   ]);
+  const since180d = new Date(now.getTime() - 180 * 24 * 60 * 60 * 1000);
+  const claimAttemptsRaw = await prisma.attempt.findMany({
+    where: {
+      studentId,
+      status: "completed",
+      createdAt: { gte: since180d },
+    },
+    orderBy: { createdAt: "desc" },
+    take: 260,
+    select: {
+      createdAt: true,
+      scoresJson: true,
+      taskEvaluationJson: true,
+      task: {
+        select: { type: true },
+      },
+    },
+  });
+  const claimAttempts = claimAttemptsRaw.map((attempt) => {
+    const scores = (attempt.scoresJson || {}) as { taskScore?: number | null };
+    const evaluation =
+      attempt.taskEvaluationJson &&
+      typeof attempt.taskEvaluationJson === "object" &&
+      !Array.isArray(attempt.taskEvaluationJson)
+        ? (attempt.taskEvaluationJson as Record<string, unknown>)
+        : {};
+    const artifacts =
+      evaluation.artifacts && typeof evaluation.artifacts === "object" && !Array.isArray(evaluation.artifacts)
+        ? (evaluation.artifacts as Record<string, unknown>)
+        : {};
+    const discourse =
+      artifacts.discoursePragmatics &&
+      typeof artifacts.discoursePragmatics === "object" &&
+      !Array.isArray(artifacts.discoursePragmatics)
+        ? (artifacts.discoursePragmatics as Record<string, unknown>)
+        : {};
+    const discoursePassByDimension =
+      discourse.passByDimension &&
+      typeof discourse.passByDimension === "object" &&
+      !Array.isArray(discourse.passByDimension)
+        ? (discourse.passByDimension as Record<string, boolean>)
+        : null;
+    const discourseScores =
+      discourse.scores && typeof discourse.scores === "object" && !Array.isArray(discourse.scores)
+        ? (discourse.scores as Record<string, unknown>)
+        : null;
+
+    return {
+      createdAt: attempt.createdAt,
+      taskType: attempt.task.type,
+      taskScore:
+        typeof scores.taskScore === "number"
+          ? scores.taskScore
+          : typeof evaluation.taskScore === "number"
+          ? evaluation.taskScore
+          : null,
+      discourseOverallScore:
+        typeof discourse.overallScore === "number"
+          ? discourse.overallScore
+          : discourseScores && typeof discourseScores.argumentStructure === "number"
+          ? Number(discourseScores.argumentStructure)
+          : null,
+      discoursePassByDimension,
+    };
+  });
+  const claimStatus = buildC2ClaimStatus({
+    domainStages: projection.domainStages,
+    retentionCertification: projection.retentionCertification,
+    attempts: claimAttempts,
+  });
   const uniq = (rows: Array<{ nodeId: string }>) => new Set(rows.map((row) => row.nodeId)).size;
   const last7Coverage = uniq(last7Evidence);
   const prev7Coverage = uniq(prev7Evidence);
@@ -221,6 +302,7 @@ export async function getStudentProgress(studentId: string) {
 
   const placementStage = projection.placementStage;
   const promotionStage = projection.promotionStage;
+  const latestPolicyGate = asObject(asObject(latestPromotionAudit?.reasonsJson).policyGate);
   let whyDifferent = "Placement and promotion are aligned.";
   if (stageIndex(placementStage) > stageIndex(promotionStage)) {
     const topReason = projection.blockedBundles[0]?.reason || "bundle evidence is not sufficient yet";
@@ -241,6 +323,7 @@ export async function getStudentProgress(studentId: string) {
     cycleWeek: profile?.cycleWeek || 1,
     placementConfidence: profile?.placementConfidence || projection.placementConfidence,
     placementFresh: Boolean(profile?.placementFresh),
+    claimStatus,
     carryoverSummary: profile?.placementCarryoverJson || null,
     placementNeeded: gseMastery.length < 8,
     recentAttempts: attempts.map((attempt) => ({
@@ -291,8 +374,12 @@ export async function getStudentProgress(studentId: string) {
       })),
       targetStageBundleProgress: projection.targetStageBundleProgress ?? [],
       stressGate: projection.stressGate,
+      retentionOperational: projection.retentionOperational,
+      retentionCertification: projection.retentionCertification,
       retentionGate: projection.retentionGate,
       retention: projection.retention,
+      policyGate: Object.keys(latestPolicyGate).length > 0 ? latestPolicyGate : null,
+      claimStatus,
     },
     blockedByNodes: projection.blockedByNodes,
     weeklyFocusReason,

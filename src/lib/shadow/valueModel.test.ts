@@ -2,6 +2,23 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { __internal, type ShadowValueCandidateInput } from "./valueModel";
 
+const modelSnapshot = {
+  version: "snapshot-1",
+  trainedAt: "2026-02-18T00:00:00Z",
+  sampleSize: 1200,
+  weights: {
+    bias: 0,
+    priorReward: 1,
+    expectedGain: 0.055,
+    successProbability: 1.1,
+    verificationGain: 0.45,
+    explorationBonus: 0.25,
+    causalRemediationAdjustment: 0.7,
+    engagementRisk: 1.2,
+    latencyRisk: 0.8,
+  },
+};
+
 test("reward priors learn per-task reward means with shrinkage", () => {
   const priors = __internal.summarizeRewardPriors({
     now: new Date("2026-02-18T00:00:00Z"),
@@ -60,6 +77,7 @@ test("shadow scorer can disagree with rules while keeping deterministic ranking"
   const trace = __internal.evaluateShadowDecisionFromPriors({
     now: new Date("2026-02-18T00:00:00Z"),
     rulesChosenTaskType: "qa_prompt",
+    modelSnapshot,
     requiresVerificationCoverage: false,
     priors: {
       generatedAt: "2026-02-18T00:00:00Z",
@@ -80,7 +98,7 @@ test("shadow scorer can disagree with rules while keeping deterministic ranking"
 
   assert.equal(trace.shadowChosenTaskType, "role_play");
   assert.equal(trace.disagreement, true);
-  assert.equal(trace.modelVersion, "shadow-linear-contextual-v1");
+  assert.equal(trace.modelVersion, "shadow-learned-v2:snapshot-1");
 });
 
 test("safety guard blocks risky shadow pick and tracks counters", () => {
@@ -116,6 +134,7 @@ test("safety guard blocks risky shadow pick and tracks counters", () => {
   const trace = __internal.evaluateShadowDecisionFromPriors({
     now: new Date("2026-02-18T00:00:00Z"),
     rulesChosenTaskType: "qa_prompt",
+    modelSnapshot,
     requiresVerificationCoverage: true,
     priors: {
       generatedAt: "2026-02-18T00:00:00Z",
@@ -176,6 +195,7 @@ test("shadow ranking tie resolves by lexical task type order", () => {
   const trace = __internal.evaluateShadowDecisionFromPriors({
     now: new Date("2026-02-18T00:00:00Z"),
     rulesChosenTaskType: "qa_prompt",
+    modelSnapshot,
     requiresVerificationCoverage: false,
     priors: {
       generatedAt: "2026-02-18T00:00:00Z",

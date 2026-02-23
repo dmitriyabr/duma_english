@@ -8,6 +8,12 @@ type TaskResponse = {
   taskId: string;
   type: string;
   prompt: string;
+  listening?: {
+    audioUrl: string;
+    durationSec: number;
+    assetId: string;
+  } | null;
+  listeningPlaybackCompleted?: boolean;
   assessmentMode: "pa" | "stt" | "text";
   maxDurationSec: number;
   constraints: { minSeconds: number; maxSeconds: number };
@@ -17,7 +23,7 @@ type TaskResponse = {
   selectionReason?: string;
   decisionId?: string;
   primaryGoal?: string;
-  selectionReasonType?: "weakness" | "overdue" | "uncertainty" | "verification";
+  selectionReasonType?: "weakness" | "overdue" | "uncertainty" | "verification" | "memory_due";
   verificationTargetNodeIds?: string[];
   expectedGain?: number;
   difficulty?: number;
@@ -120,6 +126,7 @@ export default function TaskPage() {
   const router = useRouter();
   const [task, setTask] = useState<TaskResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [hasListened, setHasListened] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -134,6 +141,7 @@ export default function TaskPage() {
       .then((json: TaskResponse) => {
         if (!active) return;
         setTask(json);
+        setHasListened(Boolean(json.listeningPlaybackCompleted));
         localStorage.setItem("currentTask", JSON.stringify(json));
       })
       .catch((err) => {
@@ -162,6 +170,10 @@ export default function TaskPage() {
   );
   const actionCopy = taskActionCopy(task?.type);
   const exampleQuote = taskExampleQuote(task);
+  const isListeningTask = Boolean(
+    task?.type === "listening_comprehension" && task?.listening?.audioUrl
+  );
+  const listeningBlocked = isListeningTask && !hasListened;
   const modeLabel =
     task?.type === "reading_comprehension"
       ? "Read + Answer"
@@ -218,6 +230,22 @@ export default function TaskPage() {
                     </div>
                   </article>
 
+                  {isListeningTask && task?.listening && (
+                    <article className="task-guide">
+                      <p className="task-section-title">Listen First</p>
+                      <p className="results-summary-text">
+                        Play the audio at least once before you start recording.
+                      </p>
+                      <audio
+                        controls
+                        preload="none"
+                        src={task.listening.audioUrl}
+                        style={{ width: "100%", marginTop: 8 }}
+                        onEnded={() => setHasListened(true)}
+                      />
+                    </article>
+                  )}
+
                   {guide && (
                     <div className="task-guide">
                       <p className="task-section-title">{guide.title}</p>
@@ -255,7 +283,16 @@ export default function TaskPage() {
                   <div className="task-start-wrap">
                     <button
                       className="btn task-start-btn"
-                      onClick={() => router.push(task?.assessmentMode === "text" ? "/write" : "/record")}
+                      disabled={listeningBlocked}
+                      onClick={() => {
+                        if (!task) return;
+                        const payload = {
+                          ...task,
+                          listeningPlaybackCompleted: hasListened,
+                        };
+                        localStorage.setItem("currentTask", JSON.stringify(payload));
+                        router.push(task.assessmentMode === "text" ? "/write" : "/record");
+                      }}
                     >
                       <span className="task-cta-icon">📣</span>
                       {actionCopy.cta}

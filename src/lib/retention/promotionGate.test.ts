@@ -90,3 +90,29 @@ test("high-stakes targets block when one window falls below threshold", () => {
   assert.equal(result.passed, false);
   assert.ok(result.blockerReasons.includes("retention_7d_below_threshold"));
 });
+
+test("operational mode never returns hard blockers", () => {
+  const result = evaluateRetentionPromotionGateFromRows({
+    targetStage: "C1",
+    rows: rowsForWindow(40, 9, true),
+    mode: "operational",
+    now,
+  });
+
+  assert.equal(result.mode, "operational");
+  assert.equal(result.promotionImpact, "soft_signal");
+  assert.equal(result.required, false);
+  assert.equal(result.blockerReasons.length, 0);
+});
+
+test("operational mode treats insufficient sample as non-blocking", () => {
+  const result = evaluateRetentionPromotionGateFromRows({
+    targetStage: "B2",
+    rows: rowsForWindow(40, 9, true),
+    mode: "operational",
+    now,
+  });
+
+  assert.equal(result.passed, true);
+  assert.equal(result.windows.some((window) => window.status === "insufficient_sample"), true);
+});

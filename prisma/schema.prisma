@@ -706,6 +706,20 @@ model RewardTrace {
   @@index([decisionLogId, createdAt])
 }
 
+model ShadowPolicyModelSnapshot {
+  id         String   @id @default(cuid())
+  version    String   @unique
+  weightsJson Json
+  trainedAt  DateTime
+  sampleSize Int      @default(0)
+  isActive   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([isActive, trainedAt])
+  @@index([trainedAt])
+}
+
 model PolicyDecisionLogV2 {
   id                 String             @id @default(cuid())
   decisionLogId      String             @unique

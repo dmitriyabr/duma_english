@@ -6,10 +6,17 @@ import Link from "next/link";
 
 type TaskResponse = {
   taskId: string;
+  type?: string;
   prompt: string;
   assessmentMode: "pa" | "stt" | "text";
   maxDurationSec: number;
   constraints: { minSeconds: number; maxSeconds: number };
+  listening?: {
+    audioUrl: string;
+    durationSec: number;
+    assetId: string;
+  } | null;
+  listeningPlaybackCompleted?: boolean;
 };
 
 function flattenChunks(chunks: Float32Array[]) {
@@ -94,6 +101,7 @@ export default function RecordPage() {
   const [status, setStatus] = useState("Idle");
   const [error, setError] = useState<string | null>(null);
   const [seconds, setSeconds] = useState(0);
+  const [listeningReady, setListeningReady] = useState(false);
 
   const streamRef = useRef<MediaStream | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -105,7 +113,11 @@ export default function RecordPage() {
   useEffect(() => {
     const stored = localStorage.getItem("currentTask");
     if (stored) {
-      setTask(JSON.parse(stored));
+      const parsed = JSON.parse(stored) as TaskResponse;
+      setTask(parsed);
+      const isListeningTask =
+        parsed.type === "listening_comprehension" && Boolean(parsed.listening?.audioUrl);
+      setListeningReady(!isListeningTask || Boolean(parsed.listeningPlaybackCompleted));
     }
   }, []);
 
@@ -144,6 +156,14 @@ export default function RecordPage() {
   async function startRecording() {
     if (task?.assessmentMode === "text") {
       setError("This task is writing-only. Please use the writing page.");
+      return;
+    }
+    if (
+      task?.type === "listening_comprehension" &&
+      task.listening?.audioUrl &&
+      !listeningReady
+    ) {
+      setError("Please listen to the full audio once before recording.");
       return;
     }
     setError(null);
@@ -270,6 +290,9 @@ export default function RecordPage() {
 
   const isRecording = status === "Recording";
   const isUploading = status === "Uploading";
+  const isListeningTask = Boolean(
+    task?.type === "listening_comprehension" && task?.listening?.audioUrl
+  );
   const modeLabel =
     task?.assessmentMode === "pa" ? "Read Aloud" : task?.assessmentMode === "text" ? "Writing" : "Free Talk";
   const elapsedLabel = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
@@ -326,6 +349,23 @@ export default function RecordPage() {
                   <div className="record-tip-bubble">
                     <p>Tip: Smile while speaking. Your voice sounds brighter!</p>
                   </div>
+                  {isListeningTask && task?.listening && (
+                    <div style={{ marginTop: 10 }}>
+                      <p className="record-mission-label">LISTENING AUDIO:</p>
+                      <audio
+                        controls
+                        preload="none"
+                        src={task.listening.audioUrl}
+                        style={{ width: "100%" }}
+                        onEnded={() => {
+                          setListeningReady(true);
+                          const nextTask = { ...task, listeningPlaybackCompleted: true };
+                          setTask(nextTask);
+                          localStorage.setItem("currentTask", JSON.stringify(nextTask));
+                        }}
+                      />
+                    </div>
+                  )}
                 </article>
               </div>
 

@@ -4,6 +4,7 @@ import { getStudentFromRequest } from "@/lib/auth";
 import { SpeechMetrics } from "@/lib/scoring";
 import { config } from "@/lib/config";
 import { ATTEMPT_STATUS, isAttemptRetryStatus } from "@/lib/attemptStatus";
+import { buildChildCausalCoach } from "@/lib/causal/coach";
 
 type AttemptRouteContext = {
   params: Promise<{ id: string }>;
@@ -488,6 +489,9 @@ export async function GET(_: Request, context: AttemptRouteContext) {
         createdAt: attempt.causalDiagnosis.createdAt,
       }
     : null;
+  const causalCoach = attempt.causalDiagnosis
+    ? buildChildCausalCoach(attempt.causalDiagnosis.topLabel)
+    : null;
 
   return NextResponse.json({
     status: attempt.status,
@@ -526,6 +530,7 @@ export async function GET(_: Request, context: AttemptRouteContext) {
             taskEvaluation,
             feedback,
             causal,
+            causalCoach,
             gseEvidence,
             evidenceMatrix,
             consistencyFlag,

@@ -1,0 +1,61 @@
+{
+  "generatedAt": "2026-02-23T10:35:21.093Z",
+  "windowDays": 30,
+  "flags": {
+    "listening_runtime_v2": true,
+    "retention_gate_v2": true,
+    "memory_runtime_v1": true,
+    "policy_gate_v1": true,
+    "shadow_model_v2": true
+  },
+  "listeningAuthenticity": {
+    "tasksIssued": 1,
+    "withAudioPayload": 0,
+    "promptLeakCount": 1,
+    "scriptLeakRate": 1
+  },
+  "memoryRuntime": {
+    "decisions": 214,
+    "backlogDecisions": 0,
+    "backlogHitDecisions": 0,
+    "backlogHitRate": null,
+    "dueOverrideCount": 0
+  },
+  "causalCoach": {
+    "completedAttempts": 177,
+    "withCausalDiagnosis": 1,
+    "exposureRate": 0.00565,
+    "topLabels": [
+      {
+        "label": "production_constraint",
+        "count": 1
+      }
+    ]
+  },
+  "promotionBlocks": {
+    "audits": 166,
+    "blockedAudits": 158,
+    "reasons": [
+      {
+        "reason": "unknown_blocker",
+        "count": 157
+      },
+      {
+        "reason": "coverage",
+        "count": 3
+      },
+      {
+        "reason": "reliability",
+        "count": 3
+      },
+      {
+        "reason": "stability",
+        "count": 3
+      },
+      {
+        "reason": "direct_evidence",
+        "count": 3
+      }
+    ]
+  }
+}

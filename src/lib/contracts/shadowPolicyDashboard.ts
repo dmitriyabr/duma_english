@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const SHADOW_POLICY_MODEL_VERSION = "shadow-linear-contextual-v1" as const;
+export const SHADOW_POLICY_MODEL_VERSION = "shadow-learned-v2" as const;
 
 export const shadowPriorRowSchema = z.object({
   taskType: z.string(),
@@ -24,7 +24,9 @@ export const shadowSafetyCountersSchema = z.object({
 });
 
 export const shadowPolicyTraceSchema = z.object({
-  modelVersion: z.literal(SHADOW_POLICY_MODEL_VERSION),
+  modelVersion: z.string().min(1),
+  modelSnapshotVersion: z.string().nullable().optional(),
+  modelTrainedAt: z.string().datetime().nullable().optional(),
   generatedAt: z.string().datetime(),
   trainingWindowDays: z.number().int().positive(),
   trainingSampleSize: z.number().int().nonnegative(),

@@ -4,17 +4,22 @@ export const CEFR_COVERAGE_STAGE_ORDER = ["A0", "A1", "A2", "B1", "B2", "C1", "C
 export type CefrCoverageStage = (typeof CEFR_COVERAGE_STAGE_ORDER)[number];
 
 export const CEFR_COVERAGE_SKILLS = [
-  "pronunciation",
-  "fluency",
-  "tempo_control",
+  "speaking",
+  "listening",
+  "reading",
+  "writing",
+  "grammar",
   "vocabulary",
-  "task_completion",
+  "discourse",
+  "pragmatics",
 ] as const;
 export type CefrCoverageSkill = (typeof CEFR_COVERAGE_SKILLS)[number];
 
 export const CEFR_COVERAGE_TASK_FAMILIES = [
   "read_aloud",
   "listening_comprehension",
+  "reading_comprehension",
+  "writing_prompt",
   "target_vocab",
   "qa_prompt",
   "role_play",
@@ -28,25 +33,24 @@ export const CEFR_COVERAGE_TASK_FAMILIES = [
 export type CefrCoverageTaskFamily = (typeof CEFR_COVERAGE_TASK_FAMILIES)[number];
 
 export const CEFR_COVERAGE_RUBRIC_ROWS = [
-  "reference_coverage",
-  "accuracy_score",
-  "fluency_score",
+  "speaking_delivery",
+  "listening_grounding",
+  "reading_grounding",
+  "writing_clarity",
+  "grammar_accuracy",
   "required_words_used",
-  "contextual_usage",
-  "greeting",
-  "questioning",
-  "politeness",
+  "contextual_vocabulary",
+  "question_addressed",
   "question_answered",
   "direct_answer_first",
   "supporting_reasons",
   "main_point_detected",
   "supporting_detail_count",
   "coherence",
-  "filler_density",
-  "steady_flow",
-  "self_corrections",
-  "parts_present",
-  "order_quality",
+  "argument_structure",
+  "register_control",
+  "turn_taking_repair",
+  "audience_fit",
 ] as const;
 export type CefrCoverageRubricRow = (typeof CEFR_COVERAGE_RUBRIC_ROWS)[number];
 
@@ -101,53 +105,74 @@ export type CefrCoverageMatrix = z.infer<typeof cefrCoverageMatrixSchema>;
 
 const STAGE_SKILL_DESCRIPTORS: Record<CefrCoverageStage, Record<CefrCoverageSkill, string>> = {
   A0: {
-    pronunciation: "Produce high-frequency classroom and daily-life words clearly.",
-    fluency: "Speak in short chunks with teacher-like prompts and minimal silence.",
-    tempo_control: "Keep a steady beginner pace on 1-2 sentence responses.",
-    vocabulary: "Use a core bank of frequent words in guided speaking.",
-    task_completion: "Follow a simple speaking instruction and complete it.",
+    speaking: "Speak in short guided phrases with understandable meaning.",
+    listening: "Catch the main point in very short classroom audio.",
+    reading: "Read short familiar lines and find key words.",
+    writing: "Write short guided sentences with a clear idea.",
+    grammar: "Use basic sentence order with support.",
+    vocabulary: "Use core high-frequency words for daily topics.",
+    discourse: "Give one clear point with simple linking.",
+    pragmatics: "Use polite turn-taking in short exchanges.",
   },
   A1: {
-    pronunciation: "Say common words and short phrases with understandable stress.",
-    fluency: "Give 3-4 sentence answers with fewer restarts.",
-    tempo_control: "Maintain stable pace in short monologues and Q&A.",
-    vocabulary: "Use thematic school-life vocabulary in context.",
-    task_completion: "Answer prompts directly and add one supporting detail.",
+    speaking: "Answer everyday prompts in 3-4 short sentences.",
+    listening: "Understand short audio and answer direct questions.",
+    reading: "Read short passages and find explicit information.",
+    writing: "Write short connected responses on familiar topics.",
+    grammar: "Use common sentence frames with fewer rule slips.",
+    vocabulary: "Use school and home vocabulary in context.",
+    discourse: "State a main point and add one support detail.",
+    pragmatics: "Respond politely and keep conversational intent clear.",
   },
   A2: {
-    pronunciation: "Speak clearly enough for unfamiliar listeners in routine topics.",
-    fluency: "Sustain 45-60 second responses with logical flow.",
-    tempo_control: "Control pauses and pace during extended turns.",
-    vocabulary: "Use varied and precise topic vocabulary with few misuse errors.",
-    task_completion: "Complete role-play and structured prompts with relevance.",
+    speaking: "Sustain 45-60 second responses with clear structure.",
+    listening: "Track short multi-sentence audio and extract reasons/details.",
+    reading: "Understand short texts and answer inference-lite questions.",
+    writing: "Write short structured responses with coherent flow.",
+    grammar: "Apply core tense and agreement patterns reliably.",
+    vocabulary: "Use varied topic vocabulary with mostly correct usage.",
+    discourse: "Organize answer with main point, detail, and close.",
+    pragmatics: "Adjust politeness and turn-taking to simple contexts.",
   },
   B1: {
-    pronunciation: "Deliver clear intelligible speech in longer presentations.",
-    fluency: "Speak with natural rhythm in 60-90 second mini talks.",
-    tempo_control: "Control pacing strategically for emphasis and clarity.",
-    vocabulary: "Use flexible vocabulary to explain, compare, and persuade.",
-    task_completion: "Build coherent public-facing responses with structure.",
+    speaking: "Speak in extended turns with clear intent and support.",
+    listening: "Understand connected speech and answer why/how questions.",
+    reading: "Read multi-paragraph texts and identify core claims.",
+    writing: "Write coherent paragraphs with clear argument direction.",
+    grammar: "Control sentence complexity with stable accuracy.",
+    vocabulary: "Use flexible vocabulary to explain and compare ideas.",
+    discourse: "Build reasoned responses with clear coherence markers.",
+    pragmatics: "Repair misunderstandings and maintain interaction quality.",
   },
   B2: {
-    pronunciation: "Maintain clear and accurate pronunciation for unfamiliar topics.",
-    fluency: "Sustain extended speech with minimal hesitation.",
-    tempo_control: "Adapt pace and pauses intentionally for emphasis.",
-    vocabulary: "Use precise topic-specific vocabulary and paraphrase effectively.",
-    task_completion: "Handle complex prompts with balanced structure and relevance.",
+    speaking: "Handle complex speaking tasks with balanced structure.",
+    listening: "Follow nuanced audio and separate key vs supporting points.",
+    reading: "Interpret argument structure and evidence in longer texts.",
+    writing: "Write structured, audience-aware responses with clear logic.",
+    grammar: "Maintain high control over complex grammar choices.",
+    vocabulary: "Use precise vocabulary and paraphrase when needed.",
+    discourse: "Sustain coherent argument flow across longer responses.",
+    pragmatics: "Choose register and response style for context/audience.",
   },
   C1: {
-    pronunciation: "Speak with consistent clarity and advanced control of stress patterns.",
-    fluency: "Deliver long responses smoothly with natural transitions.",
-    tempo_control: "Use dynamic pacing to support argument and audience understanding.",
-    vocabulary: "Deploy nuanced vocabulary, idiomatic range, and precise register.",
-    task_completion: "Address abstract and multi-part tasks with strong coherence.",
+    speaking: "Deliver advanced spoken responses with control and flexibility.",
+    listening: "Extract subtle intent and stance from dense audio.",
+    reading: "Interpret nuanced claims, tone, and argumentative strategy.",
+    writing: "Produce advanced structured writing with clear rhetorical intent.",
+    grammar: "Use complex grammar accurately under cognitive load.",
+    vocabulary: "Deploy nuanced lexical choices and precise register shifts.",
+    discourse: "Construct robust argumentation with clear discourse control.",
+    pragmatics: "Adapt interaction strategy, register, and repair in real time.",
   },
   C2: {
-    pronunciation: "Maintain near-native clarity and intelligibility under pressure.",
-    fluency: "Speak effortlessly in extended discourse and spontaneous exchanges.",
-    tempo_control: "Control rhythm and pacing strategically for rhetorical effect.",
-    vocabulary: "Use sophisticated lexical range with accuracy and flexibility.",
-    task_completion: "Deliver polished, audience-aware responses for advanced tasks.",
+    speaking: "Speak effortlessly across demanding, spontaneous tasks.",
+    listening: "Comprehend subtle detail and implied meaning in rich audio.",
+    reading: "Process complex texts with high-fidelity interpretation.",
+    writing: "Produce polished writing with advanced argument and style control.",
+    grammar: "Maintain near-error-free grammar across complex constructions.",
+    vocabulary: "Use broad and precise vocabulary with context-appropriate nuance.",
+    discourse: "Control discourse architecture in advanced argument tasks.",
+    pragmatics: "Demonstrate audience-fit, register-switching, and repair mastery.",
   },
 };
 
@@ -162,62 +187,81 @@ type SkillBinding = {
 };
 
 const SKILL_BINDINGS: Record<CefrCoverageSkill, SkillBinding> = {
-  pronunciation: {
+  speaking: {
     nodeSelectorTemplates: [
       { kind: "bundle_domain", domain: "lo" },
       { kind: "gse_node_type", nodeType: "GSE_LO" },
     ],
-    taskFamilies: ["read_aloud", "filler_control"],
-    rubricRows: ["reference_coverage", "accuracy_score", "fluency_score"],
+    taskFamilies: ["topic_talk", "qa_prompt", "role_play", "speech_builder"],
+    rubricRows: ["speaking_delivery", "question_answered", "coherence"],
   },
-  fluency: {
+  listening: {
     nodeSelectorTemplates: [
       { kind: "bundle_domain", domain: "lo" },
       { kind: "gse_node_type", nodeType: "GSE_LO" },
     ],
-    taskFamilies: ["topic_talk", "qa_prompt", "speech_builder", "listening_comprehension"],
-    rubricRows: [
-      "main_point_detected",
-      "supporting_detail_count",
-      "coherence",
-      "question_answered",
-      "direct_answer_first",
-      "supporting_reasons",
-    ],
+    taskFamilies: ["listening_comprehension"],
+    rubricRows: ["listening_grounding", "question_addressed", "supporting_detail_count"],
   },
-  tempo_control: {
+  reading: {
     nodeSelectorTemplates: [
       { kind: "bundle_domain", domain: "lo" },
       { kind: "gse_node_type", nodeType: "GSE_LO" },
     ],
-    taskFamilies: ["filler_control", "speech_builder", "topic_talk"],
-    rubricRows: ["filler_density", "steady_flow", "self_corrections", "order_quality"],
+    taskFamilies: ["reading_comprehension"],
+    rubricRows: ["reading_grounding", "question_addressed", "main_point_detected"],
+  },
+  writing: {
+    nodeSelectorTemplates: [
+      { kind: "bundle_domain", domain: "lo" },
+      { kind: "bundle_domain", domain: "grammar" },
+      { kind: "gse_node_type", nodeType: "GSE_LO" },
+      { kind: "gse_node_type", nodeType: "GSE_GRAMMAR" },
+    ],
+    taskFamilies: ["writing_prompt"],
+    rubricRows: ["writing_clarity", "coherence", "grammar_accuracy"],
+  },
+  grammar: {
+    nodeSelectorTemplates: [
+      { kind: "bundle_domain", domain: "grammar" },
+      { kind: "gse_node_type", nodeType: "GSE_GRAMMAR" },
+    ],
+    taskFamilies: ["writing_prompt", "qa_prompt", "reading_comprehension"],
+    rubricRows: ["grammar_accuracy", "question_answered", "coherence"],
   },
   vocabulary: {
     nodeSelectorTemplates: [
       { kind: "bundle_domain", domain: "vocab" },
       { kind: "gse_node_type", nodeType: "GSE_VOCAB" },
     ],
-    taskFamilies: ["target_vocab", "topic_talk", "qa_prompt"],
-    rubricRows: ["required_words_used", "contextual_usage"],
+    taskFamilies: ["target_vocab", "writing_prompt", "reading_comprehension", "topic_talk"],
+    rubricRows: ["required_words_used", "contextual_vocabulary", "supporting_reasons"],
   },
-  task_completion: {
+  discourse: {
     nodeSelectorTemplates: [
-      { kind: "bundle_domain", domain: "grammar" },
       { kind: "bundle_domain", domain: "lo" },
-      { kind: "gse_node_type", nodeType: "GSE_GRAMMAR" },
       { kind: "gse_node_type", nodeType: "GSE_LO" },
     ],
-    taskFamilies: ["qa_prompt", "role_play", "speech_builder", "listening_comprehension"],
+    taskFamilies: ["argumentation", "register_switch", "misunderstanding_repair"],
     rubricRows: [
-      "question_answered",
-      "direct_answer_first",
+      "argument_structure",
+      "coherence",
       "supporting_reasons",
-      "greeting",
-      "questioning",
-      "politeness",
-      "parts_present",
-      "order_quality",
+      "register_control",
+      "turn_taking_repair",
+    ],
+  },
+  pragmatics: {
+    nodeSelectorTemplates: [
+      { kind: "bundle_domain", domain: "lo" },
+      { kind: "gse_node_type", nodeType: "GSE_LO" },
+    ],
+    taskFamilies: ["role_play", "register_switch", "misunderstanding_repair"],
+    rubricRows: [
+      "register_control",
+      "turn_taking_repair",
+      "audience_fit",
+      "direct_answer_first",
     ],
   },
 };
@@ -226,9 +270,10 @@ const ADVANCED_DISCOURSE_STAGE_SET = new Set<CefrCoverageStage>(["C1", "C2"]);
 const ADVANCED_DISCOURSE_TASKS_BY_SKILL: Partial<
   Record<CefrCoverageSkill, CefrCoverageTaskFamily[]>
 > = {
-  fluency: ["argumentation", "register_switch"],
-  vocabulary: ["register_switch"],
-  task_completion: ["argumentation", "register_switch", "misunderstanding_repair"],
+  speaking: ["argumentation"],
+  writing: ["argumentation"],
+  discourse: ["argumentation", "register_switch", "misunderstanding_repair"],
+  pragmatics: ["register_switch", "misunderstanding_repair"],
 };
 
 function dedupe<T>(items: T[]) {
@@ -277,11 +322,11 @@ function buildDescriptorRows(): CefrCoverageDescriptorRow[] {
   return rows;
 }
 
-export const CEFR_COVERAGE_MATRIX_VERSION = "cefr-coverage.v1.2026-02-19";
+export const CEFR_COVERAGE_MATRIX_VERSION = "cefr-coverage.v2.2026-02-23";
 
 export const CEFR_COVERAGE_MATRIX: CefrCoverageMatrix = cefrCoverageMatrixSchema.parse({
   version: CEFR_COVERAGE_MATRIX_VERSION,
-  generatedAt: "2026-02-19T00:00:00Z",
+  generatedAt: "2026-02-23T00:00:00Z",
   descriptorRows: buildDescriptorRows(),
 });
 

@@ -27,6 +27,10 @@ type PlacementResult = {
   stage: string;
   confidence: number;
   domainStages?: {
+    speaking: DomainStageInfo;
+    listening: DomainStageInfo;
+    reading: DomainStageInfo;
+    writing: DomainStageInfo;
     vocab: DomainStageInfo;
     grammar: DomainStageInfo;
     communication: DomainStageInfo;
@@ -739,6 +743,10 @@ export default function PlacementExtendedPage() {
                       <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 8, padding: "16px 0", borderTop: "1px solid #eee" }}>
                         <DomainBar label="Vocabulary" stage={placementResult.domainStages.vocab.stage} />
                         <DomainBar label="Grammar" stage={placementResult.domainStages.grammar.stage} />
+                        <DomainBar label="Speaking" stage={placementResult.domainStages.speaking.stage} />
+                        <DomainBar label="Listening" stage={placementResult.domainStages.listening.stage} />
+                        <DomainBar label="Reading" stage={placementResult.domainStages.reading.stage} />
+                        <DomainBar label="Writing" stage={placementResult.domainStages.writing.stage} />
                         <DomainBar label="Communication" stage={placementResult.domainStages.communication.stage} />
                         {placementResult.pronunciationScore != null && (
                           <div style={{ display: "flex", alignItems: "center", gap: 12, fontSize: "0.9rem" }}>

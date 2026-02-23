@@ -22,6 +22,7 @@ const MIN_SAMPLES_BY_WINDOW: Record<(typeof RETENTION_PROMOTION_WINDOWS)[number]
 };
 
 export type RetentionGateStatus = "pass" | "fail" | "insufficient_sample";
+export type RetentionPromotionGateMode = "operational" | "certification";
 
 export type RetentionPromotionGateWindowResult = {
   windowDays: (typeof RETENTION_PROMOTION_WINDOWS)[number];
@@ -34,6 +35,8 @@ export type RetentionPromotionGateWindowResult = {
 
 export type RetentionPromotionGateResult = {
   protocolVersion: typeof RETENTION_PROMOTION_GATE_VERSION;
+  mode: RetentionPromotionGateMode;
+  promotionImpact: "soft_signal" | "hard_block";
   required: boolean;
   highStakesTarget: boolean;
   passThreshold: number;
@@ -95,27 +98,38 @@ function blockerReasonFromWindow(window: RetentionPromotionGateWindowResult) {
 export function evaluateRetentionPromotionGateFromRows(params: {
   rows: KpiRetentionEvidenceRow[];
   targetStage: CEFRStage;
+  mode?: RetentionPromotionGateMode;
   now?: Date;
 }): RetentionPromotionGateResult {
   const now = params.now || new Date();
+  const mode = params.mode ?? "certification";
   const highStakesTarget = isHighStakesTargetStage(params.targetStage);
-  const required = highStakesTarget;
+  const required = mode === "certification" ? highStakesTarget : false;
 
   const windows = RETENTION_PROMOTION_WINDOWS.map((windowDays) =>
     evaluateWindow(params.rows, windowDays, now),
   );
 
-  const blockerReasons = required
+  const blockerReasons = mode === "certification" && required
     ? windows.filter((window) => !window.passed).map(blockerReasonFromWindow)
     : [];
+  const failedWindowCount = windows.filter((window) => window.status === "fail").length;
+  const passed =
+    mode === "certification"
+      ? required
+        ? blockerReasons.length === 0
+        : true
+      : failedWindowCount === 0;
 
   return {
     protocolVersion: RETENTION_PROMOTION_GATE_VERSION,
+    mode,
+    promotionImpact: mode === "certification" ? "hard_block" : "soft_signal",
     required,
     highStakesTarget,
     passThreshold: RETENTION_PROMOTION_PASS_THRESHOLD,
     windows,
-    passed: required ? blockerReasons.length === 0 : true,
+    passed,
     blockerReasons,
   };
 }
@@ -123,6 +137,7 @@ export function evaluateRetentionPromotionGateFromRows(params: {
 export async function evaluateRetentionPromotionGate(params: {
   studentId: string;
   targetStage: CEFRStage;
+  mode?: RetentionPromotionGateMode;
   now?: Date;
 }): Promise<RetentionPromotionGateResult> {
   const now = params.now || new Date();
@@ -148,6 +163,7 @@ export async function evaluateRetentionPromotionGate(params: {
   return evaluateRetentionPromotionGateFromRows({
     rows,
     targetStage: params.targetStage,
+    mode: params.mode,
     now,
   });
 }

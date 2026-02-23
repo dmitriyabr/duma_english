@@ -43,6 +43,13 @@ import {
   PLACEMENT_DOMAIN_TO_TASK_TYPE,
   type CrossModalityPlacementSummary,
 } from "@/lib/placement/crossModality";
+import {
+  buildListeningRuntimePayload,
+  LISTENING_RUNTIME_VERSION,
+  type ListeningPayload,
+} from "@/lib/listening/runtime";
+import { syncMemorySchedulerForStudent } from "@/lib/memory/scheduler";
+import { getRuntimeFeatureFlags } from "@/lib/featureFlags";
 
 const ALL_TASK_TYPES = [
   "read_aloud",
@@ -114,6 +121,7 @@ export async function GET(req: Request) {
   if (!student) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const runtimeFeatureFlags = getRuntimeFeatureFlags();
 
   const url = new URL(req.url);
   const requestedType = url.searchParams.get("type");
@@ -147,6 +155,32 @@ export async function GET(req: Request) {
     },
   });
   const placementUncertainNodes = profile?.placementUncertainNodeIds || [];
+  let memorySync:
+    | {
+        schedulerVersion: string;
+        openCounts: {
+          fresh: number;
+          review: number;
+          transfer: number;
+        };
+        queuedNodes: number;
+      }
+    | null = null;
+  if (runtimeFeatureFlags.memory_runtime_v1) {
+    try {
+      const syncResult = await syncMemorySchedulerForStudent({
+        studentId: student.studentId,
+        maxCandidates: 140,
+      });
+      memorySync = {
+        schedulerVersion: syncResult.schedulerVersion,
+        openCounts: syncResult.openCounts,
+        queuedNodes: syncResult.queuedNodes,
+      };
+    } catch {
+      memorySync = null;
+    }
+  }
 
   const weakestSkills = projection.derivedSkills
     .filter((item) => item.current !== null)
@@ -224,6 +258,7 @@ export async function GET(req: Request) {
     studentId: student.studentId,
     stage: projection.promotionStage,
     ageBand: profile?.ageBand || "9-11",
+    memoryRuntimeEnabled: runtimeFeatureFlags.memory_runtime_v1,
     useRuleOnly: useRuleOnly || undefined,
     candidateTaskTypes: (() => {
       if (
@@ -438,6 +473,11 @@ export async function GET(req: Request) {
       promptTargetWords = fallbackWords;
     }
   }
+  let listeningRuntimeSeed: ReturnType<typeof buildListeningRuntimePayload> | null = null;
+  if (selectedTaskType === "listening_comprehension" && runtimeFeatureFlags.listening_runtime_v2) {
+    listeningRuntimeSeed = buildListeningRuntimePayload({ prompt });
+    prompt = listeningRuntimeSeed.visiblePrompt;
+  }
 
   const referenceText =
     selectedTaskType === "read_aloud" ? extractReferenceText(prompt || generated.prompt) : null;
@@ -513,6 +553,22 @@ export async function GET(req: Request) {
       : null,
     fastLane: fastLaneDecision,
     oodBudgetController: oodBudgetDecision,
+    listeningPromptVersion:
+      selectedTaskType === "listening_comprehension" ? LISTENING_RUNTIME_VERSION : undefined,
+    listeningScript:
+      selectedTaskType === "listening_comprehension"
+        ? listeningRuntimeSeed?.hiddenScript || null
+        : undefined,
+    listeningQuestion:
+      selectedTaskType === "listening_comprehension" ? listeningRuntimeSeed?.question || null : undefined,
+    listeningAsset:
+      selectedTaskType === "listening_comprehension" && listeningRuntimeSeed
+        ? {
+            assetId: null,
+            durationSec: listeningRuntimeSeed.listeningAsset.durationSec,
+            runtimeVersion: LISTENING_RUNTIME_VERSION,
+          }
+        : undefined,
     localePolicyContext: {
       version: LOCALE_POLICY_CONTEXT_VERSION,
       profile: localePolicyContext.profile,
@@ -523,6 +579,8 @@ export async function GET(req: Request) {
         chosenTaskTypeAfterOverride: selectedTaskType,
       },
     },
+    memoryScheduler: memorySync,
+    runtimeFeatureFlags,
   };
 
   const localeTwinSnapshot = await prisma.learnerTwinSnapshot.create({
@@ -612,6 +670,26 @@ export async function GET(req: Request) {
       metaJson: taskMeta as Prisma.InputJsonValue,
     },
   });
+  let listeningPayload: ListeningPayload | null = null;
+  if (selectedTaskType === "listening_comprehension" && runtimeFeatureFlags.listening_runtime_v2) {
+    const listeningRuntime = buildListeningRuntimePayload({
+      taskId: task.id,
+      prompt,
+      taskMeta,
+    });
+    listeningPayload = listeningRuntime.listeningPayload;
+    prompt = listeningRuntime.visiblePrompt;
+    taskMeta.listeningScript = listeningRuntime.hiddenScript;
+    taskMeta.listeningQuestion = listeningRuntime.question;
+    taskMeta.listeningAsset = listeningRuntime.listeningAsset;
+    await prisma.task.update({
+      where: { id: task.id },
+      data: {
+        prompt,
+        metaJson: listeningRuntime.taskMeta as Prisma.InputJsonValue,
+      },
+    });
+  }
 
   // Target nodes always from planner; LLM is not asked for IDs (only for instruction text and words).
   const gseSelection = await assignTaskTargetsFromCatalog({
@@ -644,6 +722,12 @@ export async function GET(req: Request) {
       assessmentMode: effectiveAssessmentMode,
       expectedArtifacts: generated.expectedArtifacts,
       scoringHooks: generated.scoringHooks,
+      listening: listeningPayload
+        ? {
+            assetId: listeningPayload.assetId,
+            durationSec: listeningPayload.durationSec,
+          }
+        : null,
       estimatedDifficulty: generated.estimatedDifficulty,
       targetNodes: gseSelection.targetNodeIds,
       model: generated.model || null,
@@ -715,7 +799,8 @@ export async function GET(req: Request) {
   return NextResponse.json({
     taskId: task.id,
     type: task.type,
-    prompt: task.prompt,
+    prompt,
+    listening: listeningPayload,
     assessmentMode: effectiveAssessmentMode,
     maxDurationSec: effectiveMaxDurationSec,
     constraints: effectiveConstraints,
@@ -743,6 +828,9 @@ export async function GET(req: Request) {
       ? "mandatory_delayed_verification"
       : decision.primaryGoal,
     selectionReasonType: decision.selectionReasonType,
+    memoryQueueHits: decision.memoryQueueHits,
+    memoryScheduler: memorySync,
+    runtimeFeatureFlags,
     localePolicyContext: taskMeta.localePolicyContext ?? null,
     causalRemediation: decision.causalRemediation,
     causalAmbiguityTrigger: decision.ambiguityTrigger,

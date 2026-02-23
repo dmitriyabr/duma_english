@@ -45,20 +45,32 @@ test("cefr coverage validator flags duplicate and missing stage/skill mappings",
   assert.equal(codes.has("missing_stage_skill_mapping"), true);
 });
 
-test("C1/C2 task completion rows include advanced discourse task families", () => {
-  const c1TaskCompletion = CEFR_COVERAGE_MATRIX.descriptorRows.find(
-    (row) => row.stage === "C1" && row.skill === "task_completion",
+test("C1/C2 discourse rows include advanced discourse task families", () => {
+  const c1Discourse = CEFR_COVERAGE_MATRIX.descriptorRows.find(
+    (row) => row.stage === "C1" && row.skill === "discourse",
   );
-  const c2TaskCompletion = CEFR_COVERAGE_MATRIX.descriptorRows.find(
-    (row) => row.stage === "C2" && row.skill === "task_completion",
+  const c2Discourse = CEFR_COVERAGE_MATRIX.descriptorRows.find(
+    (row) => row.stage === "C2" && row.skill === "discourse",
   );
 
-  assert.ok(c1TaskCompletion);
-  assert.ok(c2TaskCompletion);
-  assert.equal(c1TaskCompletion!.taskFamilies.includes("argumentation"), true);
-  assert.equal(c1TaskCompletion!.taskFamilies.includes("register_switch"), true);
-  assert.equal(c1TaskCompletion!.taskFamilies.includes("misunderstanding_repair"), true);
-  assert.equal(c2TaskCompletion!.taskFamilies.includes("argumentation"), true);
-  assert.equal(c2TaskCompletion!.taskFamilies.includes("register_switch"), true);
-  assert.equal(c2TaskCompletion!.taskFamilies.includes("misunderstanding_repair"), true);
+  assert.ok(c1Discourse);
+  assert.ok(c2Discourse);
+  assert.equal(c1Discourse!.taskFamilies.includes("argumentation"), true);
+  assert.equal(c1Discourse!.taskFamilies.includes("register_switch"), true);
+  assert.equal(c1Discourse!.taskFamilies.includes("misunderstanding_repair"), true);
+  assert.equal(c2Discourse!.taskFamilies.includes("argumentation"), true);
+  assert.equal(c2Discourse!.taskFamilies.includes("register_switch"), true);
+  assert.equal(c2Discourse!.taskFamilies.includes("misunderstanding_repair"), true);
+});
+
+test("matrix includes explicit reading and writing runtime task families", () => {
+  const hasReading = CEFR_COVERAGE_MATRIX.descriptorRows.some((row) =>
+    row.taskFamilies.includes("reading_comprehension"),
+  );
+  const hasWriting = CEFR_COVERAGE_MATRIX.descriptorRows.some((row) =>
+    row.taskFamilies.includes("writing_prompt"),
+  );
+
+  assert.equal(hasReading, true);
+  assert.equal(hasWriting, true);
 });

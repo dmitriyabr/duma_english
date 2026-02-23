@@ -2,6 +2,7 @@ import { prisma } from "./db";
 import { nextTargetNodesForStudent } from "./gse/planner/pool";
 import { projectLearnerStageFromGse } from "./gse/stageProjection";
 import { buildC2ClaimStatus } from "./claims/c2Claim";
+import { computeCoverageDebt } from "./gse/coverageDebt";
 
 type SkillTrend = {
   skillKey: string;
@@ -94,6 +95,26 @@ export async function getStudentProgress(studentId: string) {
     take: 10,
   });
   const streak = await computeStreak(studentId);
+  const [activeLesson, latestLesson] = await Promise.all([
+    prisma.lessonSession.findFirst({
+      where: { studentId, status: "active" },
+      orderBy: { startedAt: "desc" },
+      select: {
+        id: true,
+        updatedAt: true,
+      },
+    }),
+    prisma.lessonSession.findFirst({
+      where: { studentId },
+      orderBy: { startedAt: "desc" },
+      select: {
+        id: true,
+        status: true,
+        updatedAt: true,
+      },
+    }),
+  ]);
+  const coverageDebt = await computeCoverageDebt(studentId, projection.promotionStage);
 
   const gseMastery = await prisma.studentGseMastery.findMany({
     where: { studentId },
@@ -326,6 +347,14 @@ export async function getStudentProgress(studentId: string) {
     claimStatus,
     carryoverSummary: profile?.placementCarryoverJson || null,
     placementNeeded: gseMastery.length < 8,
+    coverageDebt,
+    lastLessonSummaryRef: latestLesson?.status === "completed" ? latestLesson.id : null,
+    continuityState: {
+      continueAvailable: Boolean(activeLesson),
+      activeLessonSessionId: activeLesson?.id || null,
+      lastLessonSessionId: latestLesson?.id || null,
+      lastActivityAt: (activeLesson?.updatedAt || latestLesson?.updatedAt || null)?.toISOString() || null,
+    },
     recentAttempts: attempts.map((attempt) => ({
       id: attempt.id,
       createdAt: attempt.createdAt,

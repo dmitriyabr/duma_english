@@ -65,7 +65,7 @@ export default function PlacementPage() {
 
   useEffect(() => {
     // Placement is now hidden in UX; cold-start diagnostics run inside normal tasks.
-    router.replace("/task");
+    router.replace("/lesson");
   }, [router]);
 
   useEffect(() => {
@@ -212,7 +212,7 @@ export default function PlacementPage() {
                   <div className="spacer" />
                 </>
               )}
-              <button className="btn" onClick={() => router.push("/task")}>
+              <button className="btn" onClick={() => router.push("/lesson")}>
                 Start learning
               </button>
             </>

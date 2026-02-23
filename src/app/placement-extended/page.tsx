@@ -555,7 +555,7 @@ export default function PlacementExtendedPage() {
           <div className="task-top-row">
             <div className="task-nav-mini">
               <Link href="/home">Home</Link>
-              <Link href="/task">Task</Link>
+              <Link href="/lesson">Lesson</Link>
             </div>
           </div>
 

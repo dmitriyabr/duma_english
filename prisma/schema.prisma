@@ -24,6 +24,7 @@ model Class {
   teacher   Teacher     @relation(fields: [teacherId], references: [id])
   codes     ClassCode[]
   students  Student[]
+  lessonSessions LessonSession[]
 }
 
 model ClassCode {
@@ -68,6 +69,7 @@ model Student {
   policyDecisionLogsV2 PolicyDecisionLogV2[]
   vocabulary          StudentVocabulary[]
   taskInstances       TaskInstance[]
+  lessonSessions      LessonSession[]
 
   @@index([classId])
 }
@@ -82,6 +84,7 @@ model Task {
   attempts           Attempt[]
   gseTargets         TaskGseTarget[]
   taskInstance       TaskInstance?
+  lessonSteps        LessonStep[]
   autopilotEventLogs AutopilotEventLog[]
   autopilotOutcomes  AutopilotDelayedOutcome[]
   policyDecisionLogsV2 PolicyDecisionLogV2[]
@@ -106,6 +109,7 @@ model Attempt {
   taskEvaluationJson    Json?
   aiDebugJson           Json?
   nodeOutcomesJson      Json?
+  pronunciationIssuesJson Json?
   recoveryTriggered     Boolean              @default(false)
   student               Student              @relation(fields: [studentId], references: [id])
   task                  Task                 @relation(fields: [taskId], references: [id])
@@ -121,6 +125,7 @@ model Attempt {
   autopilotEventLogs    AutopilotEventLog[]
   autopilotOutcomes     AutopilotDelayedOutcome[]
   policyDecisionLogsV2  PolicyDecisionLogV2[]
+  lessonTurns           LessonTurn[]
 
   @@index([studentId])
   @@index([status])
@@ -523,11 +528,75 @@ model TaskInstance {
   rewardTraces        RewardTrace[]
   autopilotEventLogs  AutopilotEventLog[]
   autopilotOutcomes   AutopilotDelayedOutcome[]
+  lessonSteps         LessonStep[]
   student             Student             @relation(fields: [studentId], references: [id], onDelete: Cascade)
   task                Task                @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
   @@index([studentId, createdAt])
   @@index([decisionLogId])
+}
+
+model LessonSession {
+  id               String      @id @default(cuid())
+  studentId        String
+  classId          String
+  status           String      @default("active")
+  missionJson      Json
+  progressJson     Json
+  currentStepIndex Int         @default(0)
+  currentTurnIndex Int         @default(0)
+  startedAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  completedAt      DateTime?
+  class            Class       @relation(fields: [classId], references: [id], onDelete: Cascade)
+  student          Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  steps            LessonStep[]
+
+  @@index([studentId, status])
+  @@index([classId, status])
+  @@index([startedAt])
+}
+
+model LessonStep {
+  id              String       @id @default(cuid())
+  lessonSessionId String
+  ordinal         Int
+  stepType        String
+  taskId          String?
+  taskInstanceId  String?
+  status          String       @default("pending")
+  source          String       @default("mission")
+  targetNodeIds   String[]
+  score           Float?
+  metaJson        Json?
+  startedAt       DateTime?
+  completedAt     DateTime?
+  lessonSession   LessonSession @relation(fields: [lessonSessionId], references: [id], onDelete: Cascade)
+  task            Task?         @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  taskInstance    TaskInstance? @relation(fields: [taskInstanceId], references: [id], onDelete: SetNull)
+  turns           LessonTurn[]
+
+  @@unique([lessonSessionId, ordinal])
+  @@index([lessonSessionId, ordinal])
+  @@index([lessonSessionId, status])
+}
+
+model LessonTurn {
+  id          String    @id @default(cuid())
+  lessonStepId String
+  turnIndex   Int
+  role        String
+  promptText  String?
+  attemptId   String?
+  status      String
+  evaluationJson Json?
+  createdAt   DateTime  @default(now())
+  attempt     Attempt?  @relation(fields: [attemptId], references: [id], onDelete: SetNull)
+  lessonStep  LessonStep @relation(fields: [lessonStepId], references: [id], onDelete: Cascade)
+
+  @@unique([lessonStepId, turnIndex])
+  @@index([lessonStepId, turnIndex])
+  @@index([attemptId])
 }
 
 model PromotionAudit {

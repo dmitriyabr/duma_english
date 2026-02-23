@@ -6,6 +6,12 @@ import Link from "next/link";
 type ProgressData = {
   stage?: string;
   placementNeeded?: boolean;
+  coverageDebt?: {
+    total: number;
+  };
+  continuityState?: {
+    continueAvailable: boolean;
+  };
   streak: number;
   recentAttempts: { id: string; createdAt: string; scores: { overallScore?: number } }[];
 };
@@ -33,6 +39,7 @@ export default function HomePage() {
   const stageLabel = data?.stage || "A0";
   const lastScoreLabel = typeof lastScore === "number" ? Math.round(lastScore) : "--";
   const streakLabel = data ? `${data.streak} days` : "--";
+  const continueLabel = data?.continuityState?.continueAvailable ? "Continue lesson" : "Start lesson";
 
   return (
     <div className="page task-page home-page">
@@ -45,7 +52,7 @@ export default function HomePage() {
 
           <div className="task-top-row">
             <div className="task-nav-mini">
-              <Link href="/task">Task</Link>
+              <Link href="/lesson">Lesson</Link>
               <Link href="/progress">Progress</Link>
             </div>
           </div>
@@ -113,11 +120,16 @@ export default function HomePage() {
                   <p className="task-stat-title">STAGE</p>
                   <p className="task-stat-value">{stageLabel}</p>
                 </article>
+                <article className="task-stat home-stat">
+                  <div className="task-stat-icon">🧩</div>
+                  <p className="task-stat-title">DEBT</p>
+                  <p className="task-stat-value">{data?.coverageDebt?.total ?? "--"}</p>
+                </article>
               </div>
 
               <div className="home-actions">
-                <Link className="btn task-start-btn home-main-btn" href="/task">
-                  🎤 Start a task
+                <Link className="btn task-start-btn home-main-btn" href="/lesson">
+                  🎤 {continueLabel}
                 </Link>
                 <Link className="btn home-secondary-btn" href="/placement-extended">
                   🧭 Placement quest

@@ -59,6 +59,67 @@ function toPercentConfidence(confidence: number | undefined) {
   return roundMetric(confidence * 100);
 }
 
+function buildPronunciationIssuesFromMetrics(metrics: ReturnType<typeof calculateDerivedSpeechMetrics>) {
+  const issues: Array<{
+    id: string;
+    label: string;
+    severity: "low" | "medium" | "high";
+    hint: string;
+    cue: string;
+  }> = [];
+
+  const pronunciation =
+    typeof metrics.pronunciationTargetRef === "number"
+      ? metrics.pronunciationTargetRef
+      : typeof metrics.pronunciationSelfRef === "number"
+      ? metrics.pronunciationSelfRef
+      : typeof metrics.pronunciation === "number"
+      ? metrics.pronunciation
+      : typeof metrics.accuracy === "number"
+      ? metrics.accuracy
+      : null;
+  const fluency = typeof metrics.fluency === "number" ? metrics.fluency : null;
+  const prosody = typeof metrics.prosody === "number" ? metrics.prosody : null;
+
+  function severity(value: number) {
+    if (value <= 55) return "high" as const;
+    if (value <= 70) return "medium" as const;
+    return "low" as const;
+  }
+
+  if (pronunciation !== null && pronunciation < 75) {
+    issues.push({
+      id: "sound_precision",
+      label: "Sound precision",
+      severity: severity(pronunciation),
+      hint: "Open vowel sounds clearly and keep final consonants audible.",
+      cue: "Say target words slowly once, then at normal speed.",
+    });
+  }
+
+  if (fluency !== null && fluency < 72) {
+    issues.push({
+      id: "speech_flow",
+      label: "Speech flow",
+      severity: severity(fluency),
+      hint: "Group words in short chunks and keep smooth transitions.",
+      cue: "Pause only at punctuation.",
+    });
+  }
+
+  if (prosody !== null && prosody < 70) {
+    issues.push({
+      id: "intonation_control",
+      label: "Intonation control",
+      severity: severity(prosody),
+      hint: "Stress key words and lower tone at sentence end.",
+      cue: "Mark one keyword in each sentence and stress it slightly.",
+    });
+  }
+
+  return issues.slice(0, 3);
+}
+
 function extractVocabularyUsage(taskEvaluation: { artifacts?: Record<string, unknown>; taskScore?: number }) {
   const usage = taskEvaluation.artifacts?.wordUsageCorrectness;
   if (typeof usage === "number") return usage;
@@ -562,6 +623,7 @@ async function processAttempt(attemptId: string) {
         speechMetricsJson: derivedMetrics,
         rawRecognitionJson: analysis.raw as object,
         taskEvaluationJson: evaluated.taskEvaluation as object,
+        pronunciationIssuesJson: buildPronunciationIssuesFromMetrics(derivedMetrics) as unknown as Prisma.InputJsonValue,
         aiDebugJson:
           config.worker.showAiDebug
             ? (aiDebug as Prisma.InputJsonValue)

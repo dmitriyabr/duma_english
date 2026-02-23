@@ -170,7 +170,7 @@ export default function ProgressPage() {
         <strong style={{ fontFamily: "var(--font-display)" }}>Duma Trainer</strong>
         <div className="nav-links">
           <Link href="/home">Home</Link>
-          <Link href="/task">New task</Link>
+          <Link href="/lesson">Lesson</Link>
         </div>
       </nav>
       <section className="container">

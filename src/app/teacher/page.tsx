@@ -99,6 +99,7 @@ export default function TeacherDashboardPage() {
         <strong style={{ fontFamily: "var(--font-display)" }}>Teacher</strong>
         <div className="nav-links">
           <span style={{ color: "var(--ink-2)" }}>{me?.name ?? ""}</span>
+          <Link href="/teacher/classroom">Classroom mode</Link>
           <Link href="/">Student app</Link>
           <button
             type="button"

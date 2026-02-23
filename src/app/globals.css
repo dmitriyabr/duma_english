@@ -2618,3 +2618,135 @@ select {
     filter: brightness(1);
   }
 }
+
+.lesson-page {
+  background: linear-gradient(180deg, #dce5f0 0%, #eef5ff 100%);
+}
+
+.lesson-hero {
+  padding-top: 12px;
+}
+
+.lesson-frame {
+  max-width: 980px;
+}
+
+.lesson-accent {
+  color: #2b7cff;
+}
+
+.lesson-shell {
+  margin-top: 16px;
+  display: grid;
+  gap: 12px;
+}
+
+.lesson-panel {
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 16px;
+  border: 1px solid rgba(16, 22, 47, 0.08);
+  padding: 14px;
+}
+
+.lesson-mission-header {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.lesson-meta {
+  margin: 0;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  color: #5f6e83;
+  letter-spacing: 0.03em;
+}
+
+.lesson-panel-title {
+  margin: 0 0 8px;
+  font-family: "Fredoka", var(--font-display);
+  font-size: 1.05rem;
+}
+
+.lesson-step-type {
+  margin: 0;
+  font-size: 0.75rem;
+  color: #4b67a0;
+  letter-spacing: 0.04em;
+  font-weight: 700;
+}
+
+.lesson-step-prompt {
+  margin-top: 6px;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.lesson-step-hint {
+  margin-top: 8px;
+  color: #5f6e83;
+  font-size: 0.9rem;
+}
+
+.lesson-turns {
+  display: grid;
+  gap: 8px;
+}
+
+.lesson-turn {
+  border-radius: 12px;
+  padding: 10px;
+  border: 1px solid rgba(16, 22, 47, 0.08);
+}
+
+.lesson-turn-coach {
+  background: rgba(43, 124, 255, 0.08);
+}
+
+.lesson-turn-student {
+  background: rgba(246, 189, 96, 0.12);
+}
+
+.lesson-turn-role {
+  margin: 0;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #485976;
+}
+
+.lesson-turn-text {
+  margin-top: 4px;
+  line-height: 1.4;
+}
+
+.lesson-text-box textarea {
+  width: 100%;
+}
+
+.lesson-actions {
+  display: grid;
+  gap: 10px;
+}
+
+.lesson-main-btn {
+  width: 100%;
+  font-size: 1.1rem;
+}
+
+.lesson-secondary-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 720px) {
+  .lesson-mission-header {
+    grid-template-columns: 1fr;
+  }
+
+  .lesson-secondary-row {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+}

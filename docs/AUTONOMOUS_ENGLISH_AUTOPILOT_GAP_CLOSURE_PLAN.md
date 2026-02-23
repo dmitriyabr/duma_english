@@ -404,7 +404,101 @@ Source baseline: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` + current code
   Done: бюджеты latency для planner (p95); при breach и SLO_PLANNER_ENFORCE=true поток переходит в rule-only fallback; SLO dashboard + canary.  
   Артефакт: GET /api/quality/slo-dashboard, `npm run slo:dashboard`, `npm run slo:canary`, planner useRuleOnly fallback.
 
-## 5) Финальный критерий "world-class readiness"
+## 5) Product Plan (AI-First, UX-First)
+
+Цель этого раздела: зафиксировать не только инженерные CH-артефакты, но и конечный продуктовый контур для ученика и учителя.
+
+### 5.1) Core Learning Runtime (7)
+
+| PX | Фича | Зачем нужна для быстрого обучения | Что видит ученик | Что видит учитель | Критерий готовности (DoD) |
+| --- | --- | --- | --- | --- | --- |
+| PX-01 | Lesson Mission Engine | Без миссии система оптимизирует отдельные задачи, а не цель урока | Экран миссии: цель, прогресс, оставшиеся шаги/время | Статус активной миссии по ученику | Каждый запуск ученика привязан к mission (`start -> in_progress -> done`) и имеет единый итог урока |
+| PX-02 | Multi-turn Runtime | Язык в реальности многoходовый; one-shot не покрывает repair/clarification | Диалог 5-10 ходов, а не один ответ | Видно, где ученик срывается по ходу диалога | Для `qa/role_play/repair` по умолчанию работает многoходовый сценарий |
+| PX-03 | Executable Corrective Loop (`Fix now`) | Текстовый feedback без действия плохо исправляет ошибку | Кнопка `Fix now`: мини-объяснение -> drill -> контроль | Видно, закрыта ли ошибка в этой же сессии | Критичный fail всегда запускает исполняемый цикл, а не только совет |
+| PX-04 | GSE Coverage Debt Controller | Без debt-контроля автопилот может крутить уже известные зоны | В прогрессе видно, какие GSE-зоны `unseen/under-tested` | Виден долг покрытия по доменам/стадиям | В каждом уроке есть обязательная доля шагов на закрытие coverage debt |
+| PX-05 | In-session Transfer Check | Локальный pass != перенос навыка | Сразу после pass: challenge в новом контексте | Видно transfer status на уровне урока | Урок не считается закрытым по навыку без transfer-проверки в этой же миссии |
+| PX-06 | Pronunciation Pinpoint Coach | Общие speech-скоры не дают быстрого исправления произношения | Точная ошибка (звук/ударение/ритм) + короткий drill | Видно, что именно чинится, а не только общий score | Произношение отрабатывается через конкретные паттерны и повтор до pass |
+| PX-07 | Zero-friction Flow | Паузы и лишние клики снижают темп обучения | Непрерывный поток `ответ -> результат -> следующий шаг` | Меньше простаивания на уроке | Нет "мертвых" экранов; переходы между шагами минимальны по трению |
+
+### 5.2) Full Product Loop (ещё 5)
+
+| PX | Фича | Зачем нужна для продукта целиком | Что видит ученик | Что видит учитель | Критерий готовности (DoD) |
+| --- | --- | --- | --- | --- | --- |
+| PX-08 | Fast Entry (`code -> lesson`) | Потери на входе съедают учебное время | Вход и мгновенный старт активной миссии | Быстрый запуск потока учеников | Путь `login -> first learning step` стабильно короткий |
+| PX-09 | Classroom Mode | Офлайн-классу нужен быстрый switch учеников | Чистый старт/продолжение для каждого | Быстрый свитч учеников на одном устройстве | Переключение ученика не ломает миссии и не смешивает состояния |
+| PX-10 | Live Teacher Board | Нужна картина "кто застрял прямо сейчас" | — | В реальном времени: `in_progress/stuck/retry/completed` | Доска обновляется в ходе урока и показывает actionable статусы |
+| PX-11 | Lesson Summary | Без явного итога теряется ощущение результата | "Что выучено сегодня", "что дальше" | Итог по каждому ученику/классу после урока | У каждой завершённой миссии есть единый summary |
+| PX-12 | Next-Lesson Continuity | Без continuity каждый урок начинается как "новый" | Авто-продолжение с того же места | Видно последовательную траекторию, не разрозненные сессии | Следующий вход подхватывает незакрытые блокеры и due-review контекст |
+
+### 5.3) Порядок внедрения (без календарных оценок)
+
+1. PX-01, PX-02, PX-03, PX-07 — базовый учебный runtime и темп.
+2. PX-04, PX-05, PX-06, PX-12 — глубина обучения и устойчивый прогресс.
+3. PX-08, PX-09, PX-10, PX-11 — полный classroom/product контур.
+
+### 5.4) Product Readiness Checklist (12/12)
+
+- [x] PX-01 Lesson Mission Engine.
+- [x] PX-02 Multi-turn Runtime.
+- [x] PX-03 Executable Corrective Loop.
+- [x] PX-04 GSE Coverage Debt Controller.
+- [x] PX-05 In-session Transfer Check.
+- [x] PX-06 Pronunciation Pinpoint Coach.
+- [x] PX-07 Zero-friction Flow.
+- [x] PX-08 Fast Entry.
+- [x] PX-09 Classroom Mode.
+- [x] PX-10 Live Teacher Board.
+- [x] PX-11 Lesson Summary.
+- [x] PX-12 Next-Lesson Continuity.
+
+### 5.5) Implementation Status (2026-02-23)
+
+Реализация выполнена в коде как production runtime v1 с немедленной заменой student-flow на `/lesson`.
+
+Основной runtime и API:
+- `src/app/lesson/page.tsx`
+- `src/app/api/lesson/start/route.ts`
+- `src/app/api/lesson/active/route.ts`
+- `src/app/api/lesson/[sessionId]/state/route.ts`
+- `src/app/api/lesson/[sessionId]/turn/route.ts`
+- `src/app/api/lesson/[sessionId]/fix-now/route.ts`
+- `src/app/api/lesson/[sessionId]/advance/route.ts`
+- `src/app/api/lesson/[sessionId]/finish/route.ts`
+- `src/app/api/lesson/[sessionId]/summary/route.ts`
+- `src/lib/lesson/runtime.ts`
+
+Новые контракты:
+- `src/lib/contracts/lessonRuntime.ts`
+- `src/lib/contracts/teacherLiveBoard.ts`
+- `src/lib/contracts/pronunciationPinpoint.ts`
+
+Новая data model (Prisma):
+- `LessonSession`
+- `LessonStep`
+- `LessonTurn`
+- `Attempt.pronunciationIssuesJson`
+- `prisma/migrations/20260223160000_lesson_runtime_v1/migration.sql`
+
+Teacher loop:
+- `src/app/api/teacher/classroom/route.ts`
+- `src/app/api/teacher/live-board/route.ts`
+- `src/app/teacher/classroom/page.tsx`
+- `src/lib/teacher/liveBoard.ts`
+- расширение `src/app/api/teacher/students/[studentId]/route.ts` (lastLessonSummary + liveStatus)
+
+Progress/continuity:
+- `src/lib/gse/coverageDebt.ts`
+- `src/lib/progress.ts` (coverageDebt + continuityState + lastLessonSummaryRef)
+
+Immediate replace:
+- student routes `/task`, `/record`, `/write`, `/results` переведены на redirect-to-lesson.
+
+Проверки:
+- `npm run lint` (ошибок нет, только legacy warnings в несвязанных файлах)
+- `npm run build` (успех)
+- `npm test` (71/71)
+
+## 6) Финальный критерий "world-class readiness"
 
 Режим world-class включается только когда выполнены одновременно:
 - [ ] Все `CH-01..CH-45` закрыты.
@@ -412,7 +506,7 @@ Source baseline: `docs/AUTONOMOUS_ENGLISH_AUTOPILOT_BLUEPRINT.md` + current code
 - [ ] Milestone promotion в production реально опирается на `mastery + transfer + retention`.
 - [ ] C2 claims подтверждены по 4 modality (speaking/listening/reading/writing) с CEFR coverage contract.
 
-## 6) Универсальный промпт для запуска агента
+## 7) Универсальный промпт для запуска агента
 
 Используй этот шаблон (замени только `OWNER_NAME`):
 

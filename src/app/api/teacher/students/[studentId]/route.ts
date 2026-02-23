@@ -66,7 +66,7 @@ export async function GET(
     100
   );
 
-  const [recentAttempts, fullMasteryRows, attemptsWithOutcomes] = await Promise.all([
+  const [recentAttempts, fullMasteryRows, attemptsWithOutcomes, activeLessonSession, latestLessonSession] = await Promise.all([
     prisma.attempt.findMany({
       where: { studentId, status: "completed" },
       orderBy: { createdAt: "desc" },
@@ -101,6 +101,47 @@ export async function GET(
       orderBy: { createdAt: "desc" },
       take: outcomesLimit,
       select: { id: true, createdAt: true, nodeOutcomesJson: true },
+    }),
+    prisma.lessonSession.findFirst({
+      where: { studentId, status: "active" },
+      orderBy: { startedAt: "desc" },
+      select: {
+        id: true,
+        status: true,
+        updatedAt: true,
+        steps: {
+          orderBy: { ordinal: "asc" },
+          select: {
+            ordinal: true,
+            stepType: true,
+            status: true,
+            source: true,
+          },
+        },
+      },
+    }),
+    prisma.lessonSession.findFirst({
+      where: { studentId },
+      orderBy: { startedAt: "desc" },
+      select: {
+        id: true,
+        status: true,
+        startedAt: true,
+        updatedAt: true,
+        completedAt: true,
+        missionJson: true,
+        progressJson: true,
+        steps: {
+          orderBy: { ordinal: "asc" },
+          select: {
+            ordinal: true,
+            stepType: true,
+            status: true,
+            source: true,
+            score: true,
+          },
+        },
+      },
     }),
   ]);
 
@@ -333,6 +374,36 @@ export async function GET(
     })),
   };
 
+  const latestMission = latestLessonSession?.missionJson && typeof latestLessonSession.missionJson === "object"
+    ? (latestLessonSession.missionJson as Record<string, unknown>)
+    : {};
+  const latestProgress = latestLessonSession?.progressJson && typeof latestLessonSession.progressJson === "object"
+    ? (latestLessonSession.progressJson as Record<string, unknown>)
+    : {};
+  const transferPassed =
+    latestProgress.transferPassed === true ||
+    latestLessonSession?.steps.some((step) => step.stepType === "transfer" && step.status === "passed") ||
+    false;
+  const correctiveTriggered = typeof latestProgress.correctiveTriggered === "number"
+    ? latestProgress.correctiveTriggered
+    : latestLessonSession?.steps.filter((step) => step.source === "corrective").length || 0;
+  const activeStep =
+    activeLessonSession?.steps.find((step) => step.status === "active") ||
+    activeLessonSession?.steps.find((step) => step.status === "pending") ||
+    null;
+  const staleMinutes = activeLessonSession
+    ? Math.round((Date.now() - activeLessonSession.updatedAt.getTime()) / 60000)
+    : 0;
+  const liveStatus = !activeLessonSession
+    ? latestLessonSession?.status === "completed"
+      ? "completed"
+      : "idle"
+    : activeStep?.source === "corrective" || activeStep?.stepType === "drill"
+    ? "retry_loop"
+    : staleMinutes >= 8
+    ? "stuck"
+    : "in_progress";
+
   return NextResponse.json({
     student: {
       id: student.id,
@@ -355,6 +426,39 @@ export async function GET(
     })),
     fullMastery,
     recentNodeOutcomes: recentNodeOutcomes.slice(0, 80),
+    lastLessonSummary: latestLessonSession
+      ? {
+          lessonSessionId: latestLessonSession.id,
+          status: latestLessonSession.status,
+          missionTitle:
+            typeof latestMission.title === "string" ? latestMission.title : "Lesson mission",
+          goal:
+            typeof latestMission.goal === "string"
+              ? latestMission.goal
+              : "Practice and transfer in one lesson.",
+          transferPassed,
+          correctiveTriggered,
+          coverageDebtAfter:
+            latestProgress.coverageDebtAfter && typeof latestProgress.coverageDebtAfter === "object"
+              ? latestProgress.coverageDebtAfter
+              : null,
+          updatedAt: latestLessonSession.updatedAt.toISOString(),
+          completedAt: latestLessonSession.completedAt?.toISOString() || null,
+        }
+      : null,
+    liveStatus: {
+      status: liveStatus,
+      lessonSessionId: activeLessonSession?.id || null,
+      stepType: activeStep?.stepType || null,
+      stepOrdinal: typeof activeStep?.ordinal === "number" ? activeStep.ordinal : null,
+      blockerLabel:
+        liveStatus === "stuck"
+          ? `No progress for ${staleMinutes} min`
+          : liveStatus === "retry_loop"
+          ? "Fix-now loop"
+          : null,
+      updatedAt: activeLessonSession?.updatedAt.toISOString() || null,
+    },
     domainBundleBlockers,
     domainPromotionPath,
     copilot,

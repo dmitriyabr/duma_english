@@ -136,11 +136,6 @@ function stepTypeLabel(stepType: LessonStepView["stepType"]) {
   return "Final scene";
 }
 
-function displayTurnText(turn: LessonStepView["turns"][number]) {
-  if (turn.promptText) return turn.promptText;
-  return turn.role === "coach" ? "Guide is ready." : "Your line was sent.";
-}
-
 export default function LessonPage() {
   const [runtime, setRuntime] = useState<RuntimeStatePayload | null>(null);
   const [summary, setSummary] = useState<LessonSummaryView | null>(null);
@@ -227,6 +222,13 @@ export default function LessonPage() {
     if (runtime.activeStep.stepType === "drill") return "Tiny retry, then keep going.";
     return "Say your next line.";
   }, [runtime?.activeStep]);
+
+  const visibleTurns = useMemo(() => {
+    if (!activeStep) return [];
+    return activeStep.turns
+      .slice(-6)
+      .filter((turn) => turn.role === "coach" || Boolean(turn.promptText?.trim()));
+  }, [activeStep]);
 
   async function refreshState() {
     if (!sessionId) return;
@@ -568,13 +570,13 @@ export default function LessonPage() {
             </section>
 
             <section className="lesson-panel">
-              <p className="lesson-panel-title">Chat story</p>
-              {activeStep?.turns.length ? (
+              <p className="lesson-panel-title">Turns</p>
+              {visibleTurns.length ? (
                 <div className="lesson-turns">
-                  {activeStep.turns.slice(-6).map((turn) => (
+                  {visibleTurns.map((turn) => (
                     <article key={turn.id} className={`lesson-turn ${turn.role === "coach" ? "lesson-turn-coach" : "lesson-turn-student"}`}>
                       <p className="lesson-turn-role">{turn.role === "coach" ? "Guide" : "You"}</p>
-                      <p className="lesson-turn-text">{displayTurnText(turn)}</p>
+                      <p className="lesson-turn-text">{turn.promptText}</p>
                     </article>
                   ))}
                 </div>

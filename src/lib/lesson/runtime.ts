@@ -49,6 +49,14 @@ function asNumber(value: unknown, fallback: number) {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
 
+function compactTurnText(value: string | null | undefined, maxChars = 180) {
+  if (typeof value !== "string") return null;
+  const compact = value.replace(/\s+/g, " ").trim();
+  if (!compact) return null;
+  if (compact.length <= maxChars) return compact;
+  return `${compact.slice(0, maxChars - 1).trim()}...`;
+}
+
 function toJsonValue(value: unknown): Prisma.InputJsonValue {
   return JSON.parse(JSON.stringify(value ?? null)) as Prisma.InputJsonValue;
 }
@@ -122,15 +130,19 @@ function mapTurnView(turn: {
   role: string;
   promptText: string | null;
   attemptId: string | null;
+  attempt?: {
+    transcript: string | null;
+  } | null;
   status: string;
   evaluationJson: unknown;
   createdAt: Date;
 }): LessonTurnView {
+  const fallbackTranscript = turn.role === "student" ? compactTurnText(turn.attempt?.transcript) : null;
   return {
     id: turn.id,
     turnIndex: turn.turnIndex,
     role: turn.role === "coach" ? "coach" : "student",
-    promptText: turn.promptText,
+    promptText: turn.promptText || fallbackTranscript,
     attemptId: turn.attemptId,
     status: turn.status,
     evaluation: turn.evaluationJson ? (asObject(turn.evaluationJson) as Record<string, unknown>) : null,
@@ -155,6 +167,9 @@ function mapStepView(step: {
     role: string;
     promptText: string | null;
     attemptId: string | null;
+    attempt?: {
+      transcript: string | null;
+    } | null;
     status: string;
     evaluationJson: unknown;
     createdAt: Date;
@@ -245,6 +260,13 @@ async function loadLessonSessionOrThrow(sessionId: string, studentId: string) {
         include: {
           turns: {
             orderBy: { turnIndex: "asc" },
+            include: {
+              attempt: {
+                select: {
+                  transcript: true,
+                },
+              },
+            },
           },
           task: {
             select: {
@@ -631,6 +653,7 @@ export async function submitLessonTurn(params: {
     select: {
       id: true,
       status: true,
+      transcript: true,
       scoresJson: true,
       feedbackJson: true,
       speechMetricsJson: true,
@@ -683,12 +706,12 @@ export async function submitLessonTurn(params: {
   const newTurnIndex = step.turns.length;
   const coachPrompt =
     engine.nextAction === "fix_now"
-      ? "Tiny retry. Say it again."
+      ? "Try again now."
       : engine.nextAction === "next_turn"
-      ? "Nice. One more line."
+      ? "Continue."
       : engine.nextAction === "transfer_step"
-      ? "Great. New scene now."
-      : "Level clear.";
+      ? "New scene."
+      : "Scene done.";
 
   await prisma.$transaction(async (tx) => {
     await tx.lessonTurn.create({
@@ -697,6 +720,7 @@ export async function submitLessonTurn(params: {
         turnIndex: newTurnIndex,
         role: "student",
         attemptId: attempt.id,
+        promptText: compactTurnText(attempt.transcript),
         status: attempt.status,
         evaluationJson: {
           mode: params.mode,

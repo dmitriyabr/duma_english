@@ -23,7 +23,7 @@ import {
 } from "@/lib/policy/fastLane";
 import { isPlannerSloBreached } from "@/lib/quality/sloDashboard";
 import {
-  buildImmediateSelfRepairPrompt,
+  buildImmediateSelfRepairPromptGenerated,
   findPendingImmediateSelfRepairCycle,
   SELF_REPAIR_IMMEDIATE_LOOP_VERSION,
 } from "@/lib/selfRepair/immediateLoop";
@@ -453,7 +453,7 @@ export async function GET(req: Request) {
 
   let prompt = generated.prompt;
   if (pendingImmediateSelfRepair) {
-    prompt = buildImmediateSelfRepairPrompt({
+    prompt = await buildImmediateSelfRepairPromptGenerated({
       sourcePrompt: pendingImmediateSelfRepair.sourcePrompt,
       causeLabel: pendingImmediateSelfRepair.causeLabel,
       feedback: pendingImmediateSelfRepair.feedback,

@@ -1,3 +1,6 @@
+import { chatJson } from "@/lib/llm";
+import { config } from "@/lib/config";
+
 export type CausalCoachCard = {
   reasonTitle: string;
   reasonBody: string;
@@ -60,3 +63,80 @@ export function buildChildCausalCoach(topLabel: string | null | undefined): Caus
   return COACH_BY_LABEL[key] || DEFAULT_CAUSAL_COACH;
 }
 
+function asRecord(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return value as Record<string, unknown>;
+}
+
+function asString(value: unknown) {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function compact(value: string | null | undefined, maxChars = 140) {
+  if (!value) return null;
+  const text = value.replace(/\s+/g, " ").trim();
+  if (!text) return null;
+  if (text.length <= maxChars) return text;
+  return `${text.slice(0, maxChars - 1).trim()}...`;
+}
+
+export async function buildChildCausalCoachGenerated(params: {
+  topLabel: string | null | undefined;
+  taskPrompt?: string | null;
+  transcript?: string | null;
+  feedback?: unknown;
+}): Promise<CausalCoachCard> {
+  const fallback = buildChildCausalCoach(params.topLabel);
+  const apiKey = config.openai.apiKey;
+  if (!apiKey) return fallback;
+
+  const feedback = asRecord(params.feedback);
+  const feedbackSummary =
+    asString(feedback.summary) ||
+    asString(feedback.message) ||
+    asString(feedback.short) ||
+    null;
+
+  const system = [
+    "You are a child English coach.",
+    "Return strict JSON only: {\"reasonTitle\":\"...\",\"reasonBody\":\"...\",\"nextAction\":\"...\"}.",
+    "Keep it specific and actionable.",
+    "No jargon and no generic praise.",
+    "reasonTitle max 4 words; reasonBody max 12 words; nextAction max 10 words.",
+  ].join(" ");
+
+  const user = [
+    `causeLabel=${params.topLabel || "unknown"}`,
+    `taskPrompt=${params.taskPrompt || "n/a"}`,
+    `learnerTranscript=${params.transcript || "n/a"}`,
+    `feedbackHint=${feedbackSummary || "n/a"}`,
+    `fallbackReasonTitle=${fallback.reasonTitle}`,
+    `fallbackReasonBody=${fallback.reasonBody}`,
+    `fallbackNextAction=${fallback.nextAction}`,
+  ].join("\n");
+
+  try {
+    const raw = await chatJson(system, user, {
+      openaiApiKey: apiKey,
+      model: config.openai.model,
+      temperature: 0.2,
+      maxTokens: 120,
+      runName: "child_causal_coach",
+      tags: ["causal", "coach"],
+    });
+    const parsed = JSON.parse(raw) as {
+      reasonTitle?: unknown;
+      reasonBody?: unknown;
+      nextAction?: unknown;
+    };
+    const reasonTitle = compact(asString(parsed.reasonTitle), 40);
+    const reasonBody = compact(asString(parsed.reasonBody), 120);
+    const nextAction = compact(asString(parsed.nextAction), 80);
+    if (!reasonTitle || !reasonBody || !nextAction) return fallback;
+    return { reasonTitle, reasonBody, nextAction };
+  } catch {
+    return fallback;
+  }
+}

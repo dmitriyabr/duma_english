@@ -959,7 +959,7 @@ export async function triggerFixNow(params: {
     sourcePrompt: step.task.prompt,
     issues,
   });
-  const correctivePrompt = buildCorrectivePrompt({
+  const correctivePrompt = await buildCorrectivePrompt({
     sourcePrompt: step.task.prompt,
     causeLabel: null,
     feedback: attempt.feedbackJson,

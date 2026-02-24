@@ -1,4 +1,4 @@
-import { buildImmediateSelfRepairPrompt } from "@/lib/selfRepair/immediateLoop";
+import { buildImmediateSelfRepairPromptGenerated } from "@/lib/selfRepair/immediateLoop";
 import type { PronunciationDrillPlan, PronunciationIssue } from "@/lib/contracts/pronunciationPinpoint";
 
 function asObject(value: unknown): Record<string, unknown> {
@@ -112,13 +112,13 @@ export function buildPronunciationDrillPlan(params: {
   };
 }
 
-export function buildCorrectivePrompt(params: {
+export async function buildCorrectivePrompt(params: {
   sourcePrompt: string;
   causeLabel: string | null;
   feedback: unknown;
   drillPlan: PronunciationDrillPlan;
 }) {
-  const base = buildImmediateSelfRepairPrompt({
+  const base = await buildImmediateSelfRepairPromptGenerated({
     sourcePrompt: params.sourcePrompt,
     causeLabel: params.causeLabel,
     feedback: params.feedback,

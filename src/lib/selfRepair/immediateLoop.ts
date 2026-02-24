@@ -1,5 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { chatJson } from "@/lib/llm";
+import { config } from "@/lib/config";
 import {
   SELF_REPAIR_BUDGET_GUARDRAILS_VERSION,
   SELF_REPAIR_ESCALATION_QUEUE_TYPE,
@@ -366,4 +368,55 @@ export function buildImmediateSelfRepairPrompt(params: {
   return `Immediate self-repair retry. ${causeHint} ${feedbackHint} Repeat the same task with a corrected answer: ${params.sourcePrompt}`
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function compactPromptLine(value: string | null | undefined, maxChars = 260) {
+  if (typeof value !== "string") return null;
+  const compact = value.replace(/\s+/g, " ").trim();
+  if (!compact) return null;
+  if (compact.length <= maxChars) return compact;
+  return `${compact.slice(0, maxChars - 1).trim()}...`;
+}
+
+export async function buildImmediateSelfRepairPromptGenerated(params: {
+  sourcePrompt: string;
+  causeLabel: string | null;
+  feedback: unknown;
+}): Promise<string> {
+  const fallback = buildImmediateSelfRepairPrompt(params);
+  const apiKey = config.openai.apiKey;
+  if (!apiKey) return fallback;
+
+  const feedback = asRecord(params.feedback);
+  const feedbackMessage = asString(feedback.message) || asString(feedback.short) || null;
+
+  const system = [
+    "You write one immediate retry task prompt for a child English learner.",
+    "Return strict JSON only: {\"prompt\":\"...\"}.",
+    "One short instruction sentence.",
+    "Action only, no abstract explanations, no jargon.",
+  ].join(" ");
+
+  const user = [
+    `sourcePrompt=${params.sourcePrompt}`,
+    `causeLabel=${params.causeLabel || "unknown"}`,
+    `feedbackHint=${feedbackMessage || "fix the main mistake"}`,
+    `fallback=${fallback}`,
+  ].join("\n");
+
+  try {
+    const raw = await chatJson(system, user, {
+      openaiApiKey: apiKey,
+      model: config.openai.model,
+      temperature: 0.2,
+      maxTokens: 120,
+      runName: "immediate_self_repair_prompt",
+      tags: ["self_repair", "prompt"],
+    });
+    const parsed = JSON.parse(raw) as { prompt?: unknown };
+    const prompt = compactPromptLine(typeof parsed.prompt === "string" ? parsed.prompt : null, 320);
+    return prompt || fallback;
+  } catch {
+    return fallback;
+  }
 }

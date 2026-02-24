@@ -1,5 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { chatJson } from "@/lib/llm";
+import { config } from "@/lib/config";
 import {
   assignTaskTargetsFromCatalog,
   createTaskInstance,
@@ -82,6 +84,110 @@ function attemptScore(scoresJson: unknown) {
   const taskScore = typeof scores.taskScore === "number" ? scores.taskScore : null;
   const overallScore = typeof scores.overallScore === "number" ? scores.overallScore : null;
   return taskScore ?? overallScore;
+}
+
+function shortCoachText(value: string | null | undefined) {
+  if (typeof value !== "string") return null;
+  const compact = value.replace(/\s+/g, " ").trim();
+  if (!compact) return null;
+  const clipped = compact.length > 110 ? `${compact.slice(0, 109).trim()}...` : compact;
+  return clipped;
+}
+
+function extractQuotedHints(text: string) {
+  const result: string[] = [];
+  const re = /['"]([^'"]{2,40})['"]/g;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(text))) {
+    const value = (match[1] || "").trim();
+    if (value && !result.includes(value)) result.push(value);
+  }
+  return result;
+}
+
+function buildCoachFallback(params: {
+  nextAction: LessonNextAction;
+  taskPrompt: string;
+  transcript: string | null;
+  existingStudentTurns: number;
+}) {
+  if (params.nextAction === "fix_now") return "Try again. Clear and short.";
+  if (params.nextAction === "transfer_step") return "Great. New scene now.";
+  if (params.nextAction === "step_done") return "Scene complete.";
+
+  const transcript = (params.transcript || "").toLowerCase();
+  const prompt = params.taskPrompt.toLowerCase();
+
+  const hints = extractQuotedHints(params.taskPrompt);
+  const missingHint = hints.find((hint) => !transcript.includes(hint.toLowerCase()));
+  if (missingHint) {
+    return `Use: "${missingHint}".`;
+  }
+
+  const needsQuestion = prompt.includes("ask") || prompt.includes("question");
+  const hasQuestion = /\?/.test(params.transcript || "");
+  if (needsQuestion && !hasQuestion) {
+    return "Ask one clear question.";
+  }
+
+  const needsOrder = prompt.includes("order");
+  const hasOrderPhrase = /(i would like|i'd like|can i have)/i.test(params.transcript || "");
+  if (needsOrder && !hasOrderPhrase) {
+    return `Order with "I'd like..."`;
+  }
+
+  if (params.existingStudentTurns <= 1) return "Add one more detail.";
+  return "One final line.";
+}
+
+async function buildCoachPrompt(params: {
+  nextAction: LessonNextAction;
+  stepType: LessonStepView["stepType"];
+  taskPrompt: string;
+  transcript: string | null;
+  existingStudentTurns: number;
+}) {
+  const fallback = buildCoachFallback({
+    nextAction: params.nextAction,
+    taskPrompt: params.taskPrompt,
+    transcript: params.transcript,
+    existingStudentTurns: params.existingStudentTurns,
+  });
+
+  const apiKey = config.openai.apiKey;
+  if (!apiKey) return fallback;
+
+  const system = [
+    "You are a child English speaking coach.",
+    "Return strict JSON: {\"coach_line\":\"...\"}.",
+    "One sentence only, max 10 words.",
+    "Concrete next action only. No praise fluff.",
+    "No educational jargon.",
+  ].join(" ");
+
+  const user = [
+    `nextAction=${params.nextAction}`,
+    `stepType=${params.stepType}`,
+    `taskPrompt=${params.taskPrompt}`,
+    `learnerTranscript=${params.transcript || "n/a"}`,
+    `fallbackHint=${fallback}`,
+  ].join("\n");
+
+  try {
+    const raw = await chatJson(system, user, {
+      openaiApiKey: apiKey,
+      model: config.openai.model,
+      temperature: 0.2,
+      maxTokens: 60,
+      runName: "lesson_coach_prompt",
+      tags: ["lesson", "coach"],
+    });
+    const parsed = JSON.parse(raw) as { coach_line?: unknown };
+    const line = shortCoachText(typeof parsed.coach_line === "string" ? parsed.coach_line : null);
+    return line || fallback;
+  } catch {
+    return fallback;
+  }
 }
 
 function buildStepTaskView(step: {
@@ -704,14 +810,13 @@ export async function submitLessonTurn(params: {
   });
 
   const newTurnIndex = step.turns.length;
-  const coachPrompt =
-    engine.nextAction === "fix_now"
-      ? "Try again now."
-      : engine.nextAction === "next_turn"
-      ? "Continue."
-      : engine.nextAction === "transfer_step"
-      ? "New scene."
-      : "Scene done.";
+  const coachPrompt = await buildCoachPrompt({
+    nextAction: engine.nextAction,
+    stepType: step.stepType,
+    taskPrompt: step.task.prompt,
+    transcript: attempt.transcript,
+    existingStudentTurns,
+  });
 
   await prisma.$transaction(async (tx) => {
     await tx.lessonTurn.create({

@@ -41,7 +41,7 @@ export function buildLessonSummary(params: {
   return {
     sessionId: params.session.id,
     status: params.session.status,
-    missionTitle: typeof params.session.mission.title === "string" ? params.session.mission.title : "Lesson mission",
+    missionTitle: typeof params.session.mission.title === "string" ? params.session.mission.title : "Mission",
     goalCoverage: {
       completedSteps,
       totalSteps,

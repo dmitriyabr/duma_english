@@ -219,18 +219,18 @@ function buildMissionHeader(session: LessonSessionView): LessonMissionHeaderView
 
   const cta =
     !activeStep
-      ? "Finish lesson"
+      ? "Finish"
       : activeStep.stepType === "drill"
-      ? "Fix now"
+      ? "Retry line"
       : activeStep.stepType === "transfer"
-      ? "Do transfer"
-      : "Send voice turn";
+      ? "Next scene"
+      : "Start";
 
   return {
-    title: asString(mission.title, "Lesson mission"),
-    goal: asString(mission.goal, "Practice now and transfer in a new context."),
-    stepLabel: activeStep ? `Step ${activeStep.ordinal + 1}` : "Done",
-    progressLabel: `${completedSteps}/${totalSteps}`,
+    title: asString(mission.title, "Mission"),
+    goal: asString(mission.goal, "Scene one now. Scene two next."),
+    stepLabel: activeStep ? `Level ${activeStep.ordinal + 1} / ${totalSteps}` : "Mission done",
+    progressLabel: `${completedSteps} stars`,
     primaryCta: cta,
     coverageDebt: extractCoverageDebtFromProgress(session.progress),
   };
@@ -452,11 +452,6 @@ export async function startLessonRuntime(params: {
 
   const primaryTaskType = pickPrimaryTaskType(stage);
   const transferTaskType = pickTransferTaskType(primaryTaskType, stage);
-  const missionSeed = buildLessonMissionSeed({
-    stage,
-    coverageDebt: coverageDebtBefore,
-    primaryTaskType,
-  });
 
   const [dialogueTask, transferTask] = await Promise.all([
     createLessonTask({
@@ -478,6 +473,14 @@ export async function startLessonRuntime(params: {
       preferredNodeIds,
     }),
   ]);
+
+  const missionSeed = buildLessonMissionSeed({
+    stage,
+    coverageDebt: coverageDebtBefore,
+    primaryTaskType,
+    primaryPrompt: dialogueTask.task.prompt,
+    transferPrompt: transferTask.task.prompt,
+  });
 
   const session = await prisma.lessonSession.create({
     data: {
@@ -529,7 +532,7 @@ export async function startLessonRuntime(params: {
         metaJson: buildTransferMeta({
           fromTaskType: primaryTaskType,
           toTaskType: transferTaskType,
-          reason: "Skill must transfer to a new context in the same lesson.",
+          reason: "New scene with the same skill.",
         }) as Prisma.InputJsonValue,
       },
       {
@@ -541,7 +544,7 @@ export async function startLessonRuntime(params: {
         targetNodeIds: preferredNodeIds,
         metaJson: {
           autoSummaryStep: true,
-          cardTitle: "Lesson wrap-up",
+          cardTitle: "Mission recap",
         } as Prisma.InputJsonValue,
       },
     ],
@@ -680,12 +683,12 @@ export async function submitLessonTurn(params: {
   const newTurnIndex = step.turns.length;
   const coachPrompt =
     engine.nextAction === "fix_now"
-      ? "We fix this now. One short drill, then repeat."
+      ? "Tiny retry. Say it again."
       : engine.nextAction === "next_turn"
-      ? "Good. One more turn."
+      ? "Nice. One more line."
       : engine.nextAction === "transfer_step"
-      ? "Nice. Now do it in a new context."
-      : "Step complete. Move on.";
+      ? "Great. New scene now."
+      : "Level clear.";
 
   await prisma.$transaction(async (tx) => {
     await tx.lessonTurn.create({

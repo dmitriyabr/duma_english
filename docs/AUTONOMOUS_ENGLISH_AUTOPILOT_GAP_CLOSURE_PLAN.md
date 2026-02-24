@@ -498,6 +498,23 @@ Immediate replace:
 - `npm run build` (успех)
 - `npm test` (71/71)
 
+### 5.6) Child Copy Runtime (2026-02-24)
+
+Обновлен принцип student-facing текста в `/lesson`: никакого методического UI-copy (`gap/transfer/coverage`) в основном child-path.
+
+Что изменено:
+- Mission title/goal теперь собираются из **реально сгенерированных** task prompt (`dialogue + transfer`), а не из фиксированной фразы:
+  - `src/lib/lesson/mission.ts`
+  - интеграция в `src/lib/lesson/runtime.ts`
+- UI `/lesson` переведен на story/scene wording:
+  - `src/app/lesson/page.tsx`
+- Summary wording приведен к child-readable формату:
+  - `src/lib/lesson/summary.ts`
+
+Инвариант:
+- Педагогическая логика (`coverage debt`, `transfer gate`, `corrective loop`) остается в runtime state и оценке,
+  но не показывается ребенку в виде "взрослых" терминов на главном экране урока.
+
 ## 6) Финальный критерий "world-class readiness"
 
 Режим world-class включается только когда выполнены одновременно:

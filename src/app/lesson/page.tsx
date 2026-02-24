@@ -129,6 +129,18 @@ function countWords(text: string) {
     .filter(Boolean).length;
 }
 
+function stepTypeLabel(stepType: LessonStepView["stepType"]) {
+  if (stepType === "dialogue") return "Story scene";
+  if (stepType === "drill") return "Retry scene";
+  if (stepType === "transfer") return "Bonus scene";
+  return "Final scene";
+}
+
+function displayTurnText(turn: LessonStepView["turns"][number]) {
+  if (turn.promptText) return turn.promptText;
+  return turn.role === "coach" ? "Guide is ready." : "Your line was sent.";
+}
+
 export default function LessonPage() {
   const [runtime, setRuntime] = useState<RuntimeStatePayload | null>(null);
   const [summary, setSummary] = useState<LessonSummaryView | null>(null);
@@ -210,10 +222,10 @@ export default function LessonPage() {
   }, []);
 
   const stepHint = useMemo(() => {
-    if (!runtime?.activeStep) return "All steps done.";
-    if (runtime.activeStep.stepType === "transfer") return "New context. Show transfer.";
-    if (runtime.activeStep.stepType === "drill") return "Fix now: short correction drill.";
-    return "Voice-first: one turn at a time.";
+    if (!runtime?.activeStep) return "You did it. Tap Finish.";
+    if (runtime.activeStep.stepType === "transfer") return "New place, same skill.";
+    if (runtime.activeStep.stepType === "drill") return "Tiny retry, then keep going.";
+    return "Say your next line.";
   }, [runtime?.activeStep]);
 
   async function refreshState() {
@@ -489,11 +501,11 @@ export default function LessonPage() {
   const mainActionDisabled = busy || !runtime;
   const recording = status === "Recording";
   const actionLabel = recording
-    ? "Stop and Send"
+    ? "Stop and send"
     : canRecord
-    ? "Hold Voice Turn"
+    ? "Start recording"
     : canUseText
-    ? "Submit Text Turn"
+    ? "Send answer"
     : "Continue";
 
   if (!runtime && !error) {
@@ -501,8 +513,8 @@ export default function LessonPage() {
       <div className="page task-page lesson-page">
         <section className="task-hero">
           <div className="task-mobile-frame">
-            <p className="task-kicker">🎧 LESSON</p>
-            <h1 className="task-title-main">Loading lesson...</h1>
+            <p className="task-kicker">MISSION</p>
+            <h1 className="task-title-main">Preparing your mission...</h1>
           </div>
         </section>
       </div>
@@ -520,9 +532,9 @@ export default function LessonPage() {
             </div>
           </div>
 
-          <p className="task-kicker">🎧 LESSON MISSION</p>
-          <h1 className="task-title-main">{runtime?.missionHeader.title || "Lesson mission"}</h1>
-          <h2 className="task-title-accent lesson-accent">{runtime?.missionHeader.goal || "Practice now"}</h2>
+          <p className="task-kicker">MISSION</p>
+          <h1 className="task-title-main">{runtime?.missionHeader.title || "Your mission"}</h1>
+          <h2 className="task-title-accent lesson-accent">{runtime?.missionHeader.goal || "Start scene one."}</h2>
 
           {error && <p className="task-error">{error}</p>}
 
@@ -533,52 +545,52 @@ export default function LessonPage() {
                 <strong>{runtime?.missionHeader.progressLabel}</strong>
               </div>
               <div>
-                <p className="lesson-meta">Coverage debt</p>
-                <strong>{runtime?.missionHeader.coverageDebt.total || 0}</strong>
+                <p className="lesson-meta">Bonus scene</p>
+                <strong>{runtime?.runtimeState.transferPassed ? "Done" : "Next"}</strong>
               </div>
               <div>
                 <p className="lesson-meta">Mode</p>
-                <strong>Voice-first</strong>
+                <strong>Voice first</strong>
               </div>
             </section>
 
             <section className="lesson-panel">
-              <p className="lesson-panel-title">Current step</p>
+              <p className="lesson-panel-title">Your scene</p>
               {activeStep ? (
                 <>
-                  <p className="lesson-step-type">{activeStep.stepType.toUpperCase()}</p>
-                  <p className="lesson-step-prompt">{task?.prompt || "No task prompt"}</p>
+                  <p className="lesson-step-type">{stepTypeLabel(activeStep.stepType)}</p>
+                  <p className="lesson-step-prompt">{task?.prompt || "Scene is loading."}</p>
                   <p className="lesson-step-hint">{stepHint}</p>
                 </>
               ) : (
-                <p className="lesson-step-hint">No active step. You can finish lesson.</p>
+                <p className="lesson-step-hint">Great run. You can finish now.</p>
               )}
             </section>
 
             <section className="lesson-panel">
-              <p className="lesson-panel-title">Dialogue timeline</p>
+              <p className="lesson-panel-title">Chat story</p>
               {activeStep?.turns.length ? (
                 <div className="lesson-turns">
                   {activeStep.turns.slice(-6).map((turn) => (
                     <article key={turn.id} className={`lesson-turn ${turn.role === "coach" ? "lesson-turn-coach" : "lesson-turn-student"}`}>
-                      <p className="lesson-turn-role">{turn.role === "coach" ? "Coach" : "You"}</p>
-                      <p className="lesson-turn-text">{turn.promptText || turn.status}</p>
+                      <p className="lesson-turn-role">{turn.role === "coach" ? "Guide" : "You"}</p>
+                      <p className="lesson-turn-text">{displayTurnText(turn)}</p>
                     </article>
                   ))}
                 </div>
               ) : (
-                <p className="lesson-step-hint">No turns yet. Start with your first response.</p>
+                <p className="lesson-step-hint">No lines yet. Say your first line.</p>
               )}
             </section>
 
             <section className="lesson-panel">
-              <p className="lesson-panel-title">Input</p>
+              <p className="lesson-panel-title">Say it</p>
               {canUseText ? (
                 <div className="lesson-text-box">
                   <textarea
                     value={draft}
                     onChange={(event) => setDraft(event.target.value)}
-                    placeholder="Write your response"
+                    placeholder="Type your line..."
                     rows={5}
                     disabled={busy}
                   />
@@ -587,7 +599,7 @@ export default function LessonPage() {
               ) : (
                 <div className="lesson-voice-box">
                   <p className="lesson-step-hint">Timer: {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, "0")}</p>
-                  <p className="lesson-step-hint">Status: {status}</p>
+                  <p className="lesson-step-hint">Mic: {status}</p>
                 </div>
               )}
             </section>
@@ -608,7 +620,7 @@ export default function LessonPage() {
                   void startRecording();
                 }}
               >
-                {busy ? "Working..." : actionLabel}
+                {busy ? "Checking..." : actionLabel}
               </button>
 
               <div className="lesson-secondary-row">
@@ -619,7 +631,7 @@ export default function LessonPage() {
                     void handleFixNow();
                   }}
                 >
-                  Fix now
+                  Retry line
                 </button>
                 <button
                   className="btn ghost"
@@ -628,7 +640,7 @@ export default function LessonPage() {
                     void handleAdvance("next_step");
                   }}
                 >
-                  Next step
+                  Next scene
                 </button>
                 <button
                   className="btn ghost"
@@ -637,22 +649,23 @@ export default function LessonPage() {
                     void handleFinishLesson();
                   }}
                 >
-                  Finish lesson
+                  Finish mission
                 </button>
               </div>
             </section>
 
             {summary && (
               <section className="lesson-panel lesson-summary">
-                <p className="lesson-panel-title">Lesson summary</p>
+                <p className="lesson-panel-title">Mission recap</p>
                 <p className="lesson-step-hint">
-                  Goal coverage: {Math.round(summary.goalCoverage.ratio * 100)}% | Transfer: {summary.transfer.passed ? "pass" : "pending"}
+                  Stars: {summary.goalCoverage.completedSteps}/{summary.goalCoverage.totalSteps} | Bonus scene:{" "}
+                  {summary.transfer.passed ? "done" : "next"}
                 </p>
                 <p className="lesson-step-hint">
-                  Corrective loops: {summary.corrective.triggeredCount} (resolved {summary.corrective.resolvedCount})
+                  Retries won: {summary.corrective.resolvedCount}/{summary.corrective.triggeredCount}
                 </p>
                 <p className="lesson-step-hint">
-                  Next focus: {summary.nextFocus.join(", ") || "Keep practicing"}
+                  Next quest: {summary.nextFocus.join(", ") || "Keep going"}
                 </p>
               </section>
             )}
